@@ -102,12 +102,15 @@ export default function BookCourt() {
 
   async function createPaymentIntent() {
     try {
+      const [startTime, endTime] = timeSlot.split('-').map((t: string) => t.trim());
+      
       const response = await supabase.functions.invoke('create-payment-intent', {
         body: {
-          amount: court.base_price,
+          courtId: court.id,
           courtName: court.name,
           date: format(date, 'yyyy-MM-dd'),
-          time: timeSlot,
+          startTime,
+          endTime,
         },
       });
 

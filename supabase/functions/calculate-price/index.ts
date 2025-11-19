@@ -6,25 +6,82 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Input validation
+const validatePriceRequest = (data: any) => {
+  if (!data.courtId || typeof data.courtId !== 'string') {
+    throw new Error('Invalid courtId');
+  }
+  if (!data.date || typeof data.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(data.date)) {
+    throw new Error('Invalid date format (expected YYYY-MM-DD)');
+  }
+  if (!data.startTime || typeof data.startTime !== 'string' || !/^\d{2}:\d{2}$/.test(data.startTime)) {
+    throw new Error('Invalid startTime format (expected HH:MM)');
+  }
+  if (!data.endTime || typeof data.endTime !== 'string' || !/^\d{2}:\d{2}$/.test(data.endTime)) {
+    throw new Error('Invalid endTime format (expected HH:MM)');
+  }
+  
+  // Validate that endTime is after startTime
+  if (data.endTime <= data.startTime) {
+    throw new Error('End time must be after start time');
+  }
+  
+  // Validate date is not in the past
+  const bookingDate = new Date(data.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (bookingDate < today) {
+    throw new Error('Cannot book dates in the past');
+  }
+  
+  // Validate reasonable booking duration (max 12 hours)
+  const start = new Date(`2000-01-01T${data.startTime}`);
+  const end = new Date(`2000-01-01T${data.endTime}`);
+  const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+  if (hours > 12) {
+    throw new Error('Booking duration cannot exceed 12 hours');
+  }
+  if (hours <= 0) {
+    throw new Error('Invalid booking duration');
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { courtId, date, startTime, endTime } = await req.json();
-
-    if (!courtId || !date || !startTime || !endTime) {
-      throw new Error('Missing required parameters');
+    // Authenticate user
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Missing authorization header");
     }
 
     const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const { courtId, date, startTime, endTime } = await req.json();
+
+    // Validate inputs
+    validatePriceRequest({ courtId, date, startTime, endTime });
+
+    // Use service role key for database queries
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Get court base price
-    const { data: court, error: courtError } = await supabase
+    const { data: court, error: courtError } = await supabaseAdmin
       .from('courts')
       .select('base_price')
       .eq('id', courtId)
@@ -43,7 +100,7 @@ serve(async (req) => {
     const dayOfWeek = new Date(date).getDay();
 
     // Get active pricing rules for this court
-    const { data: pricingRules, error: rulesError } = await supabase
+    const { data: pricingRules, error: rulesError } = await supabaseAdmin
       .from('pricing_rules')
       .select('*')
       .eq('court_id', courtId)
@@ -83,7 +140,7 @@ serve(async (req) => {
     }
 
     // Check for holidays
-    const { data: holiday, error: holidayError } = await supabase
+    const { data: holiday, error: holidayError } = await supabaseAdmin
       .from('holidays')
       .select('*')
       .eq('date', date)
