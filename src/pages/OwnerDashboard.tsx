@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, DollarSign } from 'lucide-react';
+import { Loader2, Building2, Calendar, DollarSign, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { CourtForm } from '@/components/CourtForm';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -17,6 +19,7 @@ export default function OwnerDashboard() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState(0);
+  const [showCourtForm, setShowCourtForm] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -120,7 +123,17 @@ export default function OwnerDashboard() {
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Building2 className="mb-4 h-12 w-12 text-muted-foreground" />
                   <p className="mb-4 text-muted-foreground">No courts listed yet</p>
-                  <Button>Add Your First Court</Button>
+                  <Dialog open={showCourtForm} onOpenChange={setShowCourtForm}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Your First Court
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <CourtForm />
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
               </Card>
             ) : (
