@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Courts from "./pages/Courts";
@@ -54,25 +55,25 @@ const App = () => (
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute allowedRole="customer">
                   <Dashboard />
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               }
             />
             <Route
               path="/owner"
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute allowedRole="court_owner">
                   <OwnerDashboard />
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               }
             />
             <Route
               path="/admin"
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute allowedRole="admin">
                   <AdminDashboard />
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               }
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
