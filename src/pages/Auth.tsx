@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
+import { RoleBasedRedirect } from '@/components/RoleBasedRedirect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,11 +22,9 @@ export default function Auth() {
   const [showTestAccounts, setShowTestAccounts] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   if (user) {
-    navigate('/courts');
-    return null;
+    return <RoleBasedRedirect />;
   }
 
   const quickLogin = (testEmail: string) => {
@@ -95,8 +93,6 @@ export default function Auth() {
         description: error.message || 'Please check your credentials and try again.',
         variant: 'destructive',
       });
-    } else {
-      navigate('/courts');
     }
   };
 
@@ -144,7 +140,6 @@ export default function Auth() {
         title: 'Account created!',
         description: 'Welcome to CourtBook. Redirecting...',
       });
-      navigate('/courts');
     }
   };
 

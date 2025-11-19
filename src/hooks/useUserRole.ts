@@ -17,14 +17,22 @@ export function useUserRole() {
         return;
       }
 
+      // Fetch all roles for the user
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', user.id)
-        .single();
+        .eq('user_id', user.id);
 
-      if (!error && data) {
-        setRole(data.role as UserRole);
+      if (!error && data && data.length > 0) {
+        // Priority: admin > court_owner > customer
+        const roles = data.map(r => r.role as UserRole);
+        if (roles.includes('admin')) {
+          setRole('admin');
+        } else if (roles.includes('court_owner')) {
+          setRole('court_owner');
+        } else {
+          setRole('customer');
+        }
       }
       setLoading(false);
     }
