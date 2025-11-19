@@ -293,12 +293,20 @@ export default function CourtDetail() {
                 )}
 
                 <Button
-                  className="w-full"
+                  className="w-full text-lg py-6"
+                  size="lg"
                   onClick={handleBooking}
                   disabled={!selectedDate || !selectedTime}
                 >
-                  Continue to Payment
+                  {!selectedDate || !selectedTime 
+                    ? 'Select Date & Time' 
+                    : 'Continue to Payment'}
                 </Button>
+                {selectedDate && selectedTime && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Ready to book! Click above to proceed with payment
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

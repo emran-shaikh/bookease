@@ -219,6 +219,9 @@ export default function Auth() {
                   </Button>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                💡 First time? Sign up with customer/owner emails in the Sign Up tab to activate their roles
+              </p>
               <p className="text-xs text-muted-foreground">
                 Note: Create these accounts via sign up first, then they will automatically get the correct roles.
               </p>
