@@ -1,0 +1,333 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
+import { useUserRole } from '@/hooks/useUserRole';
+import { Header } from '@/components/Header';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+
+export default function AdminDashboard() {
+  const { user } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [pendingCourts, setPendingCourts] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState({
+    totalCourts: 0,
+    totalBookings: 0,
+    totalRevenue: 0,
+    activeUsers: 0,
+  });
+
+  useEffect(() => {
+    if (!roleLoading && !isAdmin) {
+      navigate('/');
+      toast({
+        title: 'Access Denied',
+        description: 'You do not have permission to access this page',
+        variant: 'destructive',
+      });
+    }
+  }, [isAdmin, roleLoading, navigate, toast]);
+
+  useEffect(() => {
+    if (user && isAdmin) {
+      fetchAdminData();
+    }
+  }, [user, isAdmin]);
+
+  async function fetchAdminData() {
+    try {
+      const [courtsData, usersData, bookingsData, statsData] = await Promise.all([
+        supabase.from('courts').select('*, profiles(full_name, email)').eq('status', 'pending'),
+        supabase.from('profiles').select('*, user_roles(role)'),
+        supabase.from('bookings').select('*'),
+        supabase.from('courts').select('*'),
+      ]);
+
+      if (courtsData.error) throw courtsData.error;
+      if (usersData.error) throw usersData.error;
+      if (bookingsData.error) throw bookingsData.error;
+      if (statsData.error) throw statsData.error;
+
+      setPendingCourts(courtsData.data || []);
+      setUsers(usersData.data || []);
+
+      const totalRevenue = bookingsData.data
+        ?.filter((b: any) => b.payment_status === 'succeeded')
+        .reduce((sum: number, b: any) => sum + parseFloat(b.total_price), 0) || 0;
+
+      setAnalytics({
+        totalCourts: statsData.data?.length || 0,
+        totalBookings: bookingsData.data?.length || 0,
+        totalRevenue,
+        activeUsers: usersData.data?.length || 0,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error loading data',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateCourtStatus(courtId: string, status: 'approved' | 'rejected') {
+    try {
+      const { error } = await supabase
+        .from('courts')
+        .update({ status })
+        .eq('id', courtId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `Court ${status} successfully`,
+      });
+
+      fetchAdminData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }
+
+  async function updateUserRole(userId: string, newRole: 'admin' | 'court_owner' | 'customer') {
+    try {
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (existingRole) {
+        const { error } = await supabase
+          .from('user_roles')
+          .update({ role: newRole })
+          .eq('user_id', userId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('user_roles')
+          .insert({ user_id: userId, role: newRole });
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'User role updated successfully',
+      });
+
+      fetchAdminData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }
+
+  if (loading || roleLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      
+      <main className="container py-8">
+        <div className="mb-8">
+          <h1 className="mb-2 text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Manage courts, users, and view analytics</p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-4 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Courts</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analytics.totalCourts}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analytics.totalBookings}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${analytics.totalRevenue.toFixed(2)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analytics.activeUsers}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="courts" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="courts">Pending Courts</TabsTrigger>
+            <TabsTrigger value="users">User Management</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="courts">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Court Approvals</CardTitle>
+                <CardDescription>Review and approve new court listings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pendingCourts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No pending courts</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Court Name</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Location</TableHead>
+                        <TableHead>Sport</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingCourts.map((court) => (
+                        <TableRow key={court.id}>
+                          <TableCell className="font-medium">{court.name}</TableCell>
+                          <TableCell>{court.profiles?.full_name || court.profiles?.email}</TableCell>
+                          <TableCell>{court.city}, {court.state}</TableCell>
+                          <TableCell>{court.sport_type}</TableCell>
+                          <TableCell>${court.base_price}/hr</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => updateCourtStatus(court.id, 'approved')}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => updateCourtStatus(court.id, 'rejected')}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="users">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>Manage user roles and permissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Current Role</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.full_name || 'N/A'}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {user.user_roles?.[0]?.role || 'customer'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateUserRole(user.id, 'customer')}
+                            >
+                              Customer
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateUserRole(user.id, 'court_owner')}
+                            >
+                              Owner
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => updateUserRole(user.id, 'admin')}
+                            >
+                              Admin
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
+}
