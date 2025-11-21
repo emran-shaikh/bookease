@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useSlotLock } from '@/hooks/useSlotLock';
+import { useProfileCompletion } from '@/hooks/useProfileCompletion';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ export default function CourtDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isProfileComplete, loading: profileLoading } = useProfileCompletion();
   const [court, setCourt] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -118,6 +120,16 @@ export default function CourtDetail() {
         variant: 'destructive',
       });
       navigate('/auth');
+      return;
+    }
+
+    // Check if profile is complete
+    if (isProfileComplete === false) {
+      toast({
+        title: 'Complete your profile',
+        description: 'Please complete your profile before booking',
+      });
+      navigate(`/complete-profile?return=/courts/${id}`);
       return;
     }
 
