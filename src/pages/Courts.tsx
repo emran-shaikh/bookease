@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, MapPin, Star, Search } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
+import { Loader2, MapPin, Star, Search, Navigation } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Court {
@@ -18,20 +20,68 @@ interface Court {
   city: string;
   base_price: number;
   images: string[];
+  latitude: number | null;
+  longitude: number | null;
   rating?: number;
   reviews_count?: number;
+  distance?: number;
+}
+
+interface UserLocation {
+  latitude: number;
+  longitude: number;
+}
+
+// Calculate distance between two coordinates using Haversine formula
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 export default function Courts() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sportFilter, setSportFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
+  const [priceRange, setPriceRange] = useState([0, 200]);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchCourts();
+    getUserLocation();
   }, []);
+
+  async function getUserLocation() {
+    if (!navigator.geolocation) {
+      setLocationLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setLocationLoading(false);
+      },
+      (error) => {
+        console.log('Location access denied:', error);
+        setLocationLoading(false);
+      }
+    );
+  }
 
   async function fetchCourts() {
     try {
@@ -52,12 +102,32 @@ export default function Courts() {
           ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length
           : 0;
         
+        let distance = undefined;
+        if (userLocation && court.latitude && court.longitude) {
+          distance = calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            court.latitude,
+            court.longitude
+          );
+        }
+        
         return {
           ...court,
           rating: avgRating,
           reviews_count: ratings.length,
+          distance,
         };
       });
+
+      // Sort by distance if user location is available
+      if (userLocation) {
+        courtsWithRatings.sort((a, b) => {
+          if (a.distance === undefined) return 1;
+          if (b.distance === undefined) return -1;
+          return a.distance - b.distance;
+        });
+      }
 
       setCourts(courtsWithRatings);
     } catch (error: any) {
@@ -71,11 +141,22 @@ export default function Courts() {
     }
   }
 
-  const filteredCourts = courts.filter(court =>
-    court.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    court.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    court.sport_type.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Get unique sport types and locations
+  const sportTypes = ['all', ...new Set(courts.map(c => c.sport_type))];
+  const locations = ['all', ...new Set(courts.map(c => c.city))];
+
+  const filteredCourts = courts.filter(court => {
+    const matchesSearch = 
+      court.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      court.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      court.sport_type.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesSport = sportFilter === 'all' || court.sport_type === sportFilter;
+    const matchesLocation = locationFilter === 'all' || court.city === locationFilter;
+    const matchesPrice = court.base_price >= priceRange[0] && court.base_price <= priceRange[1];
+    
+    return matchesSearch && matchesSport && matchesLocation && matchesPrice;
+  });
 
   if (loading) {
     return (
@@ -95,14 +176,64 @@ export default function Courts() {
           <p className="text-muted-foreground">Find and book sports venues near you</p>
         </div>
 
-        <div className="mb-6 flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, city, or sport..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+        <div className="mb-6 space-y-4">
+          {userLocation && !locationLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Navigation className="h-4 w-4 text-primary" />
+              <span>Showing courts near your location</span>
+            </div>
+          )}
+          
+          <div className="flex flex-col gap-4 lg:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search courts..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Select value={sportFilter} onValueChange={setSportFilter}>
+              <SelectTrigger className="w-full lg:w-[200px]">
+                <SelectValue placeholder="All Sports" />
+              </SelectTrigger>
+              <SelectContent>
+                {sportTypes.map(sport => (
+                  <SelectItem key={sport} value={sport}>
+                    {sport === 'all' ? 'All Sports' : sport}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-full lg:w-[200px]">
+                <SelectValue placeholder="Location..." />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.map(location => (
+                  <SelectItem key={location} value={location}>
+                    {location === 'all' ? 'All Locations' : location}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Price Range</span>
+              <span className="font-medium">${priceRange[0]} - ${priceRange[1]}</span>
+            </div>
+            <Slider
+              value={priceRange}
+              onValueChange={setPriceRange}
+              min={0}
+              max={200}
+              step={10}
+              className="w-full"
             />
           </div>
         </div>
@@ -135,6 +266,9 @@ export default function Courts() {
                   <div className="flex items-center text-sm text-muted-foreground">
                     <MapPin className="mr-1 h-4 w-4" />
                     {court.city}, {court.location}
+                    {court.distance && (
+                      <span className="ml-2 text-primary">• {court.distance.toFixed(1)}km away</span>
+                    )}
                   </div>
                   {court.rating > 0 && (
                     <div className="flex items-center text-sm">
