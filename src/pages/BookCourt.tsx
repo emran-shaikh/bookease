@@ -181,7 +181,21 @@ export default function BookCourt() {
         notes: notes || null,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Check if it's a duplicate booking error
+        if (error.message.includes('overlaps with an existing booking') || 
+            error.message.includes('unique_booking_slot')) {
+          toast({
+            title: 'Slot Already Booked',
+            description: 'Someone just booked this slot. Your payment has not been processed.',
+            variant: 'destructive',
+          });
+        } else {
+          throw error;
+        }
+        navigate(`/courts/${id}`);
+        return;
+      }
 
       // Release the lock after successful booking
       const lock = getCurrentUserLock(startTime, endTime);
@@ -190,15 +204,15 @@ export default function BookCourt() {
       }
 
       toast({
-        title: 'Booking confirmed!',
-        description: 'Your court has been successfully booked.',
+        title: '🎉 Booking Confirmed!',
+        description: `Your court is booked for ${format(date, 'MMM d, yyyy')} at ${timeSlot}`,
       });
       
       navigate('/dashboard');
     } catch (error: any) {
       toast({
-        title: 'Error creating booking',
-        description: error.message,
+        title: 'Booking Error',
+        description: error.message || 'Failed to create booking. Please contact support.',
         variant: 'destructive',
       });
     } finally {
