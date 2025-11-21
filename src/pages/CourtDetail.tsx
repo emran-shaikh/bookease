@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useSlotLock } from '@/hooks/useSlotLock';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, MapPin, Star, Clock } from 'lucide-react';
+import { Loader2, MapPin, Star, Clock, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -19,10 +20,13 @@ export default function CourtDetail() {
   const { toast } = useToast();
   const [court, setCourt] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [bookingLoading, setBookingLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [selectedTime, setSelectedTime] = useState('');
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
+  
+  const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(id || '', selectedDate || null);
 
   useEffect(() => {
     if (id) {
@@ -100,10 +104,13 @@ export default function CourtDetail() {
   ];
 
   const isSlotAvailable = (slot: string) => {
-    return !bookedSlots.includes(slot) && !blockedSlots.includes(slot);
+    const [startTime, endTime] = slot.split('-');
+    return !bookedSlots.includes(slot) && 
+           !blockedSlots.includes(slot) && 
+           !isSlotLocked(startTime, endTime);
   };
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     if (!user) {
       toast({
         title: 'Sign in required',
@@ -123,13 +130,51 @@ export default function CourtDetail() {
       return;
     }
 
-    navigate(`/book/${id}`, {
-      state: {
-        court,
-        date: selectedDate,
-        timeSlot: selectedTime,
-      },
-    });
+    setBookingLoading(true);
+
+    try {
+      const [startTime, endTime] = selectedTime.split('-');
+      
+      // Check if slot is already locked by current user
+      const existingLock = getCurrentUserLock(startTime, endTime);
+      
+      if (!existingLock) {
+        // Create a new slot lock
+        const lock = await lockSlot(startTime, endTime);
+        
+        if (!lock) {
+          toast({
+            title: 'Slot unavailable',
+            description: 'This slot was just booked. Please select another time.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        toast({
+          title: 'Slot reserved!',
+          description: 'You have 5 minutes to complete payment',
+        });
+      }
+
+      // Navigate to booking page
+      navigate(`/book/${id}`, {
+        state: {
+          court,
+          date: selectedDate,
+          timeSlot: selectedTime,
+          lockId: existingLock?.id,
+        },
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
   if (loading) {
@@ -296,15 +341,25 @@ export default function CourtDetail() {
                   className="w-full text-lg py-6"
                   size="lg"
                   onClick={handleBooking}
-                  disabled={!selectedDate || !selectedTime}
+                  disabled={!selectedDate || !selectedTime || bookingLoading}
                 >
-                  {!selectedDate || !selectedTime 
-                    ? 'Select Date & Time' 
-                    : 'Continue to Payment'}
+                  {bookingLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Reserving slot...
+                    </>
+                  ) : !selectedDate || !selectedTime ? (
+                    'Select Date & Time'
+                  ) : (
+                    <>
+                      <Lock className="mr-2 h-4 w-4" />
+                      Reserve & Continue
+                    </>
+                  )}
                 </Button>
                 {selectedDate && selectedTime && (
                   <p className="text-sm text-muted-foreground text-center">
-                    Ready to book! Click above to proceed with payment
+                    Slot will be reserved for 5 minutes
                   </p>
                 )}
               </CardContent>
