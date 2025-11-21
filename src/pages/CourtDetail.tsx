@@ -39,6 +39,51 @@ export default function CourtDetail() {
   useEffect(() => {
     if (selectedDate && id) {
       fetchBookedSlots();
+      
+      // Set up real-time subscription for bookings
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const channel = supabase
+        .channel(`court-bookings-${id}-${dateStr}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bookings',
+            filter: `court_id=eq.${id}`
+          },
+          (payload) => {
+            console.log('Booking change detected:', payload);
+            // Refresh booked slots when any booking changes
+            fetchBookedSlots();
+            
+            // Show notification for new bookings
+            if (payload.eventType === 'INSERT') {
+              toast({
+                title: 'Slot Just Booked',
+                description: 'A slot was just booked by another user. The calendar has been updated.',
+              });
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'slot_locks',
+            filter: `court_id=eq.${id}`
+          },
+          (payload) => {
+            console.log('Slot lock change detected:', payload);
+            fetchBookedSlots();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [selectedDate, id]);
 
@@ -112,6 +157,14 @@ export default function CourtDetail() {
            !isSlotLocked(startTime, endTime);
   };
 
+  const getSlotStatus = (slot: string) => {
+    const [startTime, endTime] = slot.split('-');
+    if (bookedSlots.includes(slot)) return { status: 'booked', label: 'Booked', color: 'destructive' };
+    if (blockedSlots.includes(slot)) return { status: 'blocked', label: 'Blocked', color: 'secondary' };
+    if (isSlotLocked(startTime, endTime)) return { status: 'locked', label: 'Reserved', color: 'outline' };
+    return { status: 'available', label: 'Available', color: 'default' };
+  };
+
   const handleBooking = async () => {
     if (!user) {
       toast({
@@ -146,6 +199,30 @@ export default function CourtDetail() {
 
     try {
       const [startTime, endTime] = selectedTime.split('-');
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Double-check slot availability before locking
+      const { data: existingBookings, error: checkError } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('court_id', id)
+        .eq('booking_date', dateStr)
+        .eq('start_time', startTime)
+        .eq('end_time', endTime)
+        .in('status', ['confirmed', 'pending']);
+
+      if (checkError) throw checkError;
+
+      if (existingBookings && existingBookings.length > 0) {
+        toast({
+          title: 'Slot Unavailable',
+          description: 'This slot was just booked by another user. Please select a different time.',
+          variant: 'destructive',
+        });
+        // Refresh slots to show updated availability
+        await fetchBookedSlots();
+        return;
+      }
       
       // Check if slot is already locked by current user
       const existingLock = getCurrentUserLock(startTime, endTime);
@@ -156,16 +233,17 @@ export default function CourtDetail() {
         
         if (!lock) {
           toast({
-            title: 'Slot unavailable',
-            description: 'This slot was just booked. Please select another time.',
+            title: 'Slot Unavailable',
+            description: 'This time slot is currently being reserved by another user. Please try again in a moment or select a different time.',
             variant: 'destructive',
           });
+          await fetchBookedSlots();
           return;
         }
 
         toast({
-          title: 'Slot reserved!',
-          description: 'You have 5 minutes to complete payment',
+          title: '🎉 Slot Reserved!',
+          description: 'You have 5 minutes to complete your booking',
         });
       }
 
@@ -180,8 +258,8 @@ export default function CourtDetail() {
       });
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'Booking Error',
+        description: error.message || 'Unable to reserve slot. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -318,6 +396,23 @@ export default function CourtDetail() {
                 {selectedDate && (
                   <div>
                     <label className="mb-2 block text-sm font-medium">Select Time</label>
+                    
+                    {/* Legend */}
+                    <div className="mb-3 flex flex-wrap gap-2 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="h-3 w-3 rounded-full bg-primary/20 border border-primary" />
+                        <span>Available</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="h-3 w-3 rounded-full bg-destructive/20 border border-destructive" />
+                        <span>Booked</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="h-3 w-3 rounded-full bg-muted border border-border" />
+                        <span>Reserved</span>
+                      </div>
+                    </div>
+
                     <Select value={selectedTime} onValueChange={setSelectedTime}>
                       <SelectTrigger>
                         <SelectValue placeholder="Choose a time slot">
@@ -330,22 +425,40 @@ export default function CourtDetail() {
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {timeSlots.map((slot) => (
-                          <SelectItem
-                            key={slot}
-                            value={slot}
-                            disabled={!isSlotAvailable(slot)}
-                          >
-                            <div className="flex items-center justify-between w-full">
-                              <span>{slot}</span>
-                              {!isSlotAvailable(slot) && (
-                                <Badge variant="secondary" className="ml-2">Unavailable</Badge>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
+                        {timeSlots.map((slot) => {
+                          const slotStatus = getSlotStatus(slot);
+                          return (
+                            <SelectItem
+                              key={slot}
+                              value={slot}
+                              disabled={!isSlotAvailable(slot)}
+                              className="cursor-pointer"
+                            >
+                              <div className="flex items-center justify-between w-full gap-3">
+                                <span className={!isSlotAvailable(slot) ? 'text-muted-foreground' : ''}>{slot}</span>
+                                <Badge 
+                                  variant={slotStatus.status === 'available' ? 'outline' : slotStatus.color as any}
+                                  className={
+                                    slotStatus.status === 'booked' ? 'bg-destructive/10 text-destructive border-destructive' :
+                                    slotStatus.status === 'locked' ? 'bg-muted text-muted-foreground' :
+                                    'bg-primary/10 text-primary border-primary'
+                                  }
+                                >
+                                  {slotStatus.label}
+                                </Badge>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
+
+                    {/* Show slot counts */}
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      {bookedSlots.length + blockedSlots.length > 0 && (
+                        <p>{bookedSlots.length} slot{bookedSlots.length !== 1 ? 's' : ''} booked • {timeSlots.length - bookedSlots.length - blockedSlots.length} available</p>
+                      )}
+                    </div>
                   </div>
                 )}
 
