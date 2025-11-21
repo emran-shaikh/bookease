@@ -92,15 +92,32 @@ export default function Index() {
 
       if (error) throw error;
 
-      let courtsWithDistance = data || [];
+      let courtsWithDistance: Court[] = (data || []).map(court => ({
+        ...court,
+        distance: undefined
+      }));
 
+      // Calculate distance for all courts if user location is available
       if (userLocation) {
         courtsWithDistance = courtsWithDistance.map(court => ({
           ...court,
           distance: court.latitude && court.longitude 
             ? calculateDistance(userLocation.lat, userLocation.lng, court.latitude, court.longitude)
-            : undefined
-        })).sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity));
+            : Infinity // Courts without coordinates go to the end
+        }));
+        
+        // Sort by distance (nearest first)
+        courtsWithDistance.sort((a, b) => {
+          const distA = a.distance ?? Infinity;
+          const distB = b.distance ?? Infinity;
+          return distA - distB;
+        });
+
+        console.log('Courts sorted by distance:', courtsWithDistance.map(c => ({ 
+          name: c.name, 
+          city: c.city,
+          distance: c.distance 
+        })));
       }
 
       setCourts(courtsWithDistance);
@@ -205,8 +222,17 @@ export default function Index() {
       court.base_price >= priceRange[0] && court.base_price <= priceRange[1]
     );
 
+    // Maintain distance-based sorting after filtering
+    if (userLocation) {
+      filtered.sort((a, b) => {
+        const distA = a.distance ?? Infinity;
+        const distB = b.distance ?? Infinity;
+        return distA - distB;
+      });
+    }
+
     setFilteredCourts(filtered);
-  }, [searchQuery, selectedSport, selectedLocation, priceRange, courts]);
+  }, [searchQuery, selectedSport, selectedLocation, priceRange, courts, userLocation]);
 
   const uniqueCities = Array.from(new Set(courts.map(court => court.city)));
   const uniqueSports = Array.from(new Set(courts.map(court => court.sport_type)));
@@ -332,6 +358,85 @@ export default function Index() {
           </CardContent>
         </Card>
 
+        {/* Courts Grid */}
+        <section className="pb-16">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-foreground mb-2">Available Courts</h2>
+            <p className="text-muted-foreground">
+              {filteredCourts.length} {filteredCourts.length === 1 ? 'court' : 'courts'} found
+              {userLocation && ' • Sorted by distance'}
+            </p>
+          </div>
+
+          {loading ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <Card key={i} className="animate-pulse">
+                  <div className="h-48 bg-muted" />
+                  <CardHeader>
+                    <div className="h-6 bg-muted rounded w-3/4" />
+                    <div className="h-4 bg-muted rounded w-1/2 mt-2" />
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : filteredCourts.length === 0 ? (
+            <Card className="p-12 text-center">
+              <MapPin className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No courts found</h3>
+              <p className="text-muted-foreground">Try adjusting your filters to see more results</p>
+            </Card>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredCourts.map((court) => (
+                <Card 
+                  key={court.id} 
+                  className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+                  onClick={() => handleCourtClick(court.id)}
+                >
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={court.images?.[0] || sportImages[court.sport_type.toLowerCase()] || sportImages.tennis}
+                      alt={court.name}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    />
+                    <div className="absolute top-3 right-3">
+                      <Badge className="bg-primary/90 backdrop-blur-sm">
+                        {court.sport_type}
+                      </Badge>
+                    </div>
+                    {court.distance !== undefined && (
+                      <div className="absolute bottom-3 left-3">
+                        <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {court.distance.toFixed(1)} km away
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  <CardHeader>
+                    <CardTitle className="line-clamp-1">{court.name}</CardTitle>
+                    <CardDescription className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      {court.city}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardFooter className="flex justify-between items-center">
+                    <div className="flex items-center gap-1 text-lg font-bold text-primary">
+                      <DollarSign className="h-5 w-5" />
+                      {court.base_price}
+                      <span className="text-sm font-normal text-muted-foreground">/hour</span>
+                    </div>
+                    <Button variant="outline" size="sm">
+                      View Details
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+
         {/* Popular Courts Carousel */}
         {popularCourts.length > 0 && (
           <section className="pb-16">
@@ -418,85 +523,6 @@ export default function Index() {
             </Carousel>
           </section>
         )}
-
-        {/* Courts Grid */}
-        <section className="pb-16">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-foreground mb-2">Available Courts</h2>
-            <p className="text-muted-foreground">
-              {filteredCourts.length} {filteredCourts.length === 1 ? 'court' : 'courts'} found
-              {userLocation && ' • Sorted by distance'}
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map(i => (
-                <Card key={i} className="animate-pulse">
-                  <div className="h-48 bg-muted" />
-                  <CardHeader>
-                    <div className="h-6 bg-muted rounded w-3/4" />
-                    <div className="h-4 bg-muted rounded w-1/2 mt-2" />
-                  </CardHeader>
-                </Card>
-              ))}
-            </div>
-          ) : filteredCourts.length === 0 ? (
-            <Card className="p-12 text-center">
-              <MapPin className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No courts found</h3>
-              <p className="text-muted-foreground">Try adjusting your filters to see more results</p>
-            </Card>
-          ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredCourts.map((court) => (
-                <Card 
-                  key={court.id} 
-                  className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-                  onClick={() => handleCourtClick(court.id)}
-                >
-                  <div className="relative h-48 overflow-hidden">
-                    <img
-                      src={court.images?.[0] || sportImages[court.sport_type.toLowerCase()] || sportImages.tennis}
-                      alt={court.name}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                    <div className="absolute top-3 right-3">
-                      <Badge className="bg-primary/90 backdrop-blur-sm">
-                        {court.sport_type}
-                      </Badge>
-                    </div>
-                    {court.distance !== undefined && (
-                      <div className="absolute bottom-3 left-3">
-                        <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          {court.distance.toFixed(1)} km away
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                  <CardHeader>
-                    <CardTitle className="line-clamp-1">{court.name}</CardTitle>
-                    <CardDescription className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      {court.city}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardFooter className="flex justify-between items-center">
-                    <div className="flex items-center gap-1 text-lg font-bold text-primary">
-                      <DollarSign className="h-5 w-5" />
-                      {court.base_price}
-                      <span className="text-sm font-normal text-muted-foreground">/hour</span>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
 
         {/* Features Section */}
         <section className="grid gap-8 pt-8 pb-16 sm:grid-cols-2 lg:grid-cols-4">
