@@ -348,6 +348,57 @@ export type Database = {
           },
         ]
       }
+      slot_locks: {
+        Row: {
+          booking_date: string
+          court_id: string
+          created_at: string
+          end_time: string
+          expires_at: string
+          id: string
+          locked_at: string
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          booking_date: string
+          court_id: string
+          created_at?: string
+          end_time: string
+          expires_at?: string
+          id?: string
+          locked_at?: string
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          booking_date?: string
+          court_id?: string
+          created_at?: string
+          end_time?: string
+          expires_at?: string
+          id?: string
+          locked_at?: string
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slot_locks_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slot_locks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -382,6 +433,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_slot_locks: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
