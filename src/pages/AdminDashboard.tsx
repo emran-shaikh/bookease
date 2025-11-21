@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -19,7 +20,9 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [pendingCourts, setPendingCourts] = useState<any[]>([]);
+  const [allCourts, setAllCourts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState({
     totalCourts: 0,
     totalBookings: 0,
@@ -46,27 +49,29 @@ export default function AdminDashboard() {
 
   async function fetchAdminData() {
     try {
-      const [courtsData, usersData, bookingsData, statsData] = await Promise.all([
+      const [courtsData, allCourtsData, usersData, bookingsData] = await Promise.all([
         supabase.from('courts').select('*, profiles(full_name, email)').eq('status', 'pending'),
+        supabase.from('courts').select('*, profiles(full_name, email)'),
         supabase.from('profiles').select('*, user_roles(role)'),
-        supabase.from('bookings').select('*'),
-        supabase.from('courts').select('*'),
+        supabase.from('bookings').select('*, courts(name), profiles(full_name, email)'),
       ]);
 
       if (courtsData.error) throw courtsData.error;
+      if (allCourtsData.error) throw allCourtsData.error;
       if (usersData.error) throw usersData.error;
       if (bookingsData.error) throw bookingsData.error;
-      if (statsData.error) throw statsData.error;
 
       setPendingCourts(courtsData.data || []);
+      setAllCourts(allCourtsData.data || []);
       setUsers(usersData.data || []);
+      setBookings(bookingsData.data || []);
 
       const totalRevenue = bookingsData.data
         ?.filter((b: any) => b.payment_status === 'succeeded')
         .reduce((sum: number, b: any) => sum + parseFloat(b.total_price), 0) || 0;
 
       setAnalytics({
-        totalCourts: statsData.data?.length || 0,
+        totalCourts: allCourtsData.data?.length || 0,
         totalBookings: bookingsData.data?.length || 0,
         totalRevenue,
         activeUsers: usersData.data?.length || 0,
@@ -108,26 +113,22 @@ export default function AdminDashboard() {
 
   async function updateUserRole(userId: string, newRole: 'admin' | 'court_owner' | 'customer') {
     try {
-      const { data: existingRole } = await supabase
+      const { data: existingRoles } = await supabase
         .from('user_roles')
         .select('*')
-        .eq('user_id', userId)
-        .single();
+        .eq('user_id', userId);
 
-      if (existingRole) {
-        const { error } = await supabase
-          .from('user_roles')
-          .update({ role: newRole })
-          .eq('user_id', userId);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('user_roles')
-          .insert({ user_id: userId, role: newRole });
-
-        if (error) throw error;
+      if (existingRoles && existingRoles.length > 0) {
+        // Delete all existing roles
+        await supabase.from('user_roles').delete().eq('user_id', userId);
       }
+
+      // Insert new role
+      const { error } = await supabase
+        .from('user_roles')
+        .insert({ user_id: userId, role: newRole });
+
+      if (error) throw error;
 
       toast({
         title: 'Success',
@@ -163,7 +164,7 @@ export default function AdminDashboard() {
       <main className="container py-8">
         <div className="mb-8">
           <h1 className="mb-2 text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">Manage courts, users, and view analytics</p>
+          <p className="text-muted-foreground">Manage courts, users, and monitor platform activity</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-4 mb-8">
@@ -174,6 +175,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{analytics.totalCourts}</div>
+              <p className="text-xs text-muted-foreground">{pendingCourts.length} pending approval</p>
             </CardContent>
           </Card>
           <Card>
@@ -208,7 +210,9 @@ export default function AdminDashboard() {
         <Tabs defaultValue="courts" className="space-y-4">
           <TabsList>
             <TabsTrigger value="courts">Pending Courts</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="all-courts">All Courts</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
 
           <TabsContent value="courts">
@@ -268,6 +272,45 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="all-courts">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Courts</CardTitle>
+                <CardDescription>View and manage all court listings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Court Name</TableHead>
+                      <TableHead>Owner</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Sport</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allCourts.map((court) => (
+                      <TableRow key={court.id}>
+                        <TableCell className="font-medium">{court.name}</TableCell>
+                        <TableCell>{court.profiles?.full_name || court.profiles?.email}</TableCell>
+                        <TableCell>{court.city}, {court.state}</TableCell>
+                        <TableCell>{court.sport_type}</TableCell>
+                        <TableCell>${court.base_price}/hr</TableCell>
+                        <TableCell>
+                          <Badge variant={court.status === 'approved' ? 'default' : court.status === 'pending' ? 'secondary' : 'destructive'}>
+                            {court.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="users">
             <Card>
               <CardHeader>
@@ -321,6 +364,47 @@ export default function AdminDashboard() {
                         </TableCell>
                       </TableRow>
                     ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment History</CardTitle>
+                <CardDescription>Monitor all platform transactions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Court</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bookings
+                      .filter(b => b.payment_status !== 'pending')
+                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                      .slice(0, 50)
+                      .map((booking) => (
+                        <TableRow key={booking.id}>
+                          <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>{booking.profiles?.full_name || booking.profiles?.email}</TableCell>
+                          <TableCell>{booking.courts?.name}</TableCell>
+                          <TableCell>${booking.total_price}</TableCell>
+                          <TableCell>
+                            <Badge variant={booking.payment_status === 'succeeded' ? 'default' : booking.payment_status === 'failed' ? 'destructive' : 'secondary'}>
+                              {booking.payment_status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </CardContent>
