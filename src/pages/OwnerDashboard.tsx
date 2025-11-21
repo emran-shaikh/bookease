@@ -8,16 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2 } from 'lucide-react';
+import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useNotifications } from '@/hooks/useNotifications';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { CheckCircle, XCircle, Info } from 'lucide-react';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { notifications } = useNotifications();
   const [courts, setCourts] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
@@ -209,6 +213,14 @@ export default function OwnerDashboard() {
           <TabsList>
             <TabsTrigger value="courts">My Courts</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="notifications">
+              Notifications
+              {notifications.filter(n => !n.read).length > 0 && (
+                <Badge variant="destructive" className="ml-2 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                  {notifications.filter(n => !n.read).length}
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="blocked">Blocked Slots</TabsTrigger>
             <TabsTrigger value="pricing">Pricing Rules</TabsTrigger>
           </TabsList>
@@ -326,6 +338,61 @@ export default function OwnerDashboard() {
                 </Card>
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="notifications" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Notifications</CardTitle>
+                <CardDescription>Stay updated on your court status changes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {notifications.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Bell className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <p className="text-muted-foreground">No notifications yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications.map((notification) => {
+                      const getIcon = () => {
+                        switch (notification.type) {
+                          case 'success':
+                            return <CheckCircle className="h-5 w-5 text-green-500" />;
+                          case 'error':
+                            return <XCircle className="h-5 w-5 text-red-500" />;
+                          default:
+                            return <Info className="h-5 w-5 text-blue-500" />;
+                        }
+                      };
+
+                      return (
+                        <Alert
+                          key={notification.id}
+                          className={!notification.read ? 'border-primary bg-accent/50' : ''}
+                        >
+                          <div className="flex items-start gap-3">
+                            {getIcon()}
+                            <div className="flex-1 space-y-1">
+                              <AlertTitle className="font-semibold">
+                                {notification.title}
+                              </AlertTitle>
+                              <AlertDescription>{notification.message}</AlertDescription>
+                              <p className="text-xs text-muted-foreground">
+                                {format(new Date(notification.created_at), 'MMM d, yyyy h:mm a')}
+                              </p>
+                            </div>
+                            {!notification.read && (
+                              <Badge variant="default" className="ml-auto">New</Badge>
+                            )}
+                          </div>
+                        </Alert>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="blocked" className="space-y-4">

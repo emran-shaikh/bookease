@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { User, LayoutDashboard, LogOut, Calendar } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 export function Header() {
   const { user, signOut } = useAuth();
@@ -36,6 +37,7 @@ export function Header() {
               <Link to="/courts" className="text-sm font-medium hover:text-primary transition-colors">
                 Browse Courts
               </Link>
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
