@@ -14,7 +14,9 @@ import { format } from 'date-fns';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+// TODO: Replace with your Stripe publishable key (starts with pk_test_ or pk_live_)
+const STRIPE_PUBLISHABLE_KEY = 'pk_test_YOUR_KEY_HERE';
+const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 function CheckoutForm({ bookingData, onSuccess }: any) {
   const stripe = useStripe();
