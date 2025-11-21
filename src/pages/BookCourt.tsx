@@ -14,8 +14,7 @@ import { format } from 'date-fns';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 
-// TODO: Replace with your Stripe publishable key (starts with pk_test_ or pk_live_)
-const STRIPE_PUBLISHABLE_KEY = 'pk_test_YOUR_KEY_HERE';
+const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SSBmnLZr8CjOqMuDiSm1WASkrmK8khlJxuvPHSBEOVv5sEwyK3g4XZScU31C6ZtLbKsOHLxMS9iV6HaFhEygfrh00Nodfg4f3';
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 function CheckoutForm({ bookingData, onSuccess }: any) {
