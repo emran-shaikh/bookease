@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Clock, Shield, Search, DollarSign, Star } from 'lucide-react';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { Calendar, MapPin, Clock, Shield, Search, DollarSign, Star, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import heroImage from '@/assets/hero-sports.jpg';
@@ -28,6 +29,9 @@ interface Court {
   distance?: number;
   status: string;
   is_active: boolean;
+  booking_count?: number;
+  average_rating?: number;
+  review_count?: number;
 }
 
 const sportImages: { [key: string]: string } = {
@@ -43,6 +47,7 @@ export default function Index() {
   
   const [courts, setCourts] = useState<Court[]>([]);
   const [filteredCourts, setFilteredCourts] = useState<Court[]>([]);
+  const [popularCourts, setPopularCourts] = useState<Court[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSport, setSelectedSport] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
@@ -74,6 +79,7 @@ export default function Index() {
 
   useEffect(() => {
     fetchCourts();
+    fetchPopularCourts();
   }, []);
 
   const fetchCourts = async () => {
@@ -108,6 +114,59 @@ export default function Index() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPopularCourts = async () => {
+    try {
+      // Fetch courts with booking counts and ratings
+      const { data: courtsData, error: courtsError } = await supabase
+        .from('courts')
+        .select('*')
+        .eq('status', 'approved')
+        .eq('is_active', true)
+        .limit(10);
+
+      if (courtsError) throw courtsError;
+
+      // Fetch booking counts for each court
+      const courtsWithStats = await Promise.all(
+        (courtsData || []).map(async (court) => {
+          const { count: bookingCount } = await supabase
+            .from('bookings')
+            .select('*', { count: 'exact', head: true })
+            .eq('court_id', court.id);
+
+          const { data: reviewsData } = await supabase
+            .from('reviews')
+            .select('rating')
+            .eq('court_id', court.id);
+
+          const averageRating = reviewsData && reviewsData.length > 0
+            ? reviewsData.reduce((acc, r) => acc + r.rating, 0) / reviewsData.length
+            : 0;
+
+          return {
+            ...court,
+            booking_count: bookingCount || 0,
+            average_rating: averageRating,
+            review_count: reviewsData?.length || 0,
+          };
+        })
+      );
+
+      // Sort by booking count and rating
+      const sorted = courtsWithStats
+        .sort((a, b) => {
+          const scoreA = (a.booking_count || 0) * 2 + (a.average_rating || 0);
+          const scoreB = (b.booking_count || 0) * 2 + (b.average_rating || 0);
+          return scoreB - scoreA;
+        })
+        .slice(0, 6);
+
+      setPopularCourts(sorted);
+    } catch (error) {
+      console.error('Error fetching popular courts:', error);
     }
   };
 
@@ -272,6 +331,93 @@ export default function Index() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Popular Courts Carousel */}
+        {popularCourts.length > 0 && (
+          <section className="pb-16">
+            <div className="mb-8 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
+                <TrendingUp className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-3xl font-bold text-foreground">Popular Courts</h2>
+                <p className="text-muted-foreground">Top-rated and most-booked venues</p>
+              </div>
+            </div>
+
+            <Carousel
+              opts={{
+                align: "start",
+                loop: true,
+              }}
+              className="w-full"
+            >
+              <CarouselContent className="-ml-2 md:-ml-4">
+                {popularCourts.map((court) => (
+                  <CarouselItem key={court.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
+                    <Card 
+                      className="group overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 cursor-pointer border-2"
+                      onClick={() => handleCourtClick(court.id)}
+                    >
+                      <div className="relative h-56 overflow-hidden">
+                        <img
+                          src={court.images?.[0] || sportImages[court.sport_type.toLowerCase()] || sportImages.tennis}
+                          alt={court.name}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
+                        
+                        <div className="absolute top-3 right-3 flex gap-2">
+                          <Badge className="bg-primary/90 backdrop-blur-sm shadow-lg">
+                            {court.sport_type}
+                          </Badge>
+                          {court.booking_count && court.booking_count > 5 && (
+                            <Badge className="bg-amber-500/90 backdrop-blur-sm shadow-lg">
+                              <TrendingUp className="h-3 w-3 mr-1" />
+                              Popular
+                            </Badge>
+                          )}
+                        </div>
+
+                        {court.average_rating && court.average_rating > 0 && (
+                          <div className="absolute bottom-3 left-3">
+                            <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm shadow-lg">
+                              <Star className="h-3 w-3 mr-1 fill-amber-400 text-amber-400" />
+                              {court.average_rating.toFixed(1)} ({court.review_count})
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+
+                      <CardHeader>
+                        <CardTitle className="line-clamp-1 text-xl">{court.name}</CardTitle>
+                        <CardDescription className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          {court.city}
+                        </CardDescription>
+                      </CardHeader>
+
+                      <CardFooter className="flex justify-between items-center pt-0">
+                        <div className="flex items-center gap-1 text-xl font-bold text-primary">
+                          <DollarSign className="h-5 w-5" />
+                          {court.base_price}
+                          <span className="text-sm font-normal text-muted-foreground">/hour</span>
+                        </div>
+                        {court.booking_count !== undefined && (
+                          <Badge variant="outline" className="text-xs">
+                            {court.booking_count} bookings
+                          </Badge>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="left-0 -translate-x-1/2" />
+              <CarouselNext className="right-0 translate-x-1/2" />
+            </Carousel>
+          </section>
+        )}
 
         {/* Courts Grid */}
         <section className="pb-16">
