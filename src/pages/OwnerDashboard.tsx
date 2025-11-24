@@ -31,6 +31,8 @@ export default function OwnerDashboard() {
   const [showCourtForm, setShowCourtForm] = useState(false);
   const [showBlockSlotForm, setShowBlockSlotForm] = useState(false);
   const [showPricingForm, setShowPricingForm] = useState(false);
+  const [editingCourt, setEditingCourt] = useState<any>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   // Block slot form state
   const [blockSlotData, setBlockSlotData] = useState({
@@ -157,6 +159,52 @@ export default function OwnerDashboard() {
     }
   }
 
+  async function handleEditCourt(court: any) {
+    setEditingCourt(court);
+    setShowEditDialog(true);
+  }
+
+  async function handleUpdateCourt(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingCourt) return;
+
+    try {
+      const { error } = await supabase
+        .from('courts')
+        .update({
+          name: editingCourt.name,
+          base_price: parseFloat(editingCourt.base_price),
+          is_active: editingCourt.is_active,
+        })
+        .eq('id', editingCourt.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Court updated successfully' });
+      setShowEditDialog(false);
+      setEditingCourt(null);
+      fetchOwnerData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  }
+
+  async function handleDeleteCourt(courtId: string) {
+    if (!confirm('Are you sure you want to delete this court? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('courts').delete().eq('id', courtId);
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Court deleted successfully' });
+      fetchOwnerData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  }
+
   const upcomingBookings = bookings.filter(b => 
     new Date(b.booking_date) >= new Date() && b.status !== 'cancelled'
   );
@@ -272,7 +320,7 @@ export default function OwnerDashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid gap-2 text-sm">
+                    <div className="grid gap-2 text-sm mb-4">
                       <div>
                         <span className="font-medium">Sport:</span> {court.sport_type}
                       </div>
@@ -284,10 +332,74 @@ export default function OwnerDashboard() {
                         {court.is_active ? 'Yes' : 'No'}
                       </div>
                     </div>
+                    <div className="flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleEditCourt(court)}
+                        className="flex-1"
+                      >
+                        Edit
+                      </Button>
+                      <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        onClick={() => handleDeleteCourt(court.id)}
+                        className="flex-1"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Delete
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))
             )}
+
+            {/* Edit Court Dialog */}
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Court</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleUpdateCourt} className="space-y-4">
+                  <div>
+                    <Label>Court Name</Label>
+                    <Input
+                      value={editingCourt?.name || ''}
+                      onChange={(e) => setEditingCourt({ ...editingCourt, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label>Base Price ($/hour)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editingCourt?.base_price || ''}
+                      onChange={(e) => setEditingCourt({ ...editingCourt, base_price: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      checked={editingCourt?.is_active || false}
+                      onChange={(e) => setEditingCourt({ ...editingCourt, is_active: e.target.checked })}
+                      className="h-4 w-4"
+                    />
+                    <Label htmlFor="is_active">Active</Label>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="flex-1">Save Changes</Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="bookings" className="space-y-4">

@@ -9,11 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Clock } from 'lucide-react';
+import { Loader2, Clock, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SSBmnLZr8CjOqMuDiSm1WASkrmK8khlJxuvPHSBEOVv5sEwyK3g4XZScU31C6ZtLbKsOHLxMS9iV6HaFhEygfrh00Nodfg4f3';
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
@@ -86,6 +87,7 @@ export default function BookCourt() {
   const [clientSecret, setClientSecret] = useState('');
   const [notes, setNotes] = useState('');
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'jazzcash' | 'easypaisa' | 'bank_transfer' | 'cash'>('cash');
 
   const { court, date, timeSlot, lockId } = location.state || {};
   const { unlockSlot, getCurrentUserLock } = useSlotLock(court?.id || '', date || null);
@@ -133,8 +135,10 @@ export default function BookCourt() {
       return;
     }
 
-    createPaymentIntent();
-  }, []);
+    if (paymentMethod === 'stripe') {
+      createPaymentIntent();
+    }
+  }, [paymentMethod]);
 
   async function createPaymentIntent() {
     try {
@@ -162,11 +166,14 @@ export default function BookCourt() {
     }
   }
 
-  async function handleBookingSuccess(paymentIntentId: string) {
+  async function handleBookingSuccess(paymentIntentId?: string) {
     setLoading(true);
     
     try {
       const [startTime, endTime] = timeSlot.split('-');
+      
+      const bookingStatus = paymentMethod === 'cash' ? 'pending' : 'confirmed';
+      const paymentStatus = paymentMethod === 'cash' ? 'pending' : 'succeeded';
       
       const { error } = await supabase.from('bookings').insert({
         court_id: court.id,
@@ -175,19 +182,18 @@ export default function BookCourt() {
         start_time: startTime,
         end_time: endTime,
         total_price: court.base_price,
-        status: 'confirmed',
-        payment_status: 'succeeded',
-        payment_intent_id: paymentIntentId,
-        notes: notes || null,
+        status: bookingStatus,
+        payment_status: paymentStatus,
+        payment_intent_id: paymentIntentId || null,
+        notes: notes ? `Payment Method: ${paymentMethod.toUpperCase()}${notes ? ' | ' + notes : ''}` : `Payment Method: ${paymentMethod.toUpperCase()}`,
       });
 
       if (error) {
-        // Check if it's a duplicate booking error
         if (error.message.includes('overlaps with an existing booking') || 
             error.message.includes('unique_booking_slot')) {
           toast({
             title: 'Slot Already Booked',
-            description: 'Someone just booked this slot. Your payment has not been processed.',
+            description: 'Someone just booked this slot.',
             variant: 'destructive',
           });
         } else {
@@ -197,7 +203,6 @@ export default function BookCourt() {
         return;
       }
 
-      // Release the lock after successful booking
       const lock = getCurrentUserLock(startTime, endTime);
       if (lock) {
         await unlockSlot(lock.id);
@@ -205,7 +210,9 @@ export default function BookCourt() {
 
       toast({
         title: '🎉 Booking Confirmed!',
-        description: `Your court is booked for ${format(date, 'MMM d, yyyy')} at ${timeSlot}`,
+        description: paymentMethod === 'cash' 
+          ? `Your booking is confirmed. Please pay at the venue on ${format(date, 'MMM d, yyyy')}` 
+          : `Your court is booked for ${format(date, 'MMM d, yyyy')} at ${timeSlot}`,
       });
       
       navigate('/dashboard');
@@ -218,6 +225,10 @@ export default function BookCourt() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleLocalPaymentBooking() {
+    await handleBookingSuccess();
   }
 
   if (!court || !date || !timeSlot) {
@@ -281,20 +292,133 @@ export default function BookCourt() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Payment Information</CardTitle>
-                <CardDescription>Secure payment powered by Stripe</CardDescription>
+                <CardTitle>Payment Method</CardTitle>
+                <CardDescription>Choose your preferred payment option</CardDescription>
               </CardHeader>
-              <CardContent>
-                {clientSecret ? (
-                  <Elements stripe={stripePromise} options={{ clientSecret }}>
-                    <CheckoutForm
-                      bookingData={{ court, date, timeSlot, notes }}
-                      onSuccess={handleBookingSuccess}
-                    />
-                  </Elements>
+              <CardContent className="space-y-6">
+                <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
+                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('cash')}>
+                    <RadioGroupItem value="cash" id="cash" />
+                    <Label htmlFor="cash" className="flex-1 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Banknote className="h-5 w-5 text-green-600" />
+                        <div>
+                          <p className="font-semibold">Cash on Arrival</p>
+                          <p className="text-xs text-muted-foreground">Pay at the venue</p>
+                        </div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('jazzcash')}>
+                    <RadioGroupItem value="jazzcash" id="jazzcash" />
+                    <Label htmlFor="jazzcash" className="flex-1 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded-full bg-orange-500" />
+                        <div>
+                          <p className="font-semibold">JazzCash</p>
+                          <p className="text-xs text-muted-foreground">Mobile wallet payment</p>
+                        </div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('easypaisa')}>
+                    <RadioGroupItem value="easypaisa" id="easypaisa" />
+                    <Label htmlFor="easypaisa" className="flex-1 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded-full bg-green-600" />
+                        <div>
+                          <p className="font-semibold">EasyPaisa</p>
+                          <p className="text-xs text-muted-foreground">Mobile wallet payment</p>
+                        </div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('bank_transfer')}>
+                    <RadioGroupItem value="bank_transfer" id="bank_transfer" />
+                    <Label htmlFor="bank_transfer" className="flex-1 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded-full bg-blue-600" />
+                        <div>
+                          <p className="font-semibold">Bank Transfer</p>
+                          <p className="text-xs text-muted-foreground">Direct bank payment</p>
+                        </div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('stripe')}>
+                    <RadioGroupItem value="stripe" id="stripe" />
+                    <Label htmlFor="stripe" className="flex-1 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded-full bg-purple-600" />
+                        <div>
+                          <p className="font-semibold">Credit/Debit Card</p>
+                          <p className="text-xs text-muted-foreground">Pay with Stripe</p>
+                        </div>
+                      </div>
+                    </Label>
+                  </div>
+                </RadioGroup>
+
+                <Separator />
+
+                {paymentMethod === 'stripe' ? (
+                  clientSecret ? (
+                    <Elements stripe={stripePromise} options={{ clientSecret }}>
+                      <CheckoutForm
+                        bookingData={{ court, date, timeSlot, notes }}
+                        onSuccess={handleBookingSuccess}
+                      />
+                    </Elements>
+                  ) : (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  )
                 ) : (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <div className="space-y-4">
+                    {paymentMethod === 'jazzcash' && (
+                      <div className="rounded-lg bg-orange-50 dark:bg-orange-950/20 p-4 text-sm">
+                        <p className="font-semibold mb-2">JazzCash Payment Instructions:</p>
+                        <p className="text-muted-foreground">You'll receive payment instructions via SMS after confirming your booking.</p>
+                      </div>
+                    )}
+                    {paymentMethod === 'easypaisa' && (
+                      <div className="rounded-lg bg-green-50 dark:bg-green-950/20 p-4 text-sm">
+                        <p className="font-semibold mb-2">EasyPaisa Payment Instructions:</p>
+                        <p className="text-muted-foreground">You'll receive payment instructions via SMS after confirming your booking.</p>
+                      </div>
+                    )}
+                    {paymentMethod === 'bank_transfer' && (
+                      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4 text-sm">
+                        <p className="font-semibold mb-2">Bank Transfer Details:</p>
+                        <p className="text-muted-foreground">Bank details will be sent to your email after booking confirmation.</p>
+                      </div>
+                    )}
+                    {paymentMethod === 'cash' && (
+                      <div className="rounded-lg bg-green-50 dark:bg-green-950/20 p-4 text-sm">
+                        <p className="font-semibold mb-2">Cash Payment:</p>
+                        <p className="text-muted-foreground">Please bring exact cash amount when you arrive at the venue.</p>
+                      </div>
+                    )}
+                    <Button 
+                      onClick={handleLocalPaymentBooking} 
+                      disabled={loading} 
+                      className="w-full"
+                      size="lg"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Confirming...
+                        </>
+                      ) : (
+                        'Confirm Booking'
+                      )}
+                    </Button>
                   </div>
                 )}
               </CardContent>
