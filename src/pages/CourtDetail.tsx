@@ -409,27 +409,48 @@ export default function CourtDetail() {
 
             {court.reviews && court.reviews.length > 0 && (
               <div>
-                <h2 className="mb-4 text-xl font-semibold">Reviews</h2>
+                <h2 className="mb-4 text-xl font-semibold">Customer Reviews ({court.reviews.length})</h2>
                 <div className="space-y-4">
                   {court.reviews.map((review: any, index: number) => (
                     <Card key={index}>
                       <CardHeader>
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base">{review.profiles?.full_name || 'Anonymous'}</CardTitle>
-                          <div className="flex items-center">
-                            <Star className="mr-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span>{review.rating}</span>
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`h-4 w-4 ${
+                                  star <= review.rating
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-muted-foreground'
+                                }`}
+                              />
+                            ))}
                           </div>
                         </div>
                         <CardDescription>
                           {format(new Date(review.created_at), 'MMM d, yyyy')}
                         </CardDescription>
                       </CardHeader>
-                      {review.comment && (
-                        <CardContent>
-                          <p className="text-sm">{review.comment}</p>
-                        </CardContent>
-                      )}
+                      <CardContent className="space-y-3">
+                        {review.comment && (
+                          <p className="text-sm leading-relaxed">{review.comment}</p>
+                        )}
+                        {review.images && review.images.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {review.images.map((imageUrl: string, imgIndex: number) => (
+                              <img
+                                key={imgIndex}
+                                src={imageUrl}
+                                alt={`Review photo ${imgIndex + 1}`}
+                                className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(imageUrl, '_blank')}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
                     </Card>
                   ))}
                 </div>
