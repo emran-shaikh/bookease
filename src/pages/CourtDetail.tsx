@@ -27,6 +27,7 @@ export default function CourtDetail() {
   const [selectedTime, setSelectedTime] = useState('');
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
+  const [dateBookingStatus, setDateBookingStatus] = useState<{ [key: string]: 'full' | 'partial' | 'available' }>({});
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(id || '', selectedDate || null);
 
@@ -142,6 +143,69 @@ export default function CourtDetail() {
       console.error('Error fetching slots:', error);
     }
   }
+
+  // Fetch booking status for calendar dates
+  async function fetchDateBookingStatus() {
+    if (!id) return;
+
+    try {
+      const today = new Date();
+      const nextMonth = new Date(today);
+      nextMonth.setMonth(today.getMonth() + 2);
+
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('booking_date, start_time, end_time')
+        .eq('court_id', id)
+        .gte('booking_date', format(today, 'yyyy-MM-dd'))
+        .lte('booking_date', format(nextMonth, 'yyyy-MM-dd'))
+        .in('status', ['confirmed', 'pending']);
+
+      const { data: blocked } = await supabase
+        .from('blocked_slots')
+        .select('date, start_time, end_time')
+        .eq('court_id', id)
+        .gte('date', format(today, 'yyyy-MM-dd'))
+        .lte('date', format(nextMonth, 'yyyy-MM-dd'));
+
+      const dateStatus: { [key: string]: 'full' | 'partial' | 'available' } = {};
+      const totalSlots = 16; // Total available time slots per day
+
+      // Process bookings
+      const bookingsByDate: { [key: string]: number } = {};
+      bookings?.forEach(b => {
+        const key = b.booking_date;
+        bookingsByDate[key] = (bookingsByDate[key] || 0) + 1;
+      });
+
+      // Process blocked slots
+      blocked?.forEach(b => {
+        const key = b.date;
+        bookingsByDate[key] = (bookingsByDate[key] || 0) + 1;
+      });
+
+      // Determine status for each date
+      Object.entries(bookingsByDate).forEach(([date, count]) => {
+        if (count >= totalSlots) {
+          dateStatus[date] = 'full';
+        } else if (count > 0) {
+          dateStatus[date] = 'partial';
+        } else {
+          dateStatus[date] = 'available';
+        }
+      });
+
+      setDateBookingStatus(dateStatus);
+    } catch (error: any) {
+      console.error('Error fetching date booking status:', error);
+    }
+  }
+
+  useEffect(() => {
+    if (id) {
+      fetchDateBookingStatus();
+    }
+  }, [id]);
 
   const timeSlots = [
     '06:00-07:00', '07:00-08:00', '08:00-09:00', '09:00-10:00',
@@ -390,7 +454,31 @@ export default function CourtDetail() {
                     onSelect={setSelectedDate}
                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     className="rounded-md border"
+                    modifiers={{
+                      fullyBooked: (date) => {
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        return dateBookingStatus[dateStr] === 'full';
+                      },
+                      partiallyBooked: (date) => {
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        return dateBookingStatus[dateStr] === 'partial';
+                      },
+                    }}
+                    modifiersClassNames={{
+                      fullyBooked: 'bg-destructive/20 text-destructive font-bold',
+                      partiallyBooked: 'bg-yellow-500/20 text-yellow-700 font-medium',
+                    }}
                   />
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 w-3 rounded-sm bg-destructive/20 border border-destructive" />
+                      <span>Fully Booked</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-3 w-3 rounded-sm bg-yellow-500/20 border border-yellow-500" />
+                      <span>Partially Booked</span>
+                    </div>
+                  </div>
                 </div>
 
                 {selectedDate && (
@@ -425,31 +513,30 @@ export default function CourtDetail() {
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        {timeSlots.map((slot) => {
-                          const slotStatus = getSlotStatus(slot);
+                        {timeSlots.filter(slot => isSlotAvailable(slot)).map((slot) => {
                           return (
                             <SelectItem
                               key={slot}
                               value={slot}
-                              disabled={!isSlotAvailable(slot)}
                               className="cursor-pointer"
                             >
                               <div className="flex items-center justify-between w-full gap-3">
-                                <span className={!isSlotAvailable(slot) ? 'text-muted-foreground' : ''}>{slot}</span>
+                                <span>{slot}</span>
                                 <Badge 
-                                  variant={slotStatus.status === 'available' ? 'outline' : slotStatus.color as any}
-                                  className={
-                                    slotStatus.status === 'booked' ? 'bg-destructive/10 text-destructive border-destructive' :
-                                    slotStatus.status === 'locked' ? 'bg-muted text-muted-foreground' :
-                                    'bg-primary/10 text-primary border-primary'
-                                  }
+                                  variant="outline"
+                                  className="bg-primary/10 text-primary border-primary"
                                 >
-                                  {slotStatus.label}
+                                  Available
                                 </Badge>
                               </div>
                             </SelectItem>
                           );
                         })}
+                        {timeSlots.filter(slot => !isSlotAvailable(slot)).length === timeSlots.length && (
+                          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                            No available slots for this date
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
 
