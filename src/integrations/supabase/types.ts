@@ -351,6 +351,7 @@ export type Database = {
           court_id: string
           created_at: string
           id: string
+          images: string[] | null
           rating: number
           updated_at: string
           user_id: string
@@ -361,6 +362,7 @@ export type Database = {
           court_id: string
           created_at?: string
           id?: string
+          images?: string[] | null
           rating: number
           updated_at?: string
           user_id: string
@@ -371,6 +373,7 @@ export type Database = {
           court_id?: string
           created_at?: string
           id?: string
+          images?: string[] | null
           rating?: number
           updated_at?: string
           user_id?: string

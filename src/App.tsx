@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import CompleteProfile from "./pages/CompleteProfile";
+import ReviewPage from "./pages/ReviewPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CompleteProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/review/:bookingId"
+              element={
+                <ProtectedRoute>
+                  <ReviewPage />
                 </ProtectedRoute>
               }
             />

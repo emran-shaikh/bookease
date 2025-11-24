@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -27,12 +28,13 @@ export default function Dashboard() {
 
   async function fetchDashboardData() {
     try {
-      const [profileData, bookingsData] = await Promise.all([
+      const [profileData, bookingsData, reviewsData] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user?.id).single(),
         supabase.from('bookings').select(`
           *,
           courts (name, location, city, images)
         `).eq('user_id', user?.id).order('booking_date', { ascending: false }),
+        supabase.from('reviews').select('booking_id').eq('user_id', user?.id),
       ]);
 
       if (profileData.error) throw profileData.error;
@@ -40,6 +42,7 @@ export default function Dashboard() {
 
       setProfile(profileData.data);
       setBookings(bookingsData.data || []);
+      setReviews(reviewsData.data || []);
     } catch (error: any) {
       toast({
         title: 'Error loading dashboard',
@@ -195,13 +198,21 @@ export default function Dashboard() {
                         <span className="font-medium">Total:</span> ${booking.total_price}
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/review/${booking.id}`)}
-                    >
-                      Leave Review
-                    </Button>
+                    {reviews.some(r => r.booking_id === booking.id) ? (
+                      <Badge variant="default" className="gap-1">
+                        <Star className="h-3 w-3 fill-current" />
+                        Reviewed
+                      </Badge>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/review/${booking.id}`)}
+                      >
+                        <Star className="h-4 w-4 mr-1" />
+                        Leave Review
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ))
