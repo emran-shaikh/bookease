@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Clock, Banknote } from 'lucide-react';
+import { Loader2, Clock, Banknote, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { loadStripe } from '@stripe/stripe-js';
@@ -87,7 +87,7 @@ export default function BookCourt() {
   const [clientSecret, setClientSecret] = useState('');
   const [notes, setNotes] = useState('');
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
-  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'jazzcash' | 'easypaisa' | 'bank_transfer' | 'cash'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'bank_transfer'>('bank_transfer');
 
   const { court, date, timeSlot, lockId } = location.state || {};
   const { unlockSlot, getCurrentUserLock } = useSlotLock(court?.id || '', date || null);
@@ -172,8 +172,8 @@ export default function BookCourt() {
     try {
       const [startTime, endTime] = timeSlot.split('-');
       
-      const bookingStatus = paymentMethod === 'cash' ? 'pending' : 'confirmed';
-      const paymentStatus = paymentMethod === 'cash' ? 'pending' : 'succeeded';
+      const bookingStatus = paymentMethod === 'stripe' ? 'confirmed' : 'pending';
+      const paymentStatus = paymentMethod === 'stripe' ? 'succeeded' : 'pending';
       
       const { error } = await supabase.from('bookings').insert({
         court_id: court.id,
@@ -209,10 +209,10 @@ export default function BookCourt() {
       }
 
       toast({
-        title: '🎉 Booking Confirmed!',
-        description: paymentMethod === 'cash' 
-          ? `Your booking is confirmed. Please pay at the venue on ${format(date, 'MMM d, yyyy')}` 
-          : `Your court is booked for ${format(date, 'MMM d, yyyy')} at ${timeSlot}`,
+        title: paymentMethod === 'stripe' ? '🎉 Booking Confirmed!' : '⏳ Booking Pending',
+        description: paymentMethod === 'stripe' 
+          ? `Your court is booked for ${format(date, 'MMM d, yyyy')} at ${timeSlot}` 
+          : `Your booking request is received. It will be confirmed once payment is verified.`,
       });
       
       navigate('/dashboard');
@@ -297,53 +297,14 @@ export default function BookCourt() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
-                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('cash')}>
-                    <RadioGroupItem value="cash" id="cash" />
-                    <Label htmlFor="cash" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="h-5 w-5 text-green-600" />
-                        <div>
-                          <p className="font-semibold">Cash on Arrival</p>
-                          <p className="text-xs text-muted-foreground">Pay at the venue</p>
-                        </div>
-                      </div>
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('jazzcash')}>
-                    <RadioGroupItem value="jazzcash" id="jazzcash" />
-                    <Label htmlFor="jazzcash" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <div className="h-5 w-5 rounded-full bg-orange-500" />
-                        <div>
-                          <p className="font-semibold">JazzCash</p>
-                          <p className="text-xs text-muted-foreground">Mobile wallet payment</p>
-                        </div>
-                      </div>
-                    </Label>
-                  </div>
-
-                  <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('easypaisa')}>
-                    <RadioGroupItem value="easypaisa" id="easypaisa" />
-                    <Label htmlFor="easypaisa" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <div className="h-5 w-5 rounded-full bg-green-600" />
-                        <div>
-                          <p className="font-semibold">EasyPaisa</p>
-                          <p className="text-xs text-muted-foreground">Mobile wallet payment</p>
-                        </div>
-                      </div>
-                    </Label>
-                  </div>
-
                   <div className="flex items-center space-x-3 rounded-lg border p-4 cursor-pointer hover:bg-accent" onClick={() => setPaymentMethod('bank_transfer')}>
                     <RadioGroupItem value="bank_transfer" id="bank_transfer" />
                     <Label htmlFor="bank_transfer" className="flex-1 cursor-pointer">
                       <div className="flex items-center gap-2">
-                        <div className="h-5 w-5 rounded-full bg-blue-600" />
+                        <Banknote className="h-5 w-5 text-blue-600" />
                         <div>
                           <p className="font-semibold">Bank Transfer</p>
-                          <p className="text-xs text-muted-foreground">Direct bank payment</p>
+                          <p className="text-xs text-muted-foreground">Transfer to bank account</p>
                         </div>
                       </div>
                     </Label>
@@ -353,10 +314,10 @@ export default function BookCourt() {
                     <RadioGroupItem value="stripe" id="stripe" />
                     <Label htmlFor="stripe" className="flex-1 cursor-pointer">
                       <div className="flex items-center gap-2">
-                        <div className="h-5 w-5 rounded-full bg-purple-600" />
+                        <CreditCard className="h-5 w-5 text-purple-600" />
                         <div>
                           <p className="font-semibold">Credit/Debit Card</p>
-                          <p className="text-xs text-muted-foreground">Pay with Stripe</p>
+                          <p className="text-xs text-muted-foreground">Instant confirmation with Stripe</p>
                         </div>
                       </div>
                     </Label>
@@ -380,30 +341,17 @@ export default function BookCourt() {
                   )
                 ) : (
                   <div className="space-y-4">
-                    {paymentMethod === 'jazzcash' && (
-                      <div className="rounded-lg bg-orange-50 dark:bg-orange-950/20 p-4 text-sm">
-                        <p className="font-semibold mb-2">JazzCash Payment Instructions:</p>
-                        <p className="text-muted-foreground">You'll receive payment instructions via SMS after confirming your booking.</p>
+                    <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4 text-sm space-y-3">
+                      <p className="font-semibold">Bank Transfer Instructions:</p>
+                      <div className="space-y-2 text-muted-foreground">
+                        <p><span className="font-medium">Bank:</span> National Bank of Pakistan</p>
+                        <p><span className="font-medium">Account Title:</span> CourtConnect</p>
+                        <p><span className="font-medium">Account Number:</span> 1234567890123</p>
+                        <p><span className="font-medium">IBAN:</span> PK36NBPA0000001234567890</p>
+                        <p className="text-xs mt-2">⚠️ Please include your name and booking reference in the transfer description.</p>
+                        <p className="text-xs">Your booking will be confirmed within 24 hours after payment verification.</p>
                       </div>
-                    )}
-                    {paymentMethod === 'easypaisa' && (
-                      <div className="rounded-lg bg-green-50 dark:bg-green-950/20 p-4 text-sm">
-                        <p className="font-semibold mb-2">EasyPaisa Payment Instructions:</p>
-                        <p className="text-muted-foreground">You'll receive payment instructions via SMS after confirming your booking.</p>
-                      </div>
-                    )}
-                    {paymentMethod === 'bank_transfer' && (
-                      <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4 text-sm">
-                        <p className="font-semibold mb-2">Bank Transfer Details:</p>
-                        <p className="text-muted-foreground">Bank details will be sent to your email after booking confirmation.</p>
-                      </div>
-                    )}
-                    {paymentMethod === 'cash' && (
-                      <div className="rounded-lg bg-green-50 dark:bg-green-950/20 p-4 text-sm">
-                        <p className="font-semibold mb-2">Cash Payment:</p>
-                        <p className="text-muted-foreground">Please bring exact cash amount when you arrive at the venue.</p>
-                      </div>
-                    )}
+                    </div>
                     <Button 
                       onClick={handleLocalPaymentBooking} 
                       disabled={loading} 
@@ -413,10 +361,10 @@ export default function BookCourt() {
                       {loading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Confirming...
+                          Processing...
                         </>
                       ) : (
-                        'Confirm Booking'
+                        'Submit Booking Request'
                       )}
                     </Button>
                   </div>

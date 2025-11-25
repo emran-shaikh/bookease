@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell } from 'lucide-react';
+import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle, XCircle, Info } from 'lucide-react';
+import { XCircle, Info } from 'lucide-react';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -427,7 +427,7 @@ export default function OwnerDashboard() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid gap-2 text-sm">
+                    <div className="grid gap-2 text-sm mb-4">
                       <div>
                         <span className="font-medium">Customer:</span>{' '}
                         {booking.profiles?.full_name || booking.profiles?.email}
@@ -445,7 +445,57 @@ export default function OwnerDashboard() {
                           {booking.payment_status}
                         </Badge>
                       </div>
+                      {booking.notes && (
+                        <div>
+                          <span className="font-medium">Notes:</span>{' '}
+                          <span className="text-muted-foreground">{booking.notes}</span>
+                        </div>
+                      )}
                     </div>
+                    {booking.status === 'pending' && booking.payment_status === 'pending' && (
+                      <Button 
+                        size="sm" 
+                        className="w-full"
+                        onClick={async () => {
+                          try {
+                            const { error: updateError } = await supabase
+                              .from('bookings')
+                              .update({ 
+                                status: 'confirmed',
+                                payment_status: 'succeeded'
+                              })
+                              .eq('id', booking.id);
+
+                            if (updateError) throw updateError;
+
+                            await supabase.from('notifications').insert([
+                              {
+                                user_id: booking.user_id,
+                                title: '✅ Booking Confirmed',
+                                message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed!`,
+                                type: 'success',
+                                related_court_id: booking.court_id,
+                              }
+                            ]);
+
+                            toast({ 
+                              title: 'Success', 
+                              description: 'Booking confirmed and customer notified' 
+                            });
+                            fetchOwnerData();
+                          } catch (error: any) {
+                            toast({ 
+                              title: 'Error', 
+                              description: error.message, 
+                              variant: 'destructive' 
+                            });
+                          }
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Confirm Payment & Booking
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ))

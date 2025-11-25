@@ -210,6 +210,7 @@ export default function AdminDashboard() {
         <Tabs defaultValue="courts" className="space-y-4">
           <TabsList>
             <TabsTrigger value="courts">Pending Courts</TabsTrigger>
+            <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="all-courts">All Courts</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
@@ -268,6 +269,99 @@ export default function AdminDashboard() {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="bookings">
+            <Card>
+              <CardHeader>
+                <CardTitle>All Bookings</CardTitle>
+                <CardDescription>View and manage all court bookings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Court</TableHead>
+                      <TableHead>Customer</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Payment</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bookings
+                      .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
+                      .map((booking) => (
+                        <TableRow key={booking.id}>
+                          <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell className="font-medium">{booking.courts?.name}</TableCell>
+                          <TableCell>{booking.profiles?.full_name || booking.profiles?.email}</TableCell>
+                          <TableCell className="text-sm">{booking.start_time} - {booking.end_time}</TableCell>
+                          <TableCell>${booking.total_price}</TableCell>
+                          <TableCell>
+                            <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
+                              {booking.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={booking.payment_status === 'succeeded' ? 'default' : booking.payment_status === 'failed' ? 'destructive' : 'secondary'}>
+                              {booking.payment_status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {booking.status === 'pending' && booking.payment_status === 'pending' && (
+                              <Button
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    const { error: updateError } = await supabase
+                                      .from('bookings')
+                                      .update({ 
+                                        status: 'confirmed',
+                                        payment_status: 'succeeded'
+                                      })
+                                      .eq('id', booking.id);
+
+                                    if (updateError) throw updateError;
+
+                                    await supabase.from('notifications').insert([
+                                      {
+                                        user_id: booking.user_id,
+                                        title: '✅ Booking Confirmed',
+                                        message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed!`,
+                                        type: 'success',
+                                        related_court_id: booking.court_id,
+                                      }
+                                    ]);
+
+                                    toast({ 
+                                      title: 'Success', 
+                                      description: 'Booking confirmed and customer notified' 
+                                    });
+                                    fetchAdminData();
+                                  } catch (error: any) {
+                                    toast({ 
+                                      title: 'Error', 
+                                      description: error.message, 
+                                      variant: 'destructive' 
+                                    });
+                                  }
+                                }}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Confirm
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
