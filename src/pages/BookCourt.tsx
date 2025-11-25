@@ -88,6 +88,14 @@ export default function BookCourt() {
   const [notes, setNotes] = useState('');
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
   const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'bank_transfer'>('bank_transfer');
+  const [priceCalculation, setPriceCalculation] = useState<{
+    basePrice: number;
+    hours: number;
+    priceMultiplier: number;
+    totalPrice: string;
+    appliedRules: string[];
+  } | null>(null);
+  const [calculatingPrice, setCalculatingPrice] = useState(true);
 
   const { court, date, timeSlot, lockId } = location.state || {};
   const { unlockSlot, getCurrentUserLock } = useSlotLock(court?.id || '', date || null);
@@ -135,12 +143,46 @@ export default function BookCourt() {
       return;
     }
 
-    if (paymentMethod === 'stripe') {
+    calculatePrice();
+  }, [court, date, timeSlot]);
+
+  useEffect(() => {
+    if (paymentMethod === 'stripe' && priceCalculation) {
       createPaymentIntent();
     }
-  }, [paymentMethod]);
+  }, [paymentMethod, priceCalculation]);
+
+  async function calculatePrice() {
+    try {
+      setCalculatingPrice(true);
+      const [startTime, endTime] = timeSlot.split('-').map((t: string) => t.trim());
+      
+      const response = await supabase.functions.invoke('calculate-price', {
+        body: {
+          courtId: court.id,
+          date: format(date, 'yyyy-MM-dd'),
+          startTime,
+          endTime,
+        },
+      });
+
+      if (response.error) throw response.error;
+
+      setPriceCalculation(response.data);
+    } catch (error: any) {
+      toast({
+        title: 'Error calculating price',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setCalculatingPrice(false);
+    }
+  }
 
   async function createPaymentIntent() {
+    if (!priceCalculation) return;
+    
     try {
       const [startTime, endTime] = timeSlot.split('-').map((t: string) => t.trim());
       
@@ -181,7 +223,7 @@ export default function BookCourt() {
         booking_date: format(date, 'yyyy-MM-dd'),
         start_time: startTime,
         end_time: endTime,
-        total_price: court.base_price,
+        total_price: priceCalculation ? parseFloat(priceCalculation.totalPrice) : court.base_price,
         status: bookingStatus,
         payment_status: paymentStatus,
         payment_intent_id: paymentIntentId || null,
@@ -273,8 +315,42 @@ export default function BookCourt() {
                 </div>
                 <Separator />
                 <div>
-                  <p className="text-sm font-medium">Total Price</p>
-                  <p className="text-2xl font-bold">${court.base_price}</p>
+                  <p className="text-sm font-medium mb-2">Price Breakdown</p>
+                  {calculatingPrice ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Calculating price...</span>
+                    </div>
+                  ) : priceCalculation ? (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Base Price (per hour)</span>
+                        <span>${priceCalculation.basePrice}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Duration</span>
+                        <span>{priceCalculation.hours} {priceCalculation.hours === 1 ? 'hour' : 'hours'}</span>
+                      </div>
+                      {priceCalculation.appliedRules.length > 0 && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs font-medium text-amber-600 dark:text-amber-500 mb-1">
+                            💰 Special Pricing Applied:
+                          </p>
+                          {priceCalculation.appliedRules.map((rule, idx) => (
+                            <p key={idx} className="text-xs text-muted-foreground pl-4">
+                              • {rule}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex justify-between text-lg font-bold pt-2 border-t">
+                        <span>Total Price</span>
+                        <span className="text-primary">${priceCalculation.totalPrice}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-2xl font-bold">${court.base_price}</p>
+                  )}
                 </div>
                 <Separator />
                 <div>
