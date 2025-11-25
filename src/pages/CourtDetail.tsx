@@ -28,6 +28,8 @@ export default function CourtDetail() {
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
   const [dateBookingStatus, setDateBookingStatus] = useState<{ [key: string]: 'full' | 'partial' | 'available' }>({});
+  const [slotPricing, setSlotPricing] = useState<{ [key: string]: { price: number; multiplier: number; rules: string[] } }>({});
+  const [loadingPricing, setLoadingPricing] = useState(false);
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(id || '', selectedDate || null);
 
@@ -40,6 +42,7 @@ export default function CourtDetail() {
   useEffect(() => {
     if (selectedDate && id) {
       fetchBookedSlots();
+      fetchSlotPricing();
       
       // Set up real-time subscription for bookings
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -144,6 +147,50 @@ export default function CourtDetail() {
     }
   }
 
+  async function fetchSlotPricing() {
+    if (!selectedDate || !id) return;
+
+    setLoadingPricing(true);
+    const pricing: { [key: string]: { price: number; multiplier: number; rules: string[] } } = {};
+
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Fetch pricing for all time slots in parallel
+      const pricingPromises = timeSlots.map(async (slot) => {
+        const [startTime, endTime] = slot.split('-').map(t => t.trim());
+        
+        try {
+          const response = await supabase.functions.invoke('calculate-price', {
+            body: {
+              courtId: id,
+              date: dateStr,
+              startTime,
+              endTime,
+            },
+          });
+
+          if (!response.error && response.data) {
+            pricing[slot] = {
+              price: parseFloat(response.data.finalPrice),
+              multiplier: response.data.priceMultiplier,
+              rules: response.data.appliedRules || []
+            };
+          }
+        } catch (error) {
+          console.error(`Error fetching price for slot ${slot}:`, error);
+        }
+      });
+
+      await Promise.all(pricingPromises);
+      setSlotPricing(pricing);
+    } catch (error: any) {
+      console.error('Error fetching slot pricing:', error);
+    } finally {
+      setLoadingPricing(false);
+    }
+  }
+
   // Fetch booking status for calendar dates
   async function fetchDateBookingStatus() {
     if (!id) return;
@@ -227,6 +274,13 @@ export default function CourtDetail() {
     if (blockedSlots.includes(slot)) return { status: 'blocked', label: 'Blocked', color: 'secondary' };
     if (isSlotLocked(startTime, endTime)) return { status: 'locked', label: 'Reserved', color: 'outline' };
     return { status: 'available', label: 'Available', color: 'default' };
+  };
+
+  const getPriceLevel = (multiplier: number) => {
+    if (multiplier === 1) return { level: 'standard', label: '💵 Standard', color: 'bg-green-500/10 text-green-700 border-green-500' };
+    if (multiplier <= 1.3) return { level: 'moderate', label: '💰 Moderate', color: 'bg-blue-500/10 text-blue-700 border-blue-500' };
+    if (multiplier <= 1.7) return { level: 'peak', label: '🔥 Peak', color: 'bg-amber-500/10 text-amber-700 border-amber-500' };
+    return { level: 'premium', label: '⭐ Premium', color: 'bg-red-500/10 text-red-700 border-red-500' };
   };
 
   const handleBooking = async () => {
@@ -504,69 +558,115 @@ export default function CourtDetail() {
 
                 {selectedDate && (
                   <div>
-                    <label className="mb-2 block text-sm font-medium">Select Time</label>
+                    <label className="mb-2 block text-sm font-medium">Select Time Slot</label>
                     
-                    {/* Legend */}
-                    <div className="mb-3 flex flex-wrap gap-2 text-xs">
-                      <div className="flex items-center gap-1">
-                        <div className="h-3 w-3 rounded-full bg-primary/20 border border-primary" />
-                        <span>Available</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="h-3 w-3 rounded-full bg-destructive/20 border border-destructive" />
-                        <span>Booked</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="h-3 w-3 rounded-full bg-muted border border-border" />
-                        <span>Reserved</span>
+                    {/* Pricing Legend */}
+                    <div className="mb-3 p-3 bg-muted/50 rounded-lg border">
+                      <p className="text-xs font-medium mb-2">Price Levels:</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                          <span>💵 Standard (1.0x)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
+                          <span>💰 Moderate (1.3x)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                          <span>🔥 Peak (1.7x)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                          <span>⭐ Premium (1.8x+)</span>
+                        </div>
                       </div>
                     </div>
 
-                    <Select value={selectedTime} onValueChange={setSelectedTime}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a time slot">
-                          {selectedTime && (
-                            <div className="flex items-center">
-                              <Clock className="mr-2 h-4 w-4" />
-                              {selectedTime}
+                    {loadingPricing ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                        <span className="ml-2 text-sm text-muted-foreground">Loading pricing...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Select value={selectedTime} onValueChange={setSelectedTime}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a time slot">
+                              {selectedTime && slotPricing[selectedTime] && (
+                                <div className="flex items-center justify-between w-full">
+                                  <div className="flex items-center">
+                                    <Clock className="mr-2 h-4 w-4" />
+                                    {selectedTime}
+                                  </div>
+                                  <span className="text-sm font-semibold">${slotPricing[selectedTime].price}</span>
+                                </div>
+                              )}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            {timeSlots.filter(slot => isSlotAvailable(slot)).map((slot) => {
+                              const pricing = slotPricing[slot];
+                              const priceLevel = pricing ? getPriceLevel(pricing.multiplier) : null;
+                              
+                              return (
+                                <SelectItem
+                                  key={slot}
+                                  value={slot}
+                                  className="cursor-pointer py-3"
+                                >
+                                  <div className="flex items-center justify-between w-full gap-3">
+                                    <div className="flex flex-col gap-1">
+                                      <span className="font-medium">{slot}</span>
+                                      {pricing && pricing.rules.length > 0 && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {pricing.rules[0]}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {pricing && (
+                                        <span className="text-sm font-bold">${pricing.price}</span>
+                                      )}
+                                      {priceLevel && (
+                                        <Badge 
+                                          variant="outline"
+                                          className={`${priceLevel.color} text-xs`}
+                                        >
+                                          {priceLevel.label}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                            {timeSlots.filter(slot => !isSlotAvailable(slot)).length === timeSlots.length && (
+                              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                No available slots for this date
+                              </div>
+                            )}
+                          </SelectContent>
+                        </Select>
+
+                        {/* Show slot availability and pricing summary */}
+                        <div className="mt-3 space-y-2">
+                          {bookedSlots.length + blockedSlots.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              {bookedSlots.length} slot{bookedSlots.length !== 1 ? 's' : ''} booked • {timeSlots.length - bookedSlots.length - blockedSlots.length} available
+                            </p>
+                          )}
+                          {selectedTime && slotPricing[selectedTime] && slotPricing[selectedTime].rules.length > 0 && (
+                            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded text-xs">
+                              <p className="font-medium text-amber-700 dark:text-amber-500 mb-1">💡 Pricing Info:</p>
+                              {slotPricing[selectedTime].rules.map((rule, idx) => (
+                                <p key={idx} className="text-muted-foreground">• {rule}</p>
+                              ))}
                             </div>
                           )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timeSlots.filter(slot => isSlotAvailable(slot)).map((slot) => {
-                          return (
-                            <SelectItem
-                              key={slot}
-                              value={slot}
-                              className="cursor-pointer"
-                            >
-                              <div className="flex items-center justify-between w-full gap-3">
-                                <span>{slot}</span>
-                                <Badge 
-                                  variant="outline"
-                                  className="bg-primary/10 text-primary border-primary"
-                                >
-                                  Available
-                                </Badge>
-                              </div>
-                            </SelectItem>
-                          );
-                        })}
-                        {timeSlots.filter(slot => !isSlotAvailable(slot)).length === timeSlots.length && (
-                          <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                            No available slots for this date
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
-
-                    {/* Show slot counts */}
-                    <div className="mt-3 text-xs text-muted-foreground">
-                      {bookedSlots.length + blockedSlots.length > 0 && (
-                        <p>{bookedSlots.length} slot{bookedSlots.length !== 1 ? 's' : ''} booked • {timeSlots.length - bookedSlots.length - blockedSlots.length} available</p>
-                      )}
-                    </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
