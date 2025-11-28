@@ -32,11 +32,11 @@ export function Header() {
         </Link>
 
         <nav className="flex items-center gap-6">
+          <Link to="/courts" className="text-sm font-medium hover:text-primary transition-colors">
+            Browse Courts
+          </Link>
           {user ? (
             <>
-              <Link to="/courts" className="text-sm font-medium hover:text-primary transition-colors">
-                Browse Courts
-              </Link>
               <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
