@@ -8,8 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, MapPin, Star, Search, Navigation } from 'lucide-react';
+import { Loader2, MapPin, Star, Search, Navigation, Heart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useFavorites } from '@/hooks/useFavorites';
 
 interface Court {
   id: string;
@@ -54,13 +55,21 @@ export default function Courts() {
   const [priceRange, setPriceRange] = useState([0, 200]);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+  const [userId, setUserId] = useState<string>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { toggleFavorite, isFavorite } = useFavorites(userId);
 
   useEffect(() => {
     fetchCourts();
     getUserLocation();
+    getUser();
   }, []);
+
+  async function getUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) setUserId(user.id);
+  }
 
   async function getUserLocation() {
     if (!navigator.geolocation) {
@@ -240,18 +249,36 @@ export default function Courts() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredCourts.map((court) => (
-            <Card key={court.id} className="overflow-hidden transition-shadow hover:shadow-lg">
-              <div className="aspect-video w-full overflow-hidden bg-muted">
+            <Card key={court.id} className="overflow-hidden transition-shadow hover:shadow-lg group">
+              <div className="aspect-video w-full overflow-hidden bg-muted relative">
                 {court.images && court.images.length > 0 ? (
                   <img
                     src={court.images[0]}
                     alt={court.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
+                    onClick={() => navigate(`/courts/${court.id}`)}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-muted-foreground">
                     No image
                   </div>
+                )}
+                {userId && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 bg-background/80 hover:bg-background"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(court.id);
+                    }}
+                  >
+                    <Heart
+                      className={`h-5 w-5 ${
+                        isFavorite(court.id) ? 'fill-red-500 text-red-500' : 'text-foreground'
+                      }`}
+                    />
+                  </Button>
                 )}
               </div>
               <CardHeader>

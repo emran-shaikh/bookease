@@ -51,6 +51,7 @@ export default function OwnerDashboard() {
     start_time: '',
     end_time: '',
     days_of_week: [] as number[],
+    specific_date: '',
   });
 
   useEffect(() => {
@@ -130,7 +131,7 @@ export default function OwnerDashboard() {
 
       toast({ title: 'Success', description: 'Pricing rule created successfully' });
       setShowPricingForm(false);
-      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [] });
+      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [], specific_date: '' });
       fetchOwnerData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -657,7 +658,7 @@ export default function OwnerDashboard() {
                     Add Pricing Rule
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Create Pricing Rule</DialogTitle>
                   </DialogHeader>
@@ -682,28 +683,92 @@ export default function OwnerDashboard() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="peak_hours">Peak Hours</SelectItem>
-                          <SelectItem value="weekend">Weekend</SelectItem>
-                          <SelectItem value="special">Special Rate</SelectItem>
+                          <SelectItem value="peak_hours">Peak Hours (Recurring)</SelectItem>
+                          <SelectItem value="weekend">Weekend Rate</SelectItem>
+                          <SelectItem value="special">Special Rate (Specific Date)</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {pricingData.rule_type === 'peak_hours' && 'Apply peak pricing during specific hours on selected days'}
+                        {pricingData.rule_type === 'weekend' && 'Apply special pricing on weekends'}
+                        {pricingData.rule_type === 'special' && 'Apply pricing for a specific date (e.g., holidays)'}
+                      </p>
                     </div>
                     <div>
                       <Label>Price Multiplier</Label>
-                      <Input type="number" step="0.1" min="0.5" max="5" value={pricingData.price_multiplier} onChange={(e) => setPricingData({...pricingData, price_multiplier: e.target.value})} required />
-                      <p className="text-xs text-muted-foreground mt-1">e.g., 1.5 = 50% increase, 2.0 = double price</p>
+                      <Input 
+                        type="number" 
+                        step="0.1" 
+                        min="0.5" 
+                        max="5" 
+                        value={pricingData.price_multiplier} 
+                        onChange={(e) => setPricingData({...pricingData, price_multiplier: e.target.value})} 
+                        required 
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Current base price × {pricingData.price_multiplier} = New price
+                        <br />
+                        Examples: 1.5 = +50%, 2.0 = double price, 0.8 = 20% discount
+                      </p>
                     </div>
+                    
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Start Time</Label>
-                        <Input type="time" value={pricingData.start_time} onChange={(e) => setPricingData({...pricingData, start_time: e.target.value})} />
+                        <Input 
+                          type="time" 
+                          value={pricingData.start_time} 
+                          onChange={(e) => setPricingData({...pricingData, start_time: e.target.value})} 
+                          required
+                        />
                       </div>
                       <div>
                         <Label>End Time</Label>
-                        <Input type="time" value={pricingData.end_time} onChange={(e) => setPricingData({...pricingData, end_time: e.target.value})} />
+                        <Input 
+                          type="time" 
+                          value={pricingData.end_time} 
+                          onChange={(e) => setPricingData({...pricingData, end_time: e.target.value})} 
+                          required
+                        />
                       </div>
                     </div>
-                    <Button type="submit" className="w-full">Create Rule</Button>
+
+                    {pricingData.rule_type === 'peak_hours' && (
+                      <div>
+                        <Label className="mb-3 block">Apply on Days (Select multiple)</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { label: 'Sunday', value: 0 },
+                            { label: 'Monday', value: 1 },
+                            { label: 'Tuesday', value: 2 },
+                            { label: 'Wednesday', value: 3 },
+                            { label: 'Thursday', value: 4 },
+                            { label: 'Friday', value: 5 },
+                            { label: 'Saturday', value: 6 },
+                          ].map((day) => (
+                            <Button
+                              key={day.value}
+                              type="button"
+                              variant={pricingData.days_of_week.includes(day.value) ? 'default' : 'outline'}
+                              className="w-full"
+                              onClick={() => {
+                                const days = pricingData.days_of_week.includes(day.value)
+                                  ? pricingData.days_of_week.filter(d => d !== day.value)
+                                  : [...pricingData.days_of_week, day.value];
+                                setPricingData({...pricingData, days_of_week: days});
+                              }}
+                            >
+                              {day.label}
+                            </Button>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Select which days of the week this rule applies to
+                        </p>
+                      </div>
+                    )}
+                    
+                    <Button type="submit" className="w-full">Create Pricing Rule</Button>
                   </form>
                 </DialogContent>
               </Dialog>
@@ -722,8 +787,15 @@ export default function OwnerDashboard() {
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle>{rule.courts?.name}</CardTitle>
-                        <CardDescription className="capitalize">{rule.rule_type.replace('_', ' ')}</CardDescription>
+                        <CardTitle className="flex items-center gap-2">
+                          {rule.courts?.name}
+                          {rule.price_multiplier > 1.5 && <Badge variant="destructive">High Rate</Badge>}
+                          {rule.price_multiplier <= 1.2 && rule.price_multiplier > 1 && <Badge>Moderate</Badge>}
+                          {rule.price_multiplier < 1 && <Badge variant="secondary">Discount</Badge>}
+                        </CardTitle>
+                        <CardDescription className="capitalize">
+                          {rule.rule_type.replace('_', ' ')}
+                        </CardDescription>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => deletePricingRule(rule.id)}>
                         <Trash2 className="h-4 w-4" />
@@ -732,16 +804,30 @@ export default function OwnerDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid gap-2 text-sm">
-                      <div>
-                        <span className="font-medium">Multiplier:</span> {rule.price_multiplier}x
+                      <div className="flex items-center justify-between p-2 bg-muted rounded">
+                        <span className="font-medium">Price Multiplier:</span> 
+                        <span className="text-lg font-bold text-primary">{rule.price_multiplier}×</span>
                       </div>
                       {rule.start_time && rule.end_time && (
-                        <div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
                           <span className="font-medium">Time:</span> {rule.start_time} - {rule.end_time}
                         </div>
                       )}
-                      <div>
-                        <span className="font-medium">Status:</span>{' '}
+                      {rule.days_of_week && rule.days_of_week.length > 0 && (
+                        <div>
+                          <span className="font-medium">Days:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {rule.days_of_week.map((day: number) => (
+                              <Badge key={day} variant="outline">
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Status:</span>
                         <Badge variant={rule.is_active ? 'default' : 'secondary'}>
                           {rule.is_active ? 'Active' : 'Inactive'}
                         </Badge>
