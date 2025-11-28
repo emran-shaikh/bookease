@@ -3,13 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useSlotLock } from '@/hooks/useSlotLock';
-import { useProfileCompletion } from '@/hooks/useProfileCompletion';
 import { Header } from '@/components/Header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, MapPin, Star, Clock, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -19,17 +17,18 @@ export default function CourtDetail() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isProfileComplete, loading: profileLoading } = useProfileCompletion();
   const [court, setCourt] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>();
-  const [selectedTime, setSelectedTime] = useState('');
+  const [selectedStartTime, setSelectedStartTime] = useState('');
+  const [selectedHours, setSelectedHours] = useState(1);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
   const [dateBookingStatus, setDateBookingStatus] = useState<{ [key: string]: 'full' | 'partial' | 'available' }>({});
   const [slotPricing, setSlotPricing] = useState<{ [key: string]: { price: number; multiplier: number; rules: string[] } }>({});
   const [loadingPricing, setLoadingPricing] = useState(false);
+  const [totalPrice, setTotalPrice] = useState<number | null>(null);
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(id || '', selectedDate || null);
 
@@ -58,10 +57,8 @@ export default function CourtDetail() {
           },
           (payload) => {
             console.log('Booking change detected:', payload);
-            // Refresh booked slots when any booking changes
             fetchBookedSlots();
             
-            // Show notification for new bookings
             if (payload.eventType === 'INSERT') {
               toast({
                 title: 'Slot Just Booked',
@@ -90,6 +87,13 @@ export default function CourtDetail() {
       };
     }
   }, [selectedDate, id]);
+
+  // Calculate total price when time/hours change
+  useEffect(() => {
+    if (selectedStartTime && selectedHours && selectedDate && id) {
+      calculateTotalPrice();
+    }
+  }, [selectedStartTime, selectedHours, selectedDate, id]);
 
   async function fetchCourtDetails() {
     try {
@@ -156,7 +160,6 @@ export default function CourtDetail() {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Fetch pricing for all time slots in parallel
       const pricingPromises = timeSlots.map(async (slot) => {
         const [startTime, endTime] = slot.split('-').map(t => t.trim());
         
@@ -191,6 +194,34 @@ export default function CourtDetail() {
     }
   }
 
+  async function calculateTotalPrice() {
+    if (!selectedDate || !selectedStartTime || !id || selectedHours < 1) {
+      setTotalPrice(null);
+      return;
+    }
+
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const endTime = addHoursToTime(selectedStartTime, selectedHours);
+
+      const response = await supabase.functions.invoke('calculate-price', {
+        body: {
+          courtId: id,
+          date: dateStr,
+          startTime: selectedStartTime,
+          endTime: endTime,
+        },
+      });
+
+      if (!response.error && response.data) {
+        setTotalPrice(parseFloat(response.data.finalPrice));
+      }
+    } catch (error) {
+      console.error('Error calculating total price:', error);
+      setTotalPrice(null);
+    }
+  }
+
   // Fetch booking status for calendar dates
   async function fetchDateBookingStatus() {
     if (!id) return;
@@ -216,22 +247,19 @@ export default function CourtDetail() {
         .lte('date', format(nextMonth, 'yyyy-MM-dd'));
 
       const dateStatus: { [key: string]: 'full' | 'partial' | 'available' } = {};
-      const totalSlots = 16; // Total available time slots per day
+      const totalSlots = 16;
 
-      // Process bookings
       const bookingsByDate: { [key: string]: number } = {};
       bookings?.forEach(b => {
         const key = b.booking_date;
         bookingsByDate[key] = (bookingsByDate[key] || 0) + 1;
       });
 
-      // Process blocked slots
       blocked?.forEach(b => {
         const key = b.date;
         bookingsByDate[key] = (bookingsByDate[key] || 0) + 1;
       });
 
-      // Determine status for each date
       Object.entries(bookingsByDate).forEach(([date, count]) => {
         if (count >= totalSlots) {
           dateStatus[date] = 'full';
@@ -255,25 +283,46 @@ export default function CourtDetail() {
   }, [id]);
 
   const timeSlots = [
-    '06:00-07:00', '07:00-08:00', '08:00-09:00', '09:00-10:00',
-    '10:00-11:00', '11:00-12:00', '12:00-13:00', '13:00-14:00',
-    '14:00-15:00', '15:00-16:00', '16:00-17:00', '17:00-18:00',
-    '18:00-19:00', '19:00-20:00', '20:00-21:00', '21:00-22:00',
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
+    '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00',
   ];
 
-  const isSlotAvailable = (slot: string) => {
-    const [startTime, endTime] = slot.split('-');
-    return !bookedSlots.includes(slot) && 
-           !blockedSlots.includes(slot) && 
-           !isSlotLocked(startTime, endTime);
+  const convertTo12Hour = (time24: string) => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
-  const getSlotStatus = (slot: string) => {
-    const [startTime, endTime] = slot.split('-');
-    if (bookedSlots.includes(slot)) return { status: 'booked', label: 'Booked', color: 'destructive' };
-    if (blockedSlots.includes(slot)) return { status: 'blocked', label: 'Blocked', color: 'secondary' };
-    if (isSlotLocked(startTime, endTime)) return { status: 'locked', label: 'Reserved', color: 'outline' };
-    return { status: 'available', label: 'Available', color: 'default' };
+  const addHoursToTime = (time: string, hours: number) => {
+    const [h, m] = time.split(':').map(Number);
+    const newHours = (h + hours) % 24;
+    return `${newHours.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
+  const isSlotAvailable = (startTime: string) => {
+    const endTime = addHoursToTime(startTime, selectedHours);
+    
+    // Check if end time is within operating hours
+    const endHour = parseInt(endTime.split(':')[0]);
+    if (endHour > 22) return false;
+    
+    // Check if any slot in the range is booked or blocked
+    for (let i = 0; i < selectedHours; i++) {
+      const checkStart = addHoursToTime(startTime, i);
+      const checkEnd = addHoursToTime(startTime, i + 1);
+      const slotKey = `${checkStart}-${checkEnd}`;
+      
+      if (bookedSlots.includes(slotKey) || blockedSlots.includes(slotKey)) {
+        return false;
+      }
+      
+      if (isSlotLocked(checkStart, checkEnd)) {
+        return false;
+      }
+    }
+    
+    return true;
   };
 
   const getPriceLevel = (multiplier: number) => {
@@ -294,20 +343,10 @@ export default function CourtDetail() {
       return;
     }
 
-    // Check if profile is complete
-    if (isProfileComplete === false) {
-      toast({
-        title: 'Complete your profile',
-        description: 'Please complete your profile before booking',
-      });
-      navigate(`/complete-profile?return=/courts/${id}`);
-      return;
-    }
-
-    if (!selectedDate || !selectedTime) {
+    if (!selectedDate || !selectedStartTime) {
       toast({
         title: 'Missing information',
-        description: 'Please select both date and time',
+        description: 'Please select date and start time',
         variant: 'destructive',
       });
       return;
@@ -316,43 +355,45 @@ export default function CourtDetail() {
     setBookingLoading(true);
 
     try {
-      const [startTime, endTime] = selectedTime.split('-');
+      const endTime = addHoursToTime(selectedStartTime, selectedHours);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Double-check slot availability before locking
-      const { data: existingBookings, error: checkError } = await supabase
-        .from('bookings')
-        .select('id')
-        .eq('court_id', id)
-        .eq('booking_date', dateStr)
-        .eq('start_time', startTime)
-        .eq('end_time', endTime)
-        .in('status', ['confirmed', 'pending']);
+      // Check all slots in range
+      for (let i = 0; i < selectedHours; i++) {
+        const checkStart = addHoursToTime(selectedStartTime, i);
+        const checkEnd = addHoursToTime(selectedStartTime, i + 1);
+        
+        const { data: existingBookings, error: checkError } = await supabase
+          .from('bookings')
+          .select('id')
+          .eq('court_id', id)
+          .eq('booking_date', dateStr)
+          .eq('start_time', checkStart)
+          .eq('end_time', checkEnd)
+          .in('status', ['confirmed', 'pending']);
 
-      if (checkError) throw checkError;
+        if (checkError) throw checkError;
 
-      if (existingBookings && existingBookings.length > 0) {
-        toast({
-          title: 'Slot Unavailable',
-          description: 'This slot was just booked by another user. Please select a different time.',
-          variant: 'destructive',
-        });
-        // Refresh slots to show updated availability
-        await fetchBookedSlots();
-        return;
+        if (existingBookings && existingBookings.length > 0) {
+          toast({
+            title: 'Slot Unavailable',
+            description: 'One or more slots in your selection were just booked. Please choose different times.',
+            variant: 'destructive',
+          });
+          await fetchBookedSlots();
+          return;
+        }
       }
       
-      // Check if slot is already locked by current user
-      const existingLock = getCurrentUserLock(startTime, endTime);
+      const existingLock = getCurrentUserLock(selectedStartTime, endTime);
       
       if (!existingLock) {
-        // Create a new slot lock
-        const lock = await lockSlot(startTime, endTime);
+        const lock = await lockSlot(selectedStartTime, endTime);
         
         if (!lock) {
           toast({
             title: 'Slot Unavailable',
-            description: 'This time slot is currently being reserved by another user. Please try again in a moment or select a different time.',
+            description: 'This time slot is currently being reserved. Please try again in a moment.',
             variant: 'destructive',
           });
           await fetchBookedSlots();
@@ -365,12 +406,11 @@ export default function CourtDetail() {
         });
       }
 
-      // Navigate to booking page
       navigate(`/book/${id}`, {
         state: {
           court,
           date: selectedDate,
-          timeSlot: selectedTime,
+          timeSlot: `${selectedStartTime}-${endTime}`,
           lockId: existingLock?.id,
         },
       });
@@ -407,6 +447,11 @@ export default function CourtDetail() {
   const avgRating = court.reviews?.length > 0
     ? court.reviews.reduce((a: number, r: any) => a + r.rating, 0) / court.reviews.length
     : 0;
+
+  const availableStartTimes = timeSlots.filter(time => {
+    const hour = parseInt(time.split(':')[0]);
+    return hour + selectedHours <= 22 && isSlotAvailable(time);
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -557,131 +602,106 @@ export default function CourtDetail() {
                 </div>
 
                 {selectedDate && (
-                  <div>
-                    <label className="mb-2 block text-sm font-medium">Select Time Slot</label>
-                    
-                    {/* Pricing Legend */}
-                    <div className="mb-3 p-3 bg-muted/50 rounded-lg border">
-                      <p className="text-xs font-medium mb-2">Price Levels:</p>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
-                          <span>💵 Standard (1.0x)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                          <span>💰 Moderate (1.3x)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                          <span>🔥 Peak (1.7x)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                          <span>⭐ Premium (1.8x+)</span>
-                        </div>
+                  <>
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">Duration (hours)</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
+                          <Button
+                            key={hours}
+                            variant={selectedHours === hours ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSelectedHours(hours)}
+                            className="h-10"
+                          >
+                            {hours}h
+                          </Button>
+                        ))}
                       </div>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Select 1-8 hours for your booking
+                      </p>
                     </div>
 
-                    {loadingPricing ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                        <span className="ml-2 text-sm text-muted-foreground">Loading pricing...</span>
-                      </div>
-                    ) : (
-                      <>
-                        <Select value={selectedTime} onValueChange={setSelectedTime}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose a time slot">
-                              {selectedTime && slotPricing[selectedTime] && (
-                                <div className="flex items-center justify-between w-full">
-                                  <div className="flex items-center">
-                                    <Clock className="mr-2 h-4 w-4" />
-                                    {selectedTime}
-                                  </div>
-                                  <span className="text-sm font-semibold">${slotPricing[selectedTime].price}</span>
-                                </div>
-                              )}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[300px]">
-                            {timeSlots.filter(slot => isSlotAvailable(slot)).map((slot) => {
-                              const pricing = slotPricing[slot];
-                              const priceLevel = pricing ? getPriceLevel(pricing.multiplier) : null;
-                              
-                              return (
-                                <SelectItem
-                                  key={slot}
-                                  value={slot}
-                                  className="cursor-pointer py-3"
-                                >
-                                  <div className="flex items-center justify-between w-full gap-3">
-                                    <div className="flex flex-col gap-1">
-                                      <span className="font-medium">{slot}</span>
-                                      {pricing && pricing.rules.length > 0 && (
-                                        <span className="text-xs text-muted-foreground">
-                                          {pricing.rules[0]}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {pricing && (
-                                        <span className="text-sm font-bold">${pricing.price}</span>
-                                      )}
-                                      {priceLevel && (
-                                        <Badge 
-                                          variant="outline"
-                                          className={`${priceLevel.color} text-xs`}
-                                        >
-                                          {priceLevel.label}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-                                </SelectItem>
-                              );
-                            })}
-                            {timeSlots.filter(slot => !isSlotAvailable(slot)).length === timeSlots.length && (
-                              <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                                No available slots for this date
+                    <div>
+                      <label className="mb-2 block text-sm font-medium">Select Start Time</label>
+                      
+                      {loadingPricing ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                          <span className="ml-2 text-sm text-muted-foreground">Loading times...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-2">
+                            {availableStartTimes.length === 0 ? (
+                              <div className="py-8 text-center text-sm text-muted-foreground">
+                                No available slots for {selectedHours} hour{selectedHours > 1 ? 's' : ''}
                               </div>
+                            ) : (
+                              availableStartTimes.map((time) => {
+                                const endTime = addHoursToTime(time, selectedHours);
+                                const slotKey = `${time}-${addHoursToTime(time, 1)}`;
+                                const pricing = slotPricing[slotKey];
+                                
+                                return (
+                                  <Button
+                                    key={time}
+                                    variant={selectedStartTime === time ? 'default' : 'outline'}
+                                    className="w-full justify-between h-auto py-3"
+                                    onClick={() => setSelectedStartTime(time)}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="h-4 w-4" />
+                                      <div className="text-left">
+                                        <div className="font-medium">
+                                          {convertTo12Hour(time)} - {convertTo12Hour(endTime)}
+                                        </div>
+                                        <div className="text-xs opacity-70">
+                                          {selectedHours} hour{selectedHours > 1 ? 's' : ''}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    {pricing && (
+                                      <Badge variant="secondary" className="ml-2">
+                                        ${pricing.price}/hr
+                                      </Badge>
+                                    )}
+                                  </Button>
+                                );
+                              })
                             )}
-                          </SelectContent>
-                        </Select>
+                          </div>
 
-                        {/* Show slot availability and pricing summary */}
-                        <div className="mt-3 space-y-2">
-                          {bookedSlots.length + blockedSlots.length > 0 && (
-                            <p className="text-xs text-muted-foreground">
-                              {bookedSlots.length} slot{bookedSlots.length !== 1 ? 's' : ''} booked • {timeSlots.length - bookedSlots.length - blockedSlots.length} available
-                            </p>
-                          )}
-                          {selectedTime && slotPricing[selectedTime] && slotPricing[selectedTime].rules.length > 0 && (
-                            <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded text-xs">
-                              <p className="font-medium text-amber-700 dark:text-amber-500 mb-1">💡 Pricing Info:</p>
-                              {slotPricing[selectedTime].rules.map((rule, idx) => (
-                                <p key={idx} className="text-muted-foreground">• {rule}</p>
-                              ))}
+                          {selectedStartTime && totalPrice !== null && (
+                            <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-sm font-medium">Total Price:</span>
+                                <span className="text-2xl font-bold text-primary">${totalPrice.toFixed(2)}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {selectedHours} hour{selectedHours > 1 ? 's' : ''} • {convertTo12Hour(selectedStartTime)} - {convertTo12Hour(addHoursToTime(selectedStartTime, selectedHours))}
+                              </p>
                             </div>
                           )}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                        </>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 <Button
                   className="w-full text-lg py-6"
                   size="lg"
                   onClick={handleBooking}
-                  disabled={!selectedDate || !selectedTime || bookingLoading}
+                  disabled={!selectedDate || !selectedStartTime || bookingLoading || loadingPricing}
                 >
                   {bookingLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Reserving slot...
                     </>
-                  ) : !selectedDate || !selectedTime ? (
+                  ) : !selectedDate || !selectedStartTime ? (
                     'Select Date & Time'
                   ) : (
                     <>
@@ -690,7 +710,7 @@ export default function CourtDetail() {
                     </>
                   )}
                 </Button>
-                {selectedDate && selectedTime && (
+                {selectedDate && selectedStartTime && (
                   <p className="text-sm text-muted-foreground text-center">
                     Slot will be reserved for 5 minutes
                   </p>

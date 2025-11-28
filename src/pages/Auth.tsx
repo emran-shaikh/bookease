@@ -19,6 +19,8 @@ export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
   const [showTestAccounts, setShowTestAccounts] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
@@ -117,8 +119,18 @@ export default function Auth() {
       return;
     }
 
+    if (!phone.trim()) {
+      toast({ title: 'Validation Error', description: 'Mobile number is required', variant: 'destructive' });
+      return;
+    }
+
+    if (!city.trim()) {
+      toast({ title: 'Validation Error', description: 'City is required', variant: 'destructive' });
+      return;
+    }
+
     setIsLoading(true);
-    const { error } = await signUp(email, password, fullName);
+    const { error } = await signUp(email, password, fullName, phone, city);
     setIsLoading(false);
 
     if (error) {
@@ -297,6 +309,28 @@ export default function Auth() {
                     placeholder="you@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">Mobile Number</Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-city">City</Label>
+                  <Input
+                    id="signup-city"
+                    type="text"
+                    placeholder="New York"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
                     required
                   />
                 </div>
