@@ -9,7 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, LayoutDashboard, LogOut, Calendar } from 'lucide-react';
+import { User, LayoutDashboard, LogOut, Calendar, Heart } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 
 export function Header() {
@@ -37,6 +37,10 @@ export function Header() {
           </Link>
           {user ? (
             <>
+              <Link to="/favorites" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1">
+                <Heart className="h-4 w-4" />
+                Favorites
+              </Link>
               <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

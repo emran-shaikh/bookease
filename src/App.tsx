@@ -16,6 +16,7 @@ import OwnerDashboard from "./pages/OwnerDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import CompleteProfile from "./pages/CompleteProfile";
 import ReviewPage from "./pages/ReviewPage";
+import Favorites from "./pages/Favorites";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

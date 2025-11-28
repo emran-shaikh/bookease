@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, MapPin, Star, Clock, Lock } from 'lucide-react';
+import { Loader2, MapPin, Star, Clock, Lock, Heart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useFavorites } from '@/hooks/useFavorites';
 
 export default function CourtDetail() {
   const { id } = useParams();
@@ -29,6 +30,7 @@ export default function CourtDetail() {
   const [slotPricing, setSlotPricing] = useState<{ [key: string]: { price: number; multiplier: number; rules: string[] } }>({});
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [totalPrice, setTotalPrice] = useState<number | null>(null);
+  const { toggleFavorite, isFavorite } = useFavorites(user?.id);
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(id || '', selectedDate || null);
 
@@ -460,7 +462,7 @@ export default function CourtDetail() {
       <main className="container py-8">
         <div className="grid gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <div className="mb-6 aspect-video w-full overflow-hidden rounded-lg bg-muted">
+            <div className="mb-6 aspect-video w-full overflow-hidden rounded-lg bg-muted relative">
               {court.images && court.images.length > 0 ? (
                 <img
                   src={court.images[0]}
@@ -471,6 +473,20 @@ export default function CourtDetail() {
                 <div className="flex h-full items-center justify-center text-muted-foreground">
                   No image available
                 </div>
+              )}
+              {user && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-4 right-4 bg-background/80 hover:bg-background"
+                  onClick={() => toggleFavorite(court.id)}
+                >
+                  <Heart
+                    className={`h-6 w-6 ${
+                      isFavorite(court.id) ? 'fill-red-500 text-red-500' : 'text-foreground'
+                    }`}
+                  />
+                </Button>
               )}
             </div>
 
