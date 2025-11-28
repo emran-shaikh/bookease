@@ -56,28 +56,6 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      navigate('/courts');
-    }
-  }, [user, navigate]);
-
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          });
-        },
-        (error) => {
-          console.log('Geolocation error:', error);
-        }
-      );
-    }
-  }, []);
-
-  useEffect(() => {
     fetchCourts();
     fetchPopularCourts();
   }, []);
@@ -238,15 +216,7 @@ export default function Index() {
   const uniqueSports = Array.from(new Set(courts.map(court => court.sport_type)));
 
   const handleCourtClick = (courtId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please sign in or sign up to view court details and book",
-      });
-      navigate('/auth');
-    } else {
-      navigate(`/courts/${courtId}`);
-    }
+    navigate(`/courts/${courtId}`);
   };
 
   return (
