@@ -8,9 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, MapPin, Star, Clock, Lock, Heart } from 'lucide-react';
+import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, addDays, startOfDay } from 'date-fns';
 import { useFavorites } from '@/hooks/useFavorites';
 
 export default function CourtDetail() {
@@ -596,53 +596,95 @@ export default function CourtDetail() {
           </div>
 
           <div className="lg:col-span-1">
-            <Card className="sticky top-20">
-              <CardHeader>
-                <CardTitle>Book This Court</CardTitle>
-                <CardDescription className="text-2xl font-bold text-foreground">
-                  ${court.base_price}/hour
-                </CardDescription>
+            <Card className="sticky top-20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-br from-primary/5 to-secondary/5 border-b">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">Book Your Slot</CardTitle>
+                    <CardDescription className="text-lg font-semibold text-primary mt-1">
+                      ${court.base_price}/hour base rate
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6 p-6">
+                {/* Horizontal Date Selector */}
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Select Date</label>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={setSelectedDate}
-                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                    className="rounded-md border"
-                    modifiers={{
-                      fullyBooked: (date) => {
-                        const dateStr = format(date, 'yyyy-MM-dd');
-                        return dateBookingStatus[dateStr] === 'full';
-                      },
-                      partiallyBooked: (date) => {
-                        const dateStr = format(date, 'yyyy-MM-dd');
-                        return dateBookingStatus[dateStr] === 'partial';
-                      },
-                    }}
-                    modifiersClassNames={{
-                      fullyBooked: 'bg-destructive/20 text-destructive font-bold',
-                      partiallyBooked: 'bg-yellow-500/20 text-yellow-700 font-medium',
-                    }}
-                  />
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <div className="h-3 w-3 rounded-sm bg-destructive/20 border border-destructive" />
-                      <span>Fully Booked</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="h-3 w-3 rounded-sm bg-yellow-500/20 border border-yellow-500" />
-                      <span>Partially Booked</span>
+                  <h3 className="text-lg font-semibold mb-4 text-center">Select a date</h3>
+                  <div className="relative">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 h-10 w-10 rounded-full"
+                        onClick={() => {
+                          const firstDate = startOfDay(new Date());
+                          setSelectedDate(firstDate);
+                        }}
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </Button>
+                      
+                      <div className="flex-1 overflow-x-auto hide-scrollbar">
+                        <div className="flex gap-2 min-w-max px-1">
+                          {Array.from({ length: 14 }).map((_, index) => {
+                            const date = addDays(startOfDay(new Date()), index);
+                            const dateStr = format(date, 'yyyy-MM-dd');
+                            const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === dateStr;
+                            const status = dateBookingStatus[dateStr];
+                            
+                            return (
+                              <button
+                                key={dateStr}
+                                onClick={() => setSelectedDate(date)}
+                                className={`flex flex-col items-center justify-center min-w-[70px] p-3 rounded-xl border-2 transition-all ${
+                                  isSelected
+                                    ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-105'
+                                    : 'bg-card hover:bg-muted border-border hover:border-primary/50'
+                                }`}
+                              >
+                                <div className={`text-xs font-medium mb-1 ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
+                                  {format(date, 'EEE')}
+                                </div>
+                                <div className={`text-2xl font-bold ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
+                                  {format(date, 'd')}
+                                </div>
+                                <div className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                  {format(date, 'MMM')}
+                                </div>
+                                {status && !isSelected && (
+                                  <div className="mt-1">
+                                    <div className={`h-1.5 w-1.5 rounded-full ${
+                                      status === 'full' ? 'bg-destructive' : 'bg-warning'
+                                    }`} />
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 h-10 w-10 rounded-full"
+                        onClick={() => {
+                          const lastDate = addDays(startOfDay(new Date()), 13);
+                          setSelectedDate(lastDate);
+                        }}
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
                     </div>
                   </div>
                 </div>
 
                 {selectedDate && (
                   <>
+                    {/* Duration Selector */}
                     <div>
-                      <label className="mb-2 block text-sm font-medium">Duration (hours)</label>
+                      <h3 className="text-sm font-medium mb-3">Duration</h3>
                       <div className="grid grid-cols-4 gap-2">
                         {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
                           <Button
@@ -650,89 +692,85 @@ export default function CourtDetail() {
                             variant={selectedHours === hours ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => setSelectedHours(hours)}
-                            className="h-10"
+                            className={`h-11 font-semibold transition-all ${
+                              selectedHours === hours ? 'shadow-md' : ''
+                            }`}
                           >
                             {hours}h
                           </Button>
                         ))}
                       </div>
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Select 1-8 hours for your booking
-                      </p>
                     </div>
 
+                    {/* Time Slots Grid */}
                     <div>
-                      <label className="mb-2 block text-sm font-medium">Select Start Time</label>
+                      <h3 className="text-sm font-medium mb-3">Select a time slot</h3>
                       
                       {loadingPricing ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                          <span className="ml-2 text-sm text-muted-foreground">Loading times...</span>
+                        <div className="flex flex-col items-center justify-center py-12">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+                          <span className="text-sm text-muted-foreground">Loading available times...</span>
                         </div>
                       ) : (
                         <>
-                          <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-2">
-                            {timeSlots.map((time) => {
-                              const hour = parseInt(time.split(':')[0]);
-                              if (hour + selectedHours > 22) return null;
-                              
-                              const endTime = addHoursToTime(time, selectedHours);
-                              const slotKey = `${time}-${addHoursToTime(time, 1)}`;
-                              const pricing = slotPricing[slotKey];
-                              const slotStatus = getSlotStatus(time);
-                              
-                              return (
-                                <Button
-                                  key={time}
-                                  variant={selectedStartTime === time ? 'default' : 'outline'}
-                                  className={`w-full justify-between h-auto py-3 ${
-                                    !slotStatus.available 
-                                      ? 'opacity-50 cursor-not-allowed bg-muted/50' 
-                                      : ''
-                                  }`}
-                                  onClick={() => slotStatus.available && setSelectedStartTime(time)}
-                                  disabled={!slotStatus.available}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4" />
-                                    <div className="text-left">
-                                      <div className="font-medium">
-                                        {convertTo12Hour(time)} - {convertTo12Hour(endTime)}
-                                      </div>
-                                      <div className="text-xs opacity-70">
-                                        {slotStatus.available ? (
-                                          <>{selectedHours} hour{selectedHours > 1 ? 's' : ''}</>
-                                        ) : (
-                                          <span className="text-destructive font-medium">{slotStatus.reason}</span>
-                                        )}
-                                      </div>
+                          <div className="max-h-[320px] overflow-y-auto pr-2 space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              {timeSlots.map((time) => {
+                                const hour = parseInt(time.split(':')[0]);
+                                if (hour + selectedHours > 22) return null;
+                                
+                                const endTime = addHoursToTime(time, selectedHours);
+                                const slotKey = `${time}-${addHoursToTime(time, 1)}`;
+                                const pricing = slotPricing[slotKey];
+                                const slotStatus = getSlotStatus(time);
+                                const isSelected = selectedStartTime === time;
+                                
+                                return (
+                                  <button
+                                    key={time}
+                                    onClick={() => slotStatus.available && setSelectedStartTime(time)}
+                                    disabled={!slotStatus.available}
+                                    className={`relative p-4 rounded-xl border-2 transition-all text-left ${
+                                      isSelected
+                                        ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-[1.02]'
+                                        : slotStatus.available
+                                        ? 'bg-card border-border hover:border-primary/50 hover:bg-muted/50'
+                                        : 'bg-muted/30 border-muted cursor-not-allowed opacity-60'
+                                    }`}
+                                  >
+                                    <div className={`text-base font-bold mb-1 ${
+                                      isSelected ? 'text-primary-foreground' : slotStatus.available ? 'text-primary' : 'text-muted-foreground'
+                                    }`}>
+                                      {convertTo12Hour(time)}
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {!slotStatus.available ? (
-                                      <Badge variant="destructive" className="ml-2">
+                                    {slotStatus.available ? (
+                                      <div className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                        {selectedHours}h • {pricing ? `$${pricing.price}/hr` : '...'}
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-destructive font-medium">
                                         {slotStatus.reason}
-                                      </Badge>
-                                    ) : pricing ? (
-                                      <Badge variant="secondary" className="ml-2">
-                                        ${pricing.price}/hr
-                                      </Badge>
-                                    ) : null}
-                                  </div>
-                                </Button>
-                              );
-                            })}
+                                      </div>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
 
                           {selectedStartTime && totalPrice !== null && (
-                            <div className="mt-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                              <div className="flex justify-between items-center mb-1">
-                                <span className="text-sm font-medium">Total Price:</span>
-                                <span className="text-2xl font-bold text-primary">${totalPrice.toFixed(2)}</span>
+                            <div className="mt-4 p-4 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/20 rounded-xl">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <div className="text-sm text-muted-foreground mb-1">Total Price</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {convertTo12Hour(selectedStartTime)} - {convertTo12Hour(addHoursToTime(selectedStartTime, selectedHours))}
+                                  </div>
+                                </div>
+                                <div className="text-3xl font-bold text-primary">
+                                  ${totalPrice.toFixed(2)}
+                                </div>
                               </div>
-                              <p className="text-xs text-muted-foreground">
-                                {selectedHours} hour{selectedHours > 1 ? 's' : ''} • {convertTo12Hour(selectedStartTime)} - {convertTo12Hour(addHoursToTime(selectedStartTime, selectedHours))}
-                              </p>
                             </div>
                           )}
                         </>
@@ -742,28 +780,28 @@ export default function CourtDetail() {
                 )}
 
                 <Button
-                  className="w-full text-lg py-6"
+                  className="w-full text-base py-6 shadow-lg hover:shadow-xl transition-all"
                   size="lg"
                   onClick={handleBooking}
                   disabled={!selectedDate || !selectedStartTime || bookingLoading || loadingPricing}
                 >
                   {bookingLoading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                       Reserving slot...
                     </>
                   ) : !selectedDate || !selectedStartTime ? (
                     'Select Date & Time'
                   ) : (
                     <>
-                      <Lock className="mr-2 h-4 w-4" />
-                      Reserve & Continue
+                      <Lock className="mr-2 h-5 w-5" />
+                      Reserve & Continue to Payment
                     </>
                   )}
                 </Button>
                 {selectedDate && selectedStartTime && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    Slot will be reserved for 5 minutes
+                  <p className="text-xs text-muted-foreground text-center">
+                    🔒 Slot will be reserved for 5 minutes
                   </p>
                 )}
               </CardContent>
