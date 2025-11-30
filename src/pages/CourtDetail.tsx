@@ -450,10 +450,32 @@ export default function CourtDetail() {
     ? court.reviews.reduce((a: number, r: any) => a + r.rating, 0) / court.reviews.length
     : 0;
 
-  const availableStartTimes = timeSlots.filter(time => {
+  const getSlotStatus = (time: string) => {
     const hour = parseInt(time.split(':')[0]);
-    return hour + selectedHours <= 22 && isSlotAvailable(time);
-  });
+    if (hour + selectedHours > 22) return { available: false, reason: 'Outside hours' };
+    
+    const available = isSlotAvailable(time);
+    if (!available) {
+      // Check if it's booked or blocked
+      for (let i = 0; i < selectedHours; i++) {
+        const checkStart = addHoursToTime(time, i);
+        const checkEnd = addHoursToTime(time, i + 1);
+        const slotKey = `${checkStart}-${checkEnd}`;
+        
+        if (bookedSlots.includes(slotKey)) {
+          return { available: false, reason: 'Booked' };
+        }
+        if (blockedSlots.includes(slotKey)) {
+          return { available: false, reason: 'Unavailable' };
+        }
+        if (isSlotLocked(checkStart, checkEnd)) {
+          return { available: false, reason: 'Being reserved' };
+        }
+      }
+    }
+    
+    return { available: true, reason: '' };
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -650,43 +672,56 @@ export default function CourtDetail() {
                       ) : (
                         <>
                           <div className="max-h-[300px] overflow-y-auto space-y-2 border rounded-md p-2">
-                            {availableStartTimes.length === 0 ? (
-                              <div className="py-8 text-center text-sm text-muted-foreground">
-                                No available slots for {selectedHours} hour{selectedHours > 1 ? 's' : ''}
-                              </div>
-                            ) : (
-                              availableStartTimes.map((time) => {
-                                const endTime = addHoursToTime(time, selectedHours);
-                                const slotKey = `${time}-${addHoursToTime(time, 1)}`;
-                                const pricing = slotPricing[slotKey];
-                                
-                                return (
-                                  <Button
-                                    key={time}
-                                    variant={selectedStartTime === time ? 'default' : 'outline'}
-                                    className="w-full justify-between h-auto py-3"
-                                    onClick={() => setSelectedStartTime(time)}
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <Clock className="h-4 w-4" />
-                                      <div className="text-left">
-                                        <div className="font-medium">
-                                          {convertTo12Hour(time)} - {convertTo12Hour(endTime)}
-                                        </div>
-                                        <div className="text-xs opacity-70">
-                                          {selectedHours} hour{selectedHours > 1 ? 's' : ''}
-                                        </div>
+                            {timeSlots.map((time) => {
+                              const hour = parseInt(time.split(':')[0]);
+                              if (hour + selectedHours > 22) return null;
+                              
+                              const endTime = addHoursToTime(time, selectedHours);
+                              const slotKey = `${time}-${addHoursToTime(time, 1)}`;
+                              const pricing = slotPricing[slotKey];
+                              const slotStatus = getSlotStatus(time);
+                              
+                              return (
+                                <Button
+                                  key={time}
+                                  variant={selectedStartTime === time ? 'default' : 'outline'}
+                                  className={`w-full justify-between h-auto py-3 ${
+                                    !slotStatus.available 
+                                      ? 'opacity-50 cursor-not-allowed bg-muted/50' 
+                                      : ''
+                                  }`}
+                                  onClick={() => slotStatus.available && setSelectedStartTime(time)}
+                                  disabled={!slotStatus.available}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4" />
+                                    <div className="text-left">
+                                      <div className="font-medium">
+                                        {convertTo12Hour(time)} - {convertTo12Hour(endTime)}
+                                      </div>
+                                      <div className="text-xs opacity-70">
+                                        {slotStatus.available ? (
+                                          <>{selectedHours} hour{selectedHours > 1 ? 's' : ''}</>
+                                        ) : (
+                                          <span className="text-destructive font-medium">{slotStatus.reason}</span>
+                                        )}
                                       </div>
                                     </div>
-                                    {pricing && (
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {!slotStatus.available ? (
+                                      <Badge variant="destructive" className="ml-2">
+                                        {slotStatus.reason}
+                                      </Badge>
+                                    ) : pricing ? (
                                       <Badge variant="secondary" className="ml-2">
                                         ${pricing.price}/hr
                                       </Badge>
-                                    )}
-                                  </Button>
-                                );
-                              })
-                            )}
+                                    ) : null}
+                                  </div>
+                                </Button>
+                              );
+                            })}
                           </div>
 
                           {selectedStartTime && totalPrice !== null && (
