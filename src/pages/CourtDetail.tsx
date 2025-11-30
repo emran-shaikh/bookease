@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -31,6 +31,7 @@ export default function CourtDetail() {
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [totalPrice, setTotalPrice] = useState<number | null>(null);
   const { toggleFavorite, isFavorite } = useFavorites(user?.id);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(id || '', selectedDate || null);
 
@@ -618,14 +619,15 @@ export default function CourtDetail() {
                         size="icon"
                         className="shrink-0 h-10 w-10 rounded-full"
                         onClick={() => {
-                          const firstDate = startOfDay(new Date());
-                          setSelectedDate(firstDate);
+                          if (scrollContainerRef.current) {
+                            scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+                          }
                         }}
                       >
                         <ChevronLeft className="h-5 w-5" />
                       </Button>
                       
-                      <div className="flex-1 overflow-x-auto hide-scrollbar">
+                      <div ref={scrollContainerRef} className="flex-1 overflow-x-auto hide-scrollbar scroll-smooth">
                         <div className="flex gap-2 min-w-max px-1">
                           {Array.from({ length: 14 }).map((_, index) => {
                             const date = addDays(startOfDay(new Date()), index);
@@ -670,8 +672,9 @@ export default function CourtDetail() {
                         size="icon"
                         className="shrink-0 h-10 w-10 rounded-full"
                         onClick={() => {
-                          const lastDate = addDays(startOfDay(new Date()), 13);
-                          setSelectedDate(lastDate);
+                          if (scrollContainerRef.current) {
+                            scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+                          }
                         }}
                       >
                         <ChevronRight className="h-5 w-5" />
@@ -728,7 +731,17 @@ export default function CourtDetail() {
                                 return (
                                   <button
                                     key={time}
-                                    onClick={() => slotStatus.available && setSelectedStartTime(time)}
+                                    onClick={() => {
+                                      if (slotStatus.available) {
+                                        setSelectedStartTime(time);
+                                      } else {
+                                        toast({
+                                          title: 'Slot Not Available',
+                                          description: `This time slot is ${slotStatus.reason.toLowerCase()}. Please select a different time.`,
+                                          variant: 'destructive',
+                                        });
+                                      }
+                                    }}
                                     disabled={!slotStatus.available}
                                     className={`relative p-4 rounded-xl border-2 transition-all text-left ${
                                       isSelected
