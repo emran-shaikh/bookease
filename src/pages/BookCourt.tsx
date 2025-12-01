@@ -245,6 +245,30 @@ export default function BookCourt() {
         return;
       }
 
+      // Send booking confirmation email
+      if (bookingStatus === 'confirmed') {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email, full_name, phone')
+          .eq('id', user?.id)
+          .single();
+
+        if (profile?.email) {
+          await supabase.functions.invoke('send-booking-confirmation', {
+            body: {
+              userEmail: profile.email,
+              userName: profile.full_name || 'Customer',
+              courtName: court.name,
+              bookingDate: format(date, 'MMMM d, yyyy'),
+              startTime: startTime,
+              endTime: endTime,
+              totalPrice: priceCalculation ? parseFloat(priceCalculation.totalPrice) : court.base_price,
+              userPhone: profile.phone,
+            }
+          });
+        }
+      }
+
       const lock = getCurrentUserLock(startTime, endTime);
       if (lock) {
         await unlockSlot(lock.id);

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, startOfDay } from 'date-fns';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -29,6 +29,7 @@ export default function CourtDetail() {
   const [dateBookingStatus, setDateBookingStatus] = useState<{ [key: string]: 'full' | 'partial' | 'available' }>({});
   const [slotPricing, setSlotPricing] = useState<{ [key: string]: { price: number; multiplier: number; rules: string[] } }>({});
   const [loadingPricing, setLoadingPricing] = useState(false);
+  const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [totalPrice, setTotalPrice] = useState<number | null>(null);
   const { toggleFavorite, isFavorite } = useFavorites(user?.id);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -707,7 +708,19 @@ export default function CourtDetail() {
 
                     {/* Time Slots Grid */}
                     <div>
-                      <h3 className="text-sm font-medium mb-3">Select a time slot</h3>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-medium">Select a time slot</h3>
+                        <Button
+                          type="button"
+                          variant={showAvailableOnly ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowAvailableOnly(!showAvailableOnly)}
+                          className="text-xs gap-1.5"
+                        >
+                          <Filter className="h-3 w-3" />
+                          {showAvailableOnly ? "Show All" : "Available Only"}
+                        </Button>
+                      </div>
                       
                       {loadingPricing ? (
                         <div className="flex flex-col items-center justify-center py-12">
@@ -718,9 +731,18 @@ export default function CourtDetail() {
                         <>
                           <div className="max-h-[320px] overflow-y-auto pr-2 space-y-2">
                             <div className="grid grid-cols-2 gap-2">
-                              {timeSlots.map((time) => {
-                                const hour = parseInt(time.split(':')[0]);
-                                if (hour + selectedHours > 22) return null;
+                              {timeSlots
+                                .filter((time) => {
+                                  // Apply filter if enabled
+                                  if (!showAvailableOnly) return true;
+                                  const hour = parseInt(time.split(':')[0]);
+                                  if (hour + selectedHours > 22) return false;
+                                  const slotStatus = getSlotStatus(time);
+                                  return slotStatus.available;
+                                })
+                                .map((time) => {
+                                  const hour = parseInt(time.split(':')[0]);
+                                  if (hour + selectedHours > 22) return null;
                                 
                                 const endTime = addHoursToTime(time, selectedHours);
                                 const slotKey = `${time}-${addHoursToTime(time, 1)}`;

@@ -314,49 +314,100 @@ export default function AdminDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {booking.status === 'pending' && booking.payment_status === 'pending' && (
-                              <Button
-                                size="sm"
-                                onClick={async () => {
-                                  try {
-                                    const { error: updateError } = await supabase
-                                      .from('bookings')
-                                      .update({ 
-                                        status: 'confirmed',
-                                        payment_status: 'succeeded'
-                                      })
-                                      .eq('id', booking.id);
+                            <div className="flex gap-2">
+                              {booking.status === 'pending' && booking.payment_status === 'pending' && (
+                                <Button
+                                  size="sm"
+                                  onClick={async () => {
+                                    try {
+                                      const { error: updateError } = await supabase
+                                        .from('bookings')
+                                        .update({ 
+                                          status: 'confirmed',
+                                          payment_status: 'succeeded'
+                                        })
+                                        .eq('id', booking.id);
 
-                                    if (updateError) throw updateError;
+                                      if (updateError) throw updateError;
 
-                                    await supabase.from('notifications').insert([
-                                      {
-                                        user_id: booking.user_id,
-                                        title: '✅ Booking Confirmed',
-                                        message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed!`,
-                                        type: 'success',
-                                        related_court_id: booking.court_id,
-                                      }
-                                    ]);
+                                      await supabase.from('notifications').insert([
+                                        {
+                                          user_id: booking.user_id,
+                                          title: '✅ Booking Confirmed',
+                                          message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed!`,
+                                          type: 'success',
+                                          related_court_id: booking.court_id,
+                                        }
+                                      ]);
 
-                                    toast({ 
-                                      title: 'Success', 
-                                      description: 'Booking confirmed and customer notified' 
-                                    });
-                                    fetchAdminData();
-                                  } catch (error: any) {
-                                    toast({ 
-                                      title: 'Error', 
-                                      description: error.message, 
-                                      variant: 'destructive' 
-                                    });
-                                  }
-                                }}
-                              >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Confirm
-                              </Button>
-                            )}
+                                      // Send email notification
+                                      await supabase.functions.invoke('send-booking-confirmation', {
+                                        body: {
+                                          bookingId: booking.id,
+                                          userEmail: booking.profiles?.email,
+                                          userName: booking.profiles?.full_name || 'Customer',
+                                          courtName: booking.courts?.name,
+                                          bookingDate: format(new Date(booking.booking_date), 'MMMM d, yyyy'),
+                                          startTime: booking.start_time,
+                                          endTime: booking.end_time,
+                                          totalPrice: booking.total_price,
+                                        }
+                                      });
+
+                                      toast({ 
+                                        title: 'Success', 
+                                        description: 'Booking confirmed and customer notified' 
+                                      });
+                                      fetchAdminData();
+                                    } catch (error: any) {
+                                      toast({ 
+                                        title: 'Error', 
+                                        description: error.message, 
+                                        variant: 'destructive' 
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Confirm
+                                </Button>
+                              )}
+                              {(booking.status === 'confirmed' || booking.status === 'pending') && (
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={async () => {
+                                    if (!confirm('Are you sure you want to cancel this booking?')) return;
+                                    try {
+                                      const { error } = await supabase
+                                        .from('bookings')
+                                        .update({ status: 'cancelled' })
+                                        .eq('id', booking.id);
+
+                                      if (error) throw error;
+
+                                      await supabase.from('notifications').insert([
+                                        {
+                                          user_id: booking.user_id,
+                                          title: '❌ Booking Cancelled',
+                                          message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been cancelled.`,
+                                          type: 'error',
+                                          related_court_id: booking.court_id,
+                                        }
+                                      ]);
+
+                                      toast({ title: 'Success', description: 'Booking cancelled' });
+                                      fetchAdminData();
+                                    } catch (error: any) {
+                                      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                                    }
+                                  }}
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Cancel
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
