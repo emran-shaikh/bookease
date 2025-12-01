@@ -1,1 +1,13 @@
 project_id = "uhmtrnmsrbeaizjxoily"
+
+[functions.calculate-price]
+verify_jwt = false
+
+[functions.create-payment-intent]
+verify_jwt = false
+
+[functions.notify-favorite-courts]
+verify_jwt = false
+
+[functions.send-booking-confirmation]
+verify_jwt = false

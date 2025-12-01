@@ -453,50 +453,88 @@ export default function OwnerDashboard() {
                         </div>
                       )}
                     </div>
-                    {booking.status === 'pending' && booking.payment_status === 'pending' && (
-                      <Button 
-                        size="sm" 
-                        className="w-full"
-                        onClick={async () => {
-                          try {
-                            const { error: updateError } = await supabase
-                              .from('bookings')
-                              .update({ 
-                                status: 'confirmed',
-                                payment_status: 'succeeded'
-                              })
-                              .eq('id', booking.id);
+                    <div className="flex gap-2 mt-4">
+                      {booking.status === 'pending' && booking.payment_status === 'pending' && (
+                        <Button 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={async () => {
+                            try {
+                              const { error: updateError } = await supabase
+                                .from('bookings')
+                                .update({ 
+                                  status: 'confirmed',
+                                  payment_status: 'succeeded'
+                                })
+                                .eq('id', booking.id);
 
-                            if (updateError) throw updateError;
+                              if (updateError) throw updateError;
 
-                            await supabase.from('notifications').insert([
-                              {
-                                user_id: booking.user_id,
-                                title: '✅ Booking Confirmed',
-                                message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed!`,
-                                type: 'success',
-                                related_court_id: booking.court_id,
-                              }
-                            ]);
+                              await supabase.from('notifications').insert([
+                                {
+                                  user_id: booking.user_id,
+                                  title: '✅ Booking Confirmed',
+                                  message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been confirmed!`,
+                                  type: 'success',
+                                  related_court_id: booking.court_id,
+                                }
+                              ]);
 
-                            toast({ 
-                              title: 'Success', 
-                              description: 'Booking confirmed and customer notified' 
-                            });
-                            fetchOwnerData();
-                          } catch (error: any) {
-                            toast({ 
-                              title: 'Error', 
-                              description: error.message, 
-                              variant: 'destructive' 
-                            });
-                          }
-                        }}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Confirm Payment & Booking
-                      </Button>
-                    )}
+                              toast({ 
+                                title: 'Success', 
+                                description: 'Booking confirmed and customer notified' 
+                              });
+                              fetchOwnerData();
+                            } catch (error: any) {
+                              toast({ 
+                                title: 'Error', 
+                                description: error.message, 
+                                variant: 'destructive' 
+                              });
+                            }
+                          }}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Confirm
+                        </Button>
+                      )}
+                      {(booking.status === 'confirmed' || booking.status === 'pending') && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={async () => {
+                            if (!confirm('Are you sure you want to cancel this booking?')) return;
+                            try {
+                              const { error } = await supabase
+                                .from('bookings')
+                                .update({ status: 'cancelled' })
+                                .eq('id', booking.id);
+
+                              if (error) throw error;
+
+                              await supabase.from('notifications').insert([
+                                {
+                                  user_id: booking.user_id,
+                                  title: '❌ Booking Cancelled',
+                                  message: `Your booking for ${booking.courts?.name} on ${format(new Date(booking.booking_date), 'MMM d, yyyy')} has been cancelled by the court owner.`,
+                                  type: 'error',
+                                  related_court_id: booking.court_id,
+                                }
+                              ]);
+
+                              toast({ title: 'Success', description: 'Booking cancelled and customer notified' });
+                              fetchOwnerData();
+                            } catch (error: any) {
+                              toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))
