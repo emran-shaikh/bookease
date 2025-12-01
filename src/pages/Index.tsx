@@ -245,7 +245,7 @@ export default function Index() {
         <div className="container relative z-10 flex flex-col items-center justify-center space-y-8 pt-16 text-center">
           <div className="space-y-6 animate-fade-in">
             <h1 className="text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl text-foreground">
-              Book Sports Venues
+              Book Sports Venuess
               <br />
               <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
                 Anytime, Anywhere
