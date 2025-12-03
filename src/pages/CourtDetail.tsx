@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
-import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, Filter, CalendarIcon, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, startOfDay } from 'date-fns';
+import { format, addDays, startOfDay, isBefore, isToday } from 'date-fns';
 import { useFavorites } from '@/hooks/useFavorites';
 
 export default function CourtDetail() {
@@ -31,6 +32,8 @@ export default function CourtDetail() {
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [totalPrice, setTotalPrice] = useState<number | null>(null);
+  const [priceBreakdown, setPriceBreakdown] = useState<{ basePrice: number; multiplier: number; rules: string[] } | null>(null);
+  const [viewMode, setViewMode] = useState<'scroll' | 'calendar'>('scroll');
   const { toggleFavorite, isFavorite } = useFavorites(user?.id);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
@@ -164,8 +167,9 @@ export default function CourtDetail() {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      const pricingPromises = timeSlots.map(async (slot) => {
-        const [startTime, endTime] = slot.split('-').map(t => t.trim());
+      const pricingPromises = timeSlots.map(async (startTime) => {
+        const endTime = addHoursToTime(startTime, 1);
+        const slotKey = `${startTime}-${endTime}`;
         
         try {
           const response = await supabase.functions.invoke('calculate-price', {
@@ -178,14 +182,14 @@ export default function CourtDetail() {
           });
 
           if (!response.error && response.data) {
-            pricing[slot] = {
-              price: parseFloat(response.data.finalPrice),
-              multiplier: response.data.priceMultiplier,
+            pricing[slotKey] = {
+              price: parseFloat(response.data.totalPrice) / 1, // totalPrice is already calculated for 1 hour
+              multiplier: response.data.priceMultiplier || 1,
               rules: response.data.appliedRules || []
             };
           }
         } catch (error) {
-          console.error(`Error fetching price for slot ${slot}:`, error);
+          console.error(`Error fetching price for slot ${slotKey}:`, error);
         }
       });
 
@@ -201,6 +205,7 @@ export default function CourtDetail() {
   async function calculateTotalPrice() {
     if (!selectedDate || !selectedStartTime || !id || selectedHours < 1) {
       setTotalPrice(null);
+      setPriceBreakdown(null);
       return;
     }
 
@@ -218,11 +223,18 @@ export default function CourtDetail() {
       });
 
       if (!response.error && response.data) {
-        setTotalPrice(parseFloat(response.data.finalPrice));
+        const total = parseFloat(response.data.totalPrice);
+        setTotalPrice(isNaN(total) ? null : total);
+        setPriceBreakdown({
+          basePrice: parseFloat(response.data.basePrice) || court?.base_price || 0,
+          multiplier: response.data.priceMultiplier || 1,
+          rules: response.data.appliedRules || []
+        });
       }
     } catch (error) {
       console.error('Error calculating total price:', error);
       setTotalPrice(null);
+      setPriceBreakdown(null);
     }
   }
 
@@ -610,78 +622,123 @@ export default function CourtDetail() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 p-6">
-                {/* Horizontal Date Selector */}
+              {/* Date Selector with Toggle */}
                 <div>
-                  <h3 className="text-lg font-semibold mb-4 text-center">Select a date</h3>
-                  <div className="relative">
-                    <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Select a date</h3>
+                    <div className="flex gap-1 p-1 bg-muted rounded-lg">
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 h-10 w-10 rounded-full"
-                        onClick={() => {
-                          if (scrollContainerRef.current) {
-                            scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
-                          }
-                        }}
+                        variant={viewMode === 'scroll' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="h-8 px-3"
+                        onClick={() => setViewMode('scroll')}
                       >
-                        <ChevronLeft className="h-5 w-5" />
+                        <List className="h-4 w-4" />
                       </Button>
-                      
-                      <div ref={scrollContainerRef} className="flex-1 overflow-x-auto hide-scrollbar scroll-smooth">
-                        <div className="flex gap-2 min-w-max px-1">
-                          {Array.from({ length: 14 }).map((_, index) => {
-                            const date = addDays(startOfDay(new Date()), index);
-                            const dateStr = format(date, 'yyyy-MM-dd');
-                            const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === dateStr;
-                            const status = dateBookingStatus[dateStr];
-                            
-                            return (
-                              <button
-                                key={dateStr}
-                                onClick={() => setSelectedDate(date)}
-                                className={`flex flex-col items-center justify-center min-w-[70px] p-3 rounded-xl border-2 transition-all ${
-                                  isSelected
-                                    ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-105'
-                                    : 'bg-card hover:bg-muted border-border hover:border-primary/50'
-                                }`}
-                              >
-                                <div className={`text-xs font-medium mb-1 ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
-                                  {format(date, 'EEE')}
-                                </div>
-                                <div className={`text-2xl font-bold ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
-                                  {format(date, 'd')}
-                                </div>
-                                <div className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                                  {format(date, 'MMM')}
-                                </div>
-                                {status && !isSelected && (
-                                  <div className="mt-1">
-                                    <div className={`h-1.5 w-1.5 rounded-full ${
-                                      status === 'full' ? 'bg-destructive' : 'bg-warning'
-                                    }`} />
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="shrink-0 h-10 w-10 rounded-full"
-                        onClick={() => {
-                          if (scrollContainerRef.current) {
-                            scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
-                          }
-                        }}
+                        variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="h-8 px-3"
+                        onClick={() => setViewMode('calendar')}
                       >
-                        <ChevronRight className="h-5 w-5" />
+                        <CalendarIcon className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
+
+                  {viewMode === 'scroll' ? (
+                    <div className="relative">
+                      <div className="flex items-center justify-between gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-10 w-10 rounded-full"
+                          onClick={() => {
+                            if (scrollContainerRef.current) {
+                              scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        
+                        <div ref={scrollContainerRef} className="flex-1 overflow-x-auto hide-scrollbar scroll-smooth">
+                          <div className="flex gap-2 min-w-max px-1">
+                            {Array.from({ length: 30 }).map((_, index) => {
+                              const date = addDays(startOfDay(new Date()), index);
+                              const dateStr = format(date, 'yyyy-MM-dd');
+                              const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === dateStr;
+                              const status = dateBookingStatus[dateStr];
+                              
+                              return (
+                                <button
+                                  key={dateStr}
+                                  onClick={() => setSelectedDate(date)}
+                                  className={`flex flex-col items-center justify-center min-w-[70px] p-3 rounded-xl border-2 transition-all ${
+                                    isSelected
+                                      ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-105'
+                                      : 'bg-card hover:bg-muted border-border hover:border-primary/50'
+                                  }`}
+                                >
+                                  <div className={`text-xs font-medium mb-1 ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
+                                    {format(date, 'EEE')}
+                                  </div>
+                                  <div className={`text-2xl font-bold ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
+                                    {format(date, 'd')}
+                                  </div>
+                                  <div className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                    {format(date, 'MMM')}
+                                  </div>
+                                  {status && !isSelected && (
+                                    <div className="mt-1">
+                                      <div className={`h-1.5 w-1.5 rounded-full ${
+                                        status === 'full' ? 'bg-destructive' : 'bg-warning'
+                                      }`} />
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-10 w-10 rounded-full"
+                          onClick={() => {
+                            if (scrollContainerRef.current) {
+                              scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
+                        className="rounded-md border pointer-events-auto"
+                        modifiers={{
+                          full: Object.entries(dateBookingStatus)
+                            .filter(([_, status]) => status === 'full')
+                            .map(([date]) => new Date(date)),
+                          partial: Object.entries(dateBookingStatus)
+                            .filter(([_, status]) => status === 'partial')
+                            .map(([date]) => new Date(date)),
+                        }}
+                        modifiersStyles={{
+                          full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
+                          partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {selectedDate && (
@@ -744,11 +801,12 @@ export default function CourtDetail() {
                                   const hour = parseInt(time.split(':')[0]);
                                   if (hour + selectedHours > 22) return null;
                                 
-                                const endTime = addHoursToTime(time, selectedHours);
                                 const slotKey = `${time}-${addHoursToTime(time, 1)}`;
                                 const pricing = slotPricing[slotKey];
                                 const slotStatus = getSlotStatus(time);
                                 const isSelected = selectedStartTime === time;
+                                const hasPeakPricing = pricing && pricing.multiplier > 1;
+                                const priceDisplay = pricing && !isNaN(pricing.price) ? `$${pricing.price.toFixed(0)}` : '...';
                                 
                                 return (
                                   <button
@@ -769,10 +827,17 @@ export default function CourtDetail() {
                                       isSelected
                                         ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-[1.02]'
                                         : slotStatus.available
-                                        ? 'bg-card border-border hover:border-primary/50 hover:bg-muted/50'
+                                        ? hasPeakPricing 
+                                          ? 'bg-amber-50 border-amber-200 hover:border-amber-400 dark:bg-amber-950/20 dark:border-amber-800'
+                                          : 'bg-card border-border hover:border-primary/50 hover:bg-muted/50'
                                         : 'bg-muted/30 border-muted cursor-not-allowed opacity-60'
                                     }`}
                                   >
+                                    {hasPeakPricing && !isSelected && slotStatus.available && (
+                                      <div className="absolute -top-2 -right-2 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full">
+                                        {pricing.multiplier.toFixed(1)}×
+                                      </div>
+                                    )}
                                     <div className={`text-base font-bold mb-1 ${
                                       isSelected ? 'text-primary-foreground' : slotStatus.available ? 'text-primary' : 'text-muted-foreground'
                                     }`}>
@@ -780,7 +845,7 @@ export default function CourtDetail() {
                                     </div>
                                     {slotStatus.available ? (
                                       <div className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                                        {selectedHours}h • {pricing ? `$${pricing.price}/hr` : '...'}
+                                        {selectedHours}h • {priceDisplay}/hr
                                       </div>
                                     ) : (
                                       <div className="text-xs text-destructive font-medium">
@@ -793,9 +858,9 @@ export default function CourtDetail() {
                             </div>
                           </div>
 
-                          {selectedStartTime && totalPrice !== null && (
+                          {selectedStartTime && totalPrice !== null && !isNaN(totalPrice) && (
                             <div className="mt-4 p-4 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/20 rounded-xl">
-                              <div className="flex justify-between items-center">
+                              <div className="flex justify-between items-center mb-2">
                                 <div>
                                   <div className="text-sm text-muted-foreground mb-1">Total Price</div>
                                   <div className="text-xs text-muted-foreground">
@@ -806,6 +871,26 @@ export default function CourtDetail() {
                                   ${totalPrice.toFixed(2)}
                                 </div>
                               </div>
+                              
+                              {/* Price Breakdown */}
+                              {priceBreakdown && (
+                                <div className="pt-2 border-t border-primary/20 space-y-1">
+                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>Base: ${priceBreakdown.basePrice}/hr × {selectedHours}h</span>
+                                    <span>${(priceBreakdown.basePrice * selectedHours).toFixed(2)}</span>
+                                  </div>
+                                  {priceBreakdown.multiplier > 1 && priceBreakdown.rules.length > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-amber-600 font-medium">
+                                        {priceBreakdown.rules.join(', ')}
+                                      </span>
+                                      <span className="text-amber-600 font-medium">
+                                        ×{priceBreakdown.multiplier.toFixed(1)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </>
