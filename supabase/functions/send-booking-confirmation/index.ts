@@ -22,12 +22,17 @@ interface BookingConfirmationRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
+  console.log("=== send-booking-confirmation function invoked ===");
+  
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const body = await req.json();
+    console.log("Request body:", JSON.stringify(body, null, 2));
+
     const {
       userEmail,
       userName,
@@ -37,9 +42,29 @@ const handler = async (req: Request): Promise<Response> => {
       endTime,
       totalPrice,
       userPhone,
-    }: BookingConfirmationRequest = await req.json();
+    }: BookingConfirmationRequest = body;
+
+    // Validate required fields
+    if (!userEmail) {
+      console.error("Missing userEmail");
+      return new Response(
+        JSON.stringify({ success: false, error: "Missing userEmail" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     console.log("Sending booking confirmation email to:", userEmail);
+    console.log("Court:", courtName, "Date:", bookingDate, "Time:", startTime, "-", endTime);
+
+    // Check if RESEND_API_KEY is set
+    const apiKey = Deno.env.get("RESEND_API_KEY");
+    if (!apiKey) {
+      console.error("RESEND_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ success: false, error: "Email service not configured" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     // Send email using Resend
     const emailResponse = await resend.emails.send({
@@ -105,15 +130,6 @@ const handler = async (req: Request): Promise<Response> => {
                 color: #6b7280;
                 font-size: 0.875rem;
               }
-              .button {
-                display: inline-block;
-                background: #667eea;
-                color: white;
-                padding: 12px 24px;
-                text-decoration: none;
-                border-radius: 6px;
-                margin: 20px 0;
-              }
             </style>
           </head>
           <body>
@@ -122,25 +138,25 @@ const handler = async (req: Request): Promise<Response> => {
               <p style="margin: 10px 0 0 0;">Your court reservation is all set</p>
             </div>
             <div class="content">
-              <p>Hi ${userName},</p>
+              <p>Hi ${userName || 'Customer'},</p>
               <p>Great news! Your booking has been confirmed. Here are the details:</p>
               
               <div class="booking-details">
                 <div class="detail-row">
                   <span class="detail-label">Court:</span>
-                  <span class="detail-value">${courtName}</span>
+                  <span class="detail-value">${courtName || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Date:</span>
-                  <span class="detail-value">${bookingDate}</span>
+                  <span class="detail-value">${bookingDate || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Time:</span>
-                  <span class="detail-value">${startTime} - ${endTime}</span>
+                  <span class="detail-value">${startTime || 'N/A'} - ${endTime || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Total Amount:</span>
-                  <span class="detail-value total">$${totalPrice.toFixed(2)}</span>
+                  <span class="detail-value total">$${(totalPrice || 0).toFixed(2)}</span>
                 </div>
               </div>
 
@@ -163,20 +179,32 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("Resend API response:", JSON.stringify(emailResponse, null, 2));
+
+    // Check for Resend error response
+    if (emailResponse.error) {
+      console.error("Resend error:", emailResponse.error);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: emailResponse.error.message || "Failed to send email"
+        }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    console.log("Email sent successfully! ID:", emailResponse.data?.id);
 
     // Note: SMS/Phone notifications would require additional service like Twilio
-    // For now, we're just logging if phone is available
     if (userPhone) {
       console.log("Phone notification would be sent to:", userPhone);
-      // TODO: Integrate with SMS service like Twilio for actual SMS notifications
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: "Confirmation email sent successfully",
-        emailResponse 
+        emailId: emailResponse.data?.id
       }),
       {
         status: 200,
@@ -187,7 +215,8 @@ const handler = async (req: Request): Promise<Response> => {
       }
     );
   } catch (error: any) {
-    console.error("Error sending confirmation:", error);
+    console.error("Error in send-booking-confirmation:", error);
+    console.error("Error stack:", error.stack);
     return new Response(
       JSON.stringify({ 
         success: false, 
