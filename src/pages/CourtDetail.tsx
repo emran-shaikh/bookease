@@ -13,6 +13,7 @@ import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, F
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, startOfDay, isBefore, isToday } from 'date-fns';
 import { useFavorites } from '@/hooks/useFavorites';
+import { formatPrice } from '@/lib/currency';
 
 export default function CourtDetail() {
   const { id } = useParams();
@@ -616,7 +617,7 @@ export default function CourtDetail() {
                   <div>
                     <CardTitle className="text-2xl">Book Your Slot</CardTitle>
                     <CardDescription className="text-lg font-semibold text-primary mt-1">
-                      ${court.base_price}/hour base rate
+                      {formatPrice(court.base_price)}/hour base rate
                     </CardDescription>
                   </div>
                 </div>
@@ -806,7 +807,7 @@ export default function CourtDetail() {
                                 const slotStatus = getSlotStatus(time);
                                 const isSelected = selectedStartTime === time;
                                 const hasPeakPricing = pricing && pricing.multiplier > 1;
-                                const priceDisplay = pricing && !isNaN(pricing.price) ? `$${pricing.price.toFixed(0)}` : '...';
+                                const priceDisplay = pricing && !isNaN(pricing.price) ? formatPrice(pricing.price) : '...';
                                 
                                 return (
                                   <button
@@ -868,7 +869,7 @@ export default function CourtDetail() {
                                   </div>
                                 </div>
                                 <div className="text-3xl font-bold text-primary">
-                                  ${totalPrice.toFixed(2)}
+                                  {formatPrice(totalPrice)}
                                 </div>
                               </div>
                               
@@ -876,8 +877,8 @@ export default function CourtDetail() {
                               {priceBreakdown && (
                                 <div className="pt-2 border-t border-primary/20 space-y-1">
                                   <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>Base: ${priceBreakdown.basePrice}/hr × {selectedHours}h</span>
-                                    <span>${(priceBreakdown.basePrice * selectedHours).toFixed(2)}</span>
+                                    <span>Base: {formatPrice(priceBreakdown.basePrice)}/hr × {selectedHours}h</span>
+                                    <span>{formatPrice(priceBreakdown.basePrice * selectedHours)}</span>
                                   </div>
                                   {priceBreakdown.multiplier > 1 && priceBreakdown.rules.length > 0 && (
                                     <div className="flex justify-between text-xs">

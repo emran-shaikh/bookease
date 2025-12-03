@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useNotifications } from '@/hooks/useNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { XCircle, Info } from 'lucide-react';
+import { formatPrice } from '@/lib/currency';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -329,7 +330,7 @@ export default function OwnerDashboard() {
                         <span className="font-medium">Sport:</span> {court.sport_type}
                       </div>
                       <div>
-                        <span className="font-medium">Base Price:</span> ${court.base_price}/hour
+                        <span className="font-medium">Base Price:</span> {formatPrice(court.base_price)}/hour
                       </div>
                       <div>
                         <span className="font-medium">Active:</span>{' '}
@@ -441,7 +442,7 @@ export default function OwnerDashboard() {
                         {booking.start_time} - {booking.end_time}
                       </div>
                       <div>
-                        <span className="font-medium">Amount:</span> ${booking.total_price}
+                        <span className="font-medium">Amount:</span> {formatPrice(booking.total_price)}
                       </div>
                       <div>
                         <span className="font-medium">Payment:</span>{' '}

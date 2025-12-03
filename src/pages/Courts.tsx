@@ -11,6 +11,7 @@ import { Slider } from '@/components/ui/slider';
 import { Loader2, MapPin, Star, Search, Navigation, Heart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 interface Court {
   id: string;
@@ -234,7 +235,7 @@ export default function Courts() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Price Range</span>
-              <span className="font-medium">${priceRange[0]} - ${priceRange[1]}</span>
+              <span className="font-medium">{formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}</span>
             </div>
             <Slider
               value={priceRange}
@@ -306,7 +307,7 @@ export default function Courts() {
                       </span>
                     </div>
                   )}
-                  <p className="text-lg font-bold">${court.base_price}/hour</p>
+                  <p className="text-lg font-bold">{formatPrice(court.base_price)}/hour</p>
                 </div>
               </CardContent>
               <CardFooter>

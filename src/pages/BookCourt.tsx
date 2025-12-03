@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { formatPrice } from '@/lib/currency';
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SSBmnLZr8CjOqMuDiSm1WASkrmK8khlJxuvPHSBEOVv5sEwyK3g4XZScU31C6ZtLbKsOHLxMS9iV6HaFhEygfrh00Nodfg4f3';
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
@@ -349,7 +350,7 @@ export default function BookCourt() {
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Base Price (per hour)</span>
-                        <span>${priceCalculation.basePrice}</span>
+                        <span>{formatPrice(priceCalculation.basePrice)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Duration</span>
@@ -369,11 +370,11 @@ export default function BookCourt() {
                       )}
                       <div className="flex justify-between text-lg font-bold pt-2 border-t">
                         <span>Total Price</span>
-                        <span className="text-primary">${priceCalculation.totalPrice}</span>
+                        <span className="text-primary">{formatPrice(priceCalculation.totalPrice)}</span>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-2xl font-bold">${court.base_price}</p>
+                    <p className="text-2xl font-bold">{formatPrice(court.base_price)}</p>
                   )}
                 </div>
                 <Separator />
