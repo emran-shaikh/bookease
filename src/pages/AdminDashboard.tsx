@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -8,10 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar, CreditCard } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar, CreditCard, ArrowUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+
+type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'amount-desc' | 'amount-asc' | 'status';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -23,6 +26,9 @@ export default function AdminDashboard() {
   const [allCourts, setAllCourts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [bookingSort, setBookingSort] = useState<SortOption>('date-desc');
+  const [courtSort, setCourtSort] = useState<SortOption>('name-asc');
+  const [userSort, setUserSort] = useState<SortOption>('name-asc');
   const [analytics, setAnalytics] = useState({
     totalCourts: 0,
     totalBookings: 0,
@@ -144,6 +150,59 @@ export default function AdminDashboard() {
       });
     }
   }
+
+  // Sorted data using useMemo
+  const sortedBookings = useMemo(() => {
+    const sorted = [...bookings];
+    switch (bookingSort) {
+      case 'date-desc':
+        return sorted.sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime());
+      case 'date-asc':
+        return sorted.sort((a, b) => new Date(a.booking_date).getTime() - new Date(b.booking_date).getTime());
+      case 'name-asc':
+        return sorted.sort((a, b) => (a.courts?.name || '').localeCompare(b.courts?.name || ''));
+      case 'name-desc':
+        return sorted.sort((a, b) => (b.courts?.name || '').localeCompare(a.courts?.name || ''));
+      case 'amount-desc':
+        return sorted.sort((a, b) => parseFloat(b.total_price) - parseFloat(a.total_price));
+      case 'amount-asc':
+        return sorted.sort((a, b) => parseFloat(a.total_price) - parseFloat(b.total_price));
+      case 'status':
+        return sorted.sort((a, b) => a.status.localeCompare(b.status));
+      default:
+        return sorted;
+    }
+  }, [bookings, bookingSort]);
+
+  const sortedCourts = useMemo(() => {
+    const sorted = [...allCourts];
+    switch (courtSort) {
+      case 'name-asc':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc':
+        return sorted.sort((a, b) => b.name.localeCompare(a.name));
+      case 'amount-desc':
+        return sorted.sort((a, b) => parseFloat(b.base_price) - parseFloat(a.base_price));
+      case 'amount-asc':
+        return sorted.sort((a, b) => parseFloat(a.base_price) - parseFloat(b.base_price));
+      case 'status':
+        return sorted.sort((a, b) => a.status.localeCompare(b.status));
+      default:
+        return sorted;
+    }
+  }, [allCourts, courtSort]);
+
+  const sortedUsers = useMemo(() => {
+    const sorted = [...users];
+    switch (userSort) {
+      case 'name-asc':
+        return sorted.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
+      case 'name-desc':
+        return sorted.sort((a, b) => (b.full_name || '').localeCompare(a.full_name || ''));
+      default:
+        return sorted;
+    }
+  }, [users, userSort]);
 
   if (loading || roleLoading) {
     return (
@@ -275,9 +334,28 @@ export default function AdminDashboard() {
 
           <TabsContent value="bookings">
             <Card>
-              <CardHeader>
-                <CardTitle>All Bookings</CardTitle>
-                <CardDescription>View and manage all court bookings</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>All Bookings</CardTitle>
+                  <CardDescription>View and manage all court bookings</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                  <Select value={bookingSort} onValueChange={(v) => setBookingSort(v as SortOption)}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="date-desc">Date (Newest)</SelectItem>
+                      <SelectItem value="date-asc">Date (Oldest)</SelectItem>
+                      <SelectItem value="name-asc">Court (A-Z)</SelectItem>
+                      <SelectItem value="name-desc">Court (Z-A)</SelectItem>
+                      <SelectItem value="amount-desc">Amount (High-Low)</SelectItem>
+                      <SelectItem value="amount-asc">Amount (Low-High)</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -294,17 +372,20 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookings
-                      .sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime())
-                      .map((booking) => (
+                    {sortedBookings.map((booking) => (
                         <TableRow key={booking.id}>
                           <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
-                          <TableCell className="font-medium">{booking.courts?.name}</TableCell>
-                          <TableCell>{booking.profiles?.full_name || booking.profiles?.email}</TableCell>
+                          <TableCell className="font-medium">{booking.courts?.name || 'N/A'}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{booking.profiles?.full_name || 'N/A'}</div>
+                              <div className="text-xs text-muted-foreground">{booking.profiles?.email}</div>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-sm">{booking.start_time} - {booking.end_time}</TableCell>
                           <TableCell>${booking.total_price}</TableCell>
                           <TableCell>
-                            <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
+                            <Badge variant={booking.status === 'confirmed' ? 'default' : booking.status === 'cancelled' ? 'destructive' : 'secondary'}>
                               {booking.status}
                             </Badge>
                           </TableCell>
@@ -419,9 +500,26 @@ export default function AdminDashboard() {
 
           <TabsContent value="all-courts">
             <Card>
-              <CardHeader>
-                <CardTitle>All Courts</CardTitle>
-                <CardDescription>View and manage all court listings</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>All Courts</CardTitle>
+                  <CardDescription>View and manage all court listings</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                  <Select value={courtSort} onValueChange={(v) => setCourtSort(v as SortOption)}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                      <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                      <SelectItem value="amount-desc">Price (High-Low)</SelectItem>
+                      <SelectItem value="amount-asc">Price (Low-High)</SelectItem>
+                      <SelectItem value="status">Status</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -436,10 +534,15 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allCourts.map((court) => (
+                    {sortedCourts.map((court) => (
                       <TableRow key={court.id}>
                         <TableCell className="font-medium">{court.name}</TableCell>
-                        <TableCell>{court.profiles?.full_name || court.profiles?.email}</TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{court.profiles?.full_name || 'N/A'}</div>
+                            <div className="text-xs text-muted-foreground">{court.profiles?.email}</div>
+                          </div>
+                        </TableCell>
                         <TableCell>{court.city}, {court.state}</TableCell>
                         <TableCell>{court.sport_type}</TableCell>
                         <TableCell>${court.base_price}/hr</TableCell>
@@ -458,9 +561,23 @@ export default function AdminDashboard() {
 
           <TabsContent value="users">
             <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage user roles and permissions</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>User Management</CardTitle>
+                  <CardDescription>Manage user roles and permissions</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                  <Select value={userSort} onValueChange={(v) => setUserSort(v as SortOption)}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                      <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -468,15 +585,17 @@ export default function AdminDashboard() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
                       <TableHead>Current Role</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
+                    {sortedUsers.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.full_name || 'N/A'}</TableCell>
                         <TableCell>{user.email}</TableCell>
+                        <TableCell>{user.phone || 'N/A'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {user.user_roles?.[0]?.role || 'customer'}

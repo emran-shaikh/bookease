@@ -51,7 +51,6 @@ export default function OwnerDashboard() {
     start_time: '',
     end_time: '',
     days_of_week: [] as number[],
-    specific_date: '',
   });
 
   useEffect(() => {
@@ -124,14 +123,18 @@ export default function OwnerDashboard() {
     e.preventDefault();
     try {
       const { error } = await supabase.from('pricing_rules').insert([{
-        ...pricingData,
+        court_id: pricingData.court_id,
+        rule_type: pricingData.rule_type,
         price_multiplier: parseFloat(pricingData.price_multiplier),
+        start_time: pricingData.start_time || null,
+        end_time: pricingData.end_time || null,
+        days_of_week: pricingData.days_of_week.length > 0 ? pricingData.days_of_week : null,
       }]);
       if (error) throw error;
 
       toast({ title: 'Success', description: 'Pricing rule created successfully' });
       setShowPricingForm(false);
-      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [], specific_date: '' });
+      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [] });
       fetchOwnerData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
