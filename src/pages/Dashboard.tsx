@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, Calendar, Star, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { formatPrice } from '@/lib/currency';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -153,7 +154,7 @@ export default function Dashboard() {
                         {booking.start_time} - {booking.end_time}
                       </div>
                       <div>
-                        <span className="font-medium">Total:</span> ${booking.total_price}
+                        <span className="font-medium">Total:</span> {formatPrice(booking.total_price)}
                       </div>
                     </div>
                   </CardContent>
@@ -195,7 +196,7 @@ export default function Dashboard() {
                         {booking.start_time} - {booking.end_time}
                       </div>
                       <div>
-                        <span className="font-medium">Total:</span> ${booking.total_price}
+                        <span className="font-medium">Total:</span> {formatPrice(booking.total_price)}
                       </div>
                     </div>
                     {reviews.some(r => r.booking_id === booking.id) ? (

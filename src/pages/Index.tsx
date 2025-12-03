@@ -8,9 +8,10 @@ import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Calendar, MapPin, Clock, Shield, Search, DollarSign, Star, TrendingUp } from 'lucide-react';
+import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatPrice } from '@/lib/currency';
 import heroImage from '@/assets/hero-sports.jpg';
 import tennisImage from '@/assets/tennis-court.jpg';
 import basketballImage from '@/assets/basketball-court.jpg';
@@ -312,8 +313,7 @@ export default function Index() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Price Range: ${priceRange[0]} - ${priceRange[1]}
+                  Price Range: {formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}
                 </label>
                 <Slider
                   value={priceRange}
@@ -391,16 +391,15 @@ export default function Index() {
                       {court.city}
                     </CardDescription>
                   </CardHeader>
-                  <CardFooter className="flex justify-between items-center">
-                    <div className="flex items-center gap-1 text-lg font-bold text-primary">
-                      <DollarSign className="h-5 w-5" />
-                      {court.base_price}
-                      <span className="text-sm font-normal text-muted-foreground">/hour</span>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
-                  </CardFooter>
+                    <CardFooter className="flex justify-between items-center">
+                      <div className="flex items-center gap-1 text-lg font-bold text-primary">
+                        {formatPrice(court.base_price)}
+                        <span className="text-sm font-normal text-muted-foreground">/hour</span>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        View Details
+                      </Button>
+                    </CardFooter>
                 </Card>
               ))}
             </div>
@@ -474,8 +473,7 @@ export default function Index() {
 
                       <CardFooter className="flex justify-between items-center pt-0">
                         <div className="flex items-center gap-1 text-xl font-bold text-primary">
-                          <DollarSign className="h-5 w-5" />
-                          {court.base_price}
+                          {formatPrice(court.base_price)}
                           <span className="text-sm font-normal text-muted-foreground">/hour</span>
                         </div>
                         {court.booking_count !== undefined && (

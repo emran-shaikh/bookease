@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Heart, MapPin, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
+import { formatPrice } from '@/lib/currency';
 
 interface Court {
   id: string;
@@ -134,7 +135,7 @@ export default function Favorites() {
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary">{court.sport_type}</Badge>
                     <div className="text-lg font-semibold text-primary">
-                      ${court.base_price}/hr
+                      {formatPrice(court.base_price)}/hr
                     </div>
                   </div>
                 </CardContent>

@@ -13,6 +13,7 @@ import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar, 
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { formatPrice } from '@/lib/currency';
 
 type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'amount-desc' | 'amount-asc' | 'status';
 
@@ -303,7 +304,7 @@ export default function AdminDashboard() {
                           <TableCell>{court.profiles?.full_name || court.profiles?.email}</TableCell>
                           <TableCell>{court.city}, {court.state}</TableCell>
                           <TableCell>{court.sport_type}</TableCell>
-                          <TableCell>${court.base_price}/hr</TableCell>
+                          <TableCell>{formatPrice(court.base_price)}/hr</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               <Button
@@ -383,7 +384,7 @@ export default function AdminDashboard() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm">{booking.start_time} - {booking.end_time}</TableCell>
-                          <TableCell>${booking.total_price}</TableCell>
+                          <TableCell>{formatPrice(booking.total_price)}</TableCell>
                           <TableCell>
                             <Badge variant={booking.status === 'confirmed' ? 'default' : booking.status === 'cancelled' ? 'destructive' : 'secondary'}>
                               {booking.status}
@@ -545,7 +546,7 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell>{court.city}, {court.state}</TableCell>
                         <TableCell>{court.sport_type}</TableCell>
-                        <TableCell>${court.base_price}/hr</TableCell>
+                        <TableCell>{formatPrice(court.base_price)}/hr</TableCell>
                         <TableCell>
                           <Badge variant={court.status === 'approved' ? 'default' : court.status === 'pending' ? 'secondary' : 'destructive'}>
                             {court.status}
@@ -661,7 +662,7 @@ export default function AdminDashboard() {
                           <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
                           <TableCell>{booking.profiles?.full_name || booking.profiles?.email}</TableCell>
                           <TableCell>{booking.courts?.name}</TableCell>
-                          <TableCell>${booking.total_price}</TableCell>
+                          <TableCell>{formatPrice(booking.total_price)}</TableCell>
                           <TableCell>
                             <Badge variant={booking.payment_status === 'succeeded' ? 'default' : booking.payment_status === 'failed' ? 'destructive' : 'secondary'}>
                               {booking.payment_status}
