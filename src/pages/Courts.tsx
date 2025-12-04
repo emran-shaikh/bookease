@@ -53,7 +53,8 @@ export default function Courts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sportFilter, setSportFilter] = useState('all');
   const [locationFilter, setLocationFilter] = useState('all');
-  const [priceRange, setPriceRange] = useState([0, 200]);
+  const [maxPrice, setMaxPrice] = useState(0);
+  const [priceRange, setPriceRange] = useState([0, 0]);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [userId, setUserId] = useState<string>();
@@ -138,6 +139,13 @@ export default function Courts() {
           return a.distance - b.distance;
         });
       }
+
+      // Calculate max price from courts
+      const calculatedMaxPrice = courtsWithRatings.length > 0 
+        ? Math.max(...courtsWithRatings.map(c => c.base_price))
+        : 0;
+      setMaxPrice(calculatedMaxPrice);
+      setPriceRange([0, calculatedMaxPrice]);
 
       setCourts(courtsWithRatings);
     } catch (error: any) {
@@ -241,8 +249,8 @@ export default function Courts() {
               value={priceRange}
               onValueChange={setPriceRange}
               min={0}
-              max={200}
-              step={10}
+              max={maxPrice || 100}
+              step={Math.max(1, Math.floor(maxPrice / 20)) || 5}
               className="w-full"
             />
           </div>
