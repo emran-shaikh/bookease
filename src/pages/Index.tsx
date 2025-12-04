@@ -52,7 +52,8 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSport, setSelectedSport] = useState<string>('all');
   const [selectedLocation, setSelectedLocation] = useState<string>('all');
-  const [priceRange, setPriceRange] = useState([0, 200]);
+  const [maxPrice, setMaxPrice] = useState(0);
+  const [priceRange, setPriceRange] = useState([0, 0]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -99,6 +100,13 @@ export default function Index() {
         })));
       }
 
+      // Calculate max price from courts
+      const calculatedMaxPrice = courtsWithDistance.length > 0 
+        ? Math.max(...courtsWithDistance.map(c => c.base_price))
+        : 0;
+      setMaxPrice(calculatedMaxPrice);
+      setPriceRange([0, calculatedMaxPrice]);
+      
       setCourts(courtsWithDistance);
       setFilteredCourts(courtsWithDistance);
     } catch (error) {
@@ -319,8 +327,8 @@ export default function Index() {
                   value={priceRange}
                   onValueChange={setPriceRange}
                   min={0}
-                  max={200}
-                  step={5}
+                  max={maxPrice || 100}
+                  step={Math.max(1, Math.floor(maxPrice / 20)) || 5}
                   className="pt-4"
                 />
               </div>
