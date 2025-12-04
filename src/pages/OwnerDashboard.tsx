@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell, CheckCircle } from 'lucide-react';
+import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
+import { CourtEditForm } from '@/components/CourtEditForm';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -363,46 +364,24 @@ export default function OwnerDashboard() {
 
             {/* Edit Court Dialog */}
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-              <DialogContent>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Edit Court</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleUpdateCourt} className="space-y-4">
-                  <div>
-                    <Label>Court Name</Label>
-                    <Input
-                      value={editingCourt?.name || ''}
-                      onChange={(e) => setEditingCourt({ ...editingCourt, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label>Base Price ($/hour)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editingCourt?.base_price || ''}
-                      onChange={(e) => setEditingCourt({ ...editingCourt, base_price: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="is_active"
-                      checked={editingCourt?.is_active || false}
-                      onChange={(e) => setEditingCourt({ ...editingCourt, is_active: e.target.checked })}
-                      className="h-4 w-4"
-                    />
-                    <Label htmlFor="is_active">Active</Label>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">
-                      Cancel
-                    </Button>
-                    <Button type="submit" className="flex-1">Save Changes</Button>
-                  </div>
-                </form>
+                {editingCourt && (
+                  <CourtEditForm
+                    court={editingCourt}
+                    onSuccess={() => {
+                      setShowEditDialog(false);
+                      setEditingCourt(null);
+                      fetchOwnerData();
+                    }}
+                    onCancel={() => {
+                      setShowEditDialog(false);
+                      setEditingCourt(null);
+                    }}
+                  />
+                )}
               </DialogContent>
             </Dialog>
           </TabsContent>

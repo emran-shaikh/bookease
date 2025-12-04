@@ -104,10 +104,13 @@ export default function Favorites() {
                 <CardHeader className="p-0 relative">
                   <div className="aspect-video relative overflow-hidden rounded-t-lg">
                     <img
-                      src={court.images[0] || '/placeholder.svg'}
+                      src={court.images?.[0] || '/placeholder.svg'}
                       alt={court.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onClick={() => navigate(`/courts/${court.id}`)}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/placeholder.svg';
+                      }}
                     />
                     <Button
                       variant="ghost"

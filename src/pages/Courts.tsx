@@ -258,6 +258,14 @@ export default function Courts() {
                     alt={court.name}
                     className="h-full w-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
                     onClick={() => navigate(`/courts/${court.id}`)}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      (e.target as HTMLImageElement).parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                      const placeholder = document.createElement('span');
+                      placeholder.textContent = 'Image unavailable';
+                      placeholder.className = 'text-muted-foreground';
+                      (e.target as HTMLImageElement).parentElement?.appendChild(placeholder);
+                    }}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center text-muted-foreground">
