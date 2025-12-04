@@ -9,11 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar, CreditCard, ArrowUpDown } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar, CreditCard, ArrowUpDown, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
+import { CourtEditForm } from '@/components/CourtEditForm';
 
 type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'amount-desc' | 'amount-asc' | 'status';
 
@@ -30,6 +32,8 @@ export default function AdminDashboard() {
   const [bookingSort, setBookingSort] = useState<SortOption>('date-desc');
   const [courtSort, setCourtSort] = useState<SortOption>('name-asc');
   const [userSort, setUserSort] = useState<SortOption>('name-asc');
+  const [editingCourt, setEditingCourt] = useState<any>(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [analytics, setAnalytics] = useState({
     totalCourts: 0,
     totalBookings: 0,
@@ -532,6 +536,7 @@ export default function AdminDashboard() {
                       <TableHead>Sport</TableHead>
                       <TableHead>Price</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -552,12 +557,48 @@ export default function AdminDashboard() {
                             {court.status}
                           </Badge>
                         </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingCourt(court);
+                              setShowEditDialog(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Edit Court Dialog */}
+            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Court</DialogTitle>
+                </DialogHeader>
+                {editingCourt && (
+                  <CourtEditForm
+                    court={editingCourt}
+                    onSuccess={() => {
+                      setShowEditDialog(false);
+                      setEditingCourt(null);
+                      fetchAdminData();
+                    }}
+                    onCancel={() => {
+                      setShowEditDialog(false);
+                      setEditingCourt(null);
+                    }}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="users">

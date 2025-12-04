@@ -369,6 +369,9 @@ export default function Index() {
                       src={court.images?.[0] || sportImages[court.sport_type.toLowerCase()] || sportImages.tennis}
                       alt={court.name}
                       className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = sportImages[court.sport_type.toLowerCase()] || sportImages.tennis;
+                      }}
                     />
                     <div className="absolute top-3 right-3">
                       <Badge className="bg-primary/90 backdrop-blur-sm">
@@ -438,6 +441,9 @@ export default function Index() {
                           src={court.images?.[0] || sportImages[court.sport_type.toLowerCase()] || sportImages.tennis}
                           alt={court.name}
                           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = sportImages[court.sport_type.toLowerCase()] || sportImages.tennis;
+                          }}
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-background/20 to-transparent" />
                         

@@ -505,6 +505,17 @@ export default function CourtDetail() {
                   src={court.images[0]}
                   alt={court.name}
                   className="h-full w-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    const parent = (e.target as HTMLImageElement).parentElement;
+                    if (parent && !parent.querySelector('.fallback-text')) {
+                      parent.classList.add('flex', 'items-center', 'justify-center');
+                      const fallback = document.createElement('span');
+                      fallback.className = 'fallback-text text-muted-foreground';
+                      fallback.textContent = 'Image unavailable';
+                      parent.appendChild(fallback);
+                    }
+                  }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center text-muted-foreground">
