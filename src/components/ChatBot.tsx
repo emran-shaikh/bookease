@@ -12,6 +12,13 @@ type Message = {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/court-assistant`;
 
+const QUICK_ACTIONS = [
+  { label: 'Show available courts', message: 'Show me available courts' },
+  { label: 'How do I book?', message: 'How do I book a court?' },
+  { label: 'Pricing info', message: 'What are the pricing options?' },
+  { label: 'Peak hours', message: 'What are the peak hours and prices?' },
+];
+
 const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -22,6 +29,7 @@ const ChatBot: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -98,10 +106,12 @@ const ChatBot: React.FC = () => {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (messageText?: string) => {
+    const text = messageText || input.trim();
+    if (!text || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    setShowQuickActions(false);
+    const userMessage: Message = { role: 'user', content: text };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
@@ -221,6 +231,27 @@ const ChatBot: React.FC = () => {
                 </div>
               </div>
             )}
+            
+            {/* Quick Actions */}
+            {showQuickActions && messages.length === 1 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs text-muted-foreground ml-11">Quick questions:</p>
+                <div className="flex flex-wrap gap-2 ml-11">
+                  {QUICK_ACTIONS.map((action, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 rounded-full"
+                      onClick={() => handleSend(action.message)}
+                      disabled={isLoading}
+                    >
+                      {action.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
@@ -237,7 +268,7 @@ const ChatBot: React.FC = () => {
               className="flex-1"
             />
             <Button
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={!input.trim() || isLoading}
               size="icon"
               className="shrink-0"
