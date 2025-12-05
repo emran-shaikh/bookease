@@ -18,7 +18,7 @@ import CompleteProfile from "./pages/CompleteProfile";
 import ReviewPage from "./pages/ReviewPage";
 import Favorites from "./pages/Favorites";
 import NotFound from "./pages/NotFound";
-
+import ChatBot from "./components/ChatBot";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -84,6 +84,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <ChatBot />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
