@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2 } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, MapPin, HelpCircle, Clock, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,18 +13,58 @@ type Message = {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/court-assistant`;
 
 const QUICK_ACTIONS = [
-  { label: 'Show available courts', message: 'Show me available courts' },
-  { label: 'How do I book?', message: 'How do I book a court?' },
-  { label: 'Pricing info', message: 'What are the pricing options?' },
-  { label: 'Peak hours', message: 'What are the peak hours and prices?' },
+  { label: 'Show courts', message: 'Show me available courts', icon: MapPin },
+  { label: 'How to book?', message: 'How do I book a court?', icon: HelpCircle },
+  { label: 'Pricing', message: 'What are the pricing options?', icon: DollarSign },
+  { label: 'Peak hours', message: 'What are the peak hours and prices?', icon: Clock },
 ];
+
+// Simple markdown-like formatting for chat messages
+const formatMessage = (content: string) => {
+  // Split by lines and process
+  const lines = content.split('\n');
+  
+  return lines.map((line, lineIndex) => {
+    // Handle bullet points
+    if (line.trim().startsWith('*') || line.trim().startsWith('-')) {
+      const bulletContent = line.trim().slice(1).trim();
+      // Handle bold text within bullet
+      const formattedContent = bulletContent.split(/(\*\*.*?\*\*)/).map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+      });
+      return (
+        <div key={lineIndex} className="flex items-start gap-2 py-1">
+          <span className="text-primary mt-0.5">•</span>
+          <span className="flex-1">{formattedContent}</span>
+        </div>
+      );
+    }
+    
+    // Handle bold text in regular lines
+    const formattedLine = line.split(/(\*\*.*?\*\*)/).map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+    
+    return line.trim() ? (
+      <p key={lineIndex} className="py-0.5">{formattedLine}</p>
+    ) : (
+      <div key={lineIndex} className="h-2" />
+    );
+  });
+};
 
 const ChatBot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hi! I'm your court booking assistant. I can help you find courts, understand pricing, and guide you through the booking process. How can I help you today?",
+      content: "Hi there! 👋 I'm your friendly court booking assistant. I can help you find the perfect court, understand pricing, and guide you through booking. What can I help you with today?",
     },
   ]);
   const [input, setInput] = useState('');
@@ -125,7 +165,7 @@ const ChatBot: React.FC = () => {
         ...prev,
         {
           role: 'assistant',
-          content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.",
+          content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment. 🔄",
         },
       ]);
     } finally {
@@ -146,61 +186,74 @@ const ChatBot: React.FC = () => {
       <Button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg transition-all duration-300",
-          "bg-primary hover:bg-primary/90 text-primary-foreground",
+          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-xl transition-all duration-300 group",
+          "bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground",
+          "hover:scale-110 hover:shadow-2xl hover:shadow-primary/25",
           isOpen && "scale-0 opacity-0"
         )}
         size="icon"
       >
-        <MessageCircle className="h-6 w-6" />
+        <MessageCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
+        <span className="absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
       </Button>
 
       {/* Chat Window */}
       <div
         className={cn(
-          "fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)] transition-all duration-300 transform",
-          "bg-background border border-border rounded-2xl shadow-2xl overflow-hidden",
-          isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0 pointer-events-none"
+          "fixed bottom-6 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)] transition-all duration-300 transform",
+          "bg-background/95 backdrop-blur-xl border border-border/50 rounded-3xl shadow-2xl overflow-hidden",
+          isOpen ? "scale-100 opacity-100 animate-scale-in" : "scale-95 opacity-0 pointer-events-none"
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-primary text-primary-foreground">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-              <Bot className="h-5 w-5" />
+        <div className="relative flex items-center justify-between p-4 bg-gradient-to-r from-primary via-primary to-primary/90 text-primary-foreground overflow-hidden">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+          
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="relative">
+              <div className="h-11 w-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/30">
+                <Bot className="h-6 w-6" />
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 bg-green-400 rounded-full border-2 border-primary" />
             </div>
             <div>
-              <h3 className="font-semibold">Court Assistant</h3>
-              <p className="text-xs text-primary-foreground/70">Here to help you book</p>
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                Court Assistant
+                <Sparkles className="h-4 w-4 text-yellow-300" />
+              </h3>
+              <p className="text-xs text-primary-foreground/80">Online • Ready to help</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsOpen(false)}
-            className="text-primary-foreground hover:bg-primary-foreground/20"
+            className="relative z-10 text-primary-foreground hover:bg-white/20 rounded-full"
           >
             <X className="h-5 w-5" />
           </Button>
         </div>
 
         {/* Messages */}
-        <ScrollArea className="h-[400px] p-4" ref={scrollRef}>
+        <ScrollArea className="h-[420px] p-4" ref={scrollRef}>
           <div className="space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
                 className={cn(
-                  "flex gap-3",
+                  "flex gap-3 animate-fade-in",
                   message.role === 'user' ? "flex-row-reverse" : "flex-row"
                 )}
+                style={{ animationDelay: `${index * 50}ms` }}
               >
                 <div
                   className={cn(
-                    "h-8 w-8 rounded-full flex items-center justify-center shrink-0",
+                    "h-9 w-9 rounded-full flex items-center justify-center shrink-0 shadow-md transition-transform hover:scale-105",
                     message.role === 'user'
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
+                      ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
+                      : "bg-gradient-to-br from-muted to-muted/80 text-muted-foreground ring-1 ring-border/50"
                   )}
                 >
                   {message.role === 'user' ? (
@@ -211,44 +264,65 @@ const ChatBot: React.FC = () => {
                 </div>
                 <div
                   className={cn(
-                    "max-w-[75%] rounded-2xl px-4 py-2 text-sm",
+                    "max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm",
                     message.role === 'user'
-                      ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted text-foreground rounded-tl-sm"
+                      ? "bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-tr-md"
+                      : "bg-gradient-to-br from-muted/80 to-muted text-foreground rounded-tl-md border border-border/30"
                   )}
                 >
-                  {message.content}
+                  <div className="space-y-1">
+                    {formatMessage(message.content)}
+                  </div>
                 </div>
               </div>
             ))}
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+              <div className="flex gap-3 animate-fade-in">
+                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-muted to-muted/80 flex items-center justify-center shadow-md ring-1 ring-border/50">
                   <Bot className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <div className="bg-gradient-to-br from-muted/80 to-muted rounded-2xl rounded-tl-md px-4 py-3 border border-border/30 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-xs text-muted-foreground">Thinking...</span>
+                  </div>
                 </div>
               </div>
             )}
             
             {/* Quick Actions */}
             {showQuickActions && messages.length === 1 && (
-              <div className="mt-4 space-y-2">
-                <p className="text-xs text-muted-foreground ml-11">Quick questions:</p>
-                <div className="flex flex-wrap gap-2 ml-11">
-                  {QUICK_ACTIONS.map((action, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs h-8 rounded-full"
-                      onClick={() => handleSend(action.message)}
-                      disabled={isLoading}
-                    >
-                      {action.label}
-                    </Button>
-                  ))}
+              <div className="mt-6 space-y-3 animate-fade-in" style={{ animationDelay: '200ms' }}>
+                <p className="text-xs text-muted-foreground font-medium ml-12 flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3 text-primary" />
+                  Quick questions to get started:
+                </p>
+                <div className="grid grid-cols-2 gap-2 ml-12">
+                  {QUICK_ACTIONS.map((action, index) => {
+                    const Icon = action.icon;
+                    return (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          "text-xs h-auto py-2.5 px-3 rounded-xl justify-start gap-2",
+                          "bg-gradient-to-br from-background to-muted/30 hover:from-primary/5 hover:to-primary/10",
+                          "border-border/50 hover:border-primary/30 hover:shadow-md",
+                          "transition-all duration-200 hover:scale-[1.02]"
+                        )}
+                        onClick={() => handleSend(action.message)}
+                        disabled={isLoading}
+                      >
+                        <Icon className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="truncate">{action.label}</span>
+                      </Button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -256,26 +330,36 @@ const ChatBot: React.FC = () => {
         </ScrollArea>
 
         {/* Input */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border/50 bg-gradient-to-t from-muted/30 to-transparent">
           <div className="flex gap-2">
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask about courts, pricing..."
-              disabled={isLoading}
-              className="flex-1"
-            />
+            <div className="flex-1 relative">
+              <Input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                className="pr-4 rounded-xl border-border/50 bg-background/80 backdrop-blur-sm focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+            </div>
             <Button
               onClick={() => handleSend()}
               disabled={!input.trim() || isLoading}
               size="icon"
-              className="shrink-0"
+              className={cn(
+                "shrink-0 rounded-xl shadow-md transition-all duration-200",
+                "bg-gradient-to-br from-primary to-primary/80 hover:from-primary/90 hover:to-primary",
+                "hover:shadow-lg hover:shadow-primary/25 hover:scale-105",
+                "disabled:opacity-50 disabled:hover:scale-100"
+              )}
             >
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          <p className="text-[10px] text-muted-foreground/60 text-center mt-2">
+            Powered by AI • Here to help 24/7
+          </p>
         </div>
       </div>
     </>
