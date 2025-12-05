@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.create-payment-intent]
 verify_jwt = false
 
+[functions.create-payfast-payment]
+verify_jwt = false
+
 [functions.notify-favorite-courts]
 verify_jwt = false
 
