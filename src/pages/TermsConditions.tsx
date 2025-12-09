@@ -13,7 +13,7 @@ const TermsConditions = () => {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
             <p className="text-muted-foreground">
-              By accessing and using CourtBooker, you accept and agree to be bound by these Terms and Conditions. 
+              By accessing and using BookedHours, you accept and agree to be bound by these Terms and Conditions. 
               If you do not agree to these terms, please do not use our services.
             </p>
           </section>
@@ -21,7 +21,7 @@ const TermsConditions = () => {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">2. Services Description</h2>
             <p className="text-muted-foreground">
-              CourtBooker is an online platform that allows users to discover, compare, and book sports courts 
+              BookedHours is an online platform that allows users to discover, compare, and book sports courts 
               across Pakistan. We act as an intermediary between court owners and customers seeking to book court time.
             </p>
           </section>
@@ -62,7 +62,7 @@ const TermsConditions = () => {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">6. Limitation of Liability</h2>
             <p className="text-muted-foreground">
-              CourtBooker is not liable for any direct, indirect, incidental, or consequential damages arising from 
+              BookedHours is not liable for any direct, indirect, incidental, or consequential damages arising from 
               your use of our services. We do not guarantee the quality, safety, or legality of the courts listed on our platform.
             </p>
           </section>

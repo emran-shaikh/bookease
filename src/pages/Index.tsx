@@ -245,7 +245,7 @@ export default function Index() {
             <div className="rounded-lg bg-primary/10 p-1.5 sm:p-2 backdrop-blur-sm">
               <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">CourtBook</span>
+            <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">BookedHours</span>
           </div>
           <Button size="default" asChild className="shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base">
             <a href="/auth">Get Started</a>

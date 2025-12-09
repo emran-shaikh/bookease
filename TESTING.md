@@ -1,4 +1,4 @@
-# CourtBook Testing Guide
+# BookedHours Testing Guide
 
 ## 🧪 Test Accounts
 

@@ -150,7 +150,7 @@ export default function Auth() {
     } else {
       toast({
         title: 'Account created!',
-        description: 'Welcome to CourtBook. Redirecting...',
+        description: 'Welcome to BookedHours. Redirecting...',
       });
     }
   };
@@ -239,7 +239,7 @@ export default function Auth() {
             <div className="mx-auto mb-2 sm:mb-4 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-primary/10">
               <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <CardTitle className="text-xl sm:text-2xl">Welcome to CourtBook</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Welcome to BookedHours</CardTitle>
             <CardDescription className="text-xs sm:text-sm">Book sports venues with ease</CardDescription>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">

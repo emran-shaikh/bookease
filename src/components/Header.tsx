@@ -42,7 +42,7 @@ export function Header() {
       <div className="container flex h-14 sm:h-16 items-center justify-between px-4">
         <Link to="/" className="flex items-center space-x-2">
           <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-          <span className="text-lg sm:text-xl font-bold">CourtBook</span>
+          <span className="text-lg sm:text-xl font-bold">BookedHours</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -97,7 +97,7 @@ export function Header() {
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  CourtBook
+                  BookedHours
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-2 mt-6">
