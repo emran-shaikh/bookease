@@ -660,7 +660,8 @@ export default function CourtDetail() {
 
                   {viewMode === 'scroll' ? (
                     <div className="relative">
-                      <div className="flex items-center justify-between gap-2">
+                      {/* Desktop view with arrows */}
+                      <div className="hidden sm:flex items-center justify-between gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -726,6 +727,47 @@ export default function CourtDetail() {
                         >
                           <ChevronRight className="h-5 w-5" />
                         </Button>
+                      </div>
+
+                      {/* Mobile view - touch scrollable */}
+                      <div className="sm:hidden overflow-x-auto overscroll-x-contain touch-pan-x pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+                        <div className="flex gap-2 min-w-max px-1">
+                          {Array.from({ length: 30 }).map((_, index) => {
+                            const date = addDays(startOfDay(new Date()), index);
+                            const dateStr = format(date, 'yyyy-MM-dd');
+                            const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === dateStr;
+                            const status = dateBookingStatus[dateStr];
+                            
+                            return (
+                              <button
+                                key={dateStr}
+                                onClick={() => setSelectedDate(date)}
+                                className={`flex flex-col items-center justify-center min-w-[60px] p-2.5 rounded-xl border-2 transition-all ${
+                                  isSelected
+                                    ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-105'
+                                    : 'bg-card active:bg-muted border-border'
+                                }`}
+                              >
+                                <div className={`text-[10px] font-medium mb-0.5 ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
+                                  {format(date, 'EEE')}
+                                </div>
+                                <div className={`text-xl font-bold ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
+                                  {format(date, 'd')}
+                                </div>
+                                <div className={`text-[10px] ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                  {format(date, 'MMM')}
+                                </div>
+                                {status && !isSelected && (
+                                  <div className="mt-0.5">
+                                    <div className={`h-1.5 w-1.5 rounded-full ${
+                                      status === 'full' ? 'bg-destructive' : 'bg-warning'
+                                    }`} />
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
                   ) : (
