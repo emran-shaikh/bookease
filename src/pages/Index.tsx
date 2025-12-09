@@ -12,6 +12,7 @@ import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp } from 'lucid
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/currency';
+import Footer from '@/components/Footer';
 import heroImage from '@/assets/hero-sports.jpg';
 import tennisImage from '@/assets/tennis-court.jpg';
 import basketballImage from '@/assets/basketball-court.jpg';
@@ -549,6 +550,7 @@ export default function Index() {
           </div>
         </section>
       </main>
+      <Footer />
     </div>
   );
 }
