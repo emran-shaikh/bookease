@@ -502,10 +502,10 @@ export default function CourtDetail() {
       />
       <Header />
       
-      <main className="container py-8">
-        <div className="grid gap-8 lg:grid-cols-3">
+      <main className="container py-4 sm:py-6 md:py-8 px-4">
+        <div className="grid gap-4 sm:gap-6 md:gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <div className="mb-6 aspect-video w-full overflow-hidden rounded-lg bg-muted relative">
+            <div className="mb-4 sm:mb-6 aspect-video w-full overflow-hidden rounded-lg bg-muted relative">
               {court.images && court.images.length > 0 ? (
                 <img
                   src={court.images[0]}
@@ -544,33 +544,33 @@ export default function CourtDetail() {
               )}
             </div>
 
-            <h1 className="mb-2 text-3xl font-bold">{court.name}</h1>
+            <h1 className="mb-2 text-xl sm:text-2xl md:text-3xl font-bold">{court.name}</h1>
             
-            <div className="mb-4 flex flex-wrap items-center gap-4">
-              <Badge variant="secondary">{court.sport_type}</Badge>
-              <div className="flex items-center text-sm text-muted-foreground">
-                <MapPin className="mr-1 h-4 w-4" />
-                {court.address}, {court.city}, {court.state}
+            <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-2 sm:gap-4">
+              <Badge variant="secondary" className="text-xs sm:text-sm">{court.sport_type}</Badge>
+              <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
+                <MapPin className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="line-clamp-1">{court.address}, {court.city}, {court.state}</span>
               </div>
               {avgRating > 0 && (
                 <div className="flex items-center">
-                  <Star className="mr-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium">{avgRating.toFixed(1)}</span>
-                  <span className="ml-1 text-sm text-muted-foreground">
-                    ({court.reviews?.length} reviews)
+                  <Star className="mr-1 h-3 w-3 sm:h-4 sm:w-4 fill-yellow-400 text-yellow-400" />
+                  <span className="font-medium text-xs sm:text-sm">{avgRating.toFixed(1)}</span>
+                  <span className="ml-1 text-xs sm:text-sm text-muted-foreground">
+                    ({court.reviews?.length})
                   </span>
                 </div>
               )}
             </div>
 
-            <p className="mb-6 text-muted-foreground">{court.description}</p>
+            <p className="mb-4 sm:mb-6 text-sm sm:text-base text-muted-foreground">{court.description}</p>
 
             {court.amenities && court.amenities.length > 0 && (
-              <div className="mb-6">
-                <h2 className="mb-2 text-xl font-semibold">Amenities</h2>
-                <div className="flex flex-wrap gap-2">
+              <div className="mb-4 sm:mb-6">
+                <h2 className="mb-2 text-base sm:text-lg md:text-xl font-semibold">Amenities</h2>
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {court.amenities.map((amenity: string, index: number) => (
-                    <Badge key={index} variant="outline">{amenity}</Badge>
+                    <Badge key={index} variant="outline" className="text-xs">{amenity}</Badge>
                   ))}
                 </div>
               </div>
@@ -578,18 +578,18 @@ export default function CourtDetail() {
 
             {court.reviews && court.reviews.length > 0 && (
               <div>
-                <h2 className="mb-4 text-xl font-semibold">Customer Reviews ({court.reviews.length})</h2>
-                <div className="space-y-4">
+                <h2 className="mb-3 sm:mb-4 text-base sm:text-lg md:text-xl font-semibold">Customer Reviews ({court.reviews.length})</h2>
+                <div className="space-y-3 sm:space-y-4">
                   {court.reviews.map((review: any, index: number) => (
                     <Card key={index}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">{review.profiles?.full_name || 'Anonymous'}</CardTitle>
-                          <div className="flex items-center gap-1">
+                      <CardHeader className="p-3 sm:p-4 md:p-6">
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-sm sm:text-base truncate">{review.profiles?.full_name || 'Anonymous'}</CardTitle>
+                          <div className="flex items-center gap-0.5 flex-shrink-0">
                             {[1, 2, 3, 4, 5].map((star) => (
                               <Star
                                 key={star}
-                                className={`h-4 w-4 ${
+                                className={`h-3 w-3 sm:h-4 sm:w-4 ${
                                   star <= review.rating
                                     ? 'fill-yellow-400 text-yellow-400'
                                     : 'text-muted-foreground'
@@ -598,22 +598,22 @@ export default function CourtDetail() {
                             ))}
                           </div>
                         </div>
-                        <CardDescription>
+                        <CardDescription className="text-xs sm:text-sm">
                           {format(new Date(review.created_at), 'MMM d, yyyy')}
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3">
+                      <CardContent className="space-y-2 sm:space-y-3 p-3 sm:p-4 md:p-6 pt-0">
                         {review.comment && (
-                          <p className="text-sm leading-relaxed">{review.comment}</p>
+                          <p className="text-xs sm:text-sm leading-relaxed">{review.comment}</p>
                         )}
                         {review.images && review.images.length > 0 && (
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
                             {review.images.map((imageUrl: string, imgIndex: number) => (
                               <img
                                 key={imgIndex}
                                 src={imageUrl}
                                 alt={`Review photo ${imgIndex + 1}`}
-                                className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                className="w-full h-20 sm:h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                                 onClick={() => window.open(imageUrl, '_blank')}
                               />
                             ))}
@@ -628,38 +628,38 @@ export default function CourtDetail() {
           </div>
 
           <div className="lg:col-span-1">
-            <Card className="sticky top-20 overflow-hidden">
-              <CardHeader className="bg-gradient-to-br from-primary/5 to-secondary/5 border-b">
+            <Card className="lg:sticky lg:top-20 overflow-hidden">
+              <CardHeader className="bg-gradient-to-br from-primary/5 to-secondary/5 border-b p-3 sm:p-4 md:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-2xl">Book Your Slot</CardTitle>
-                    <CardDescription className="text-lg font-semibold text-primary mt-1">
+                    <CardTitle className="text-lg sm:text-xl md:text-2xl">Book Your Slot</CardTitle>
+                    <CardDescription className="text-sm sm:text-base md:text-lg font-semibold text-primary mt-1">
                       {formatPrice(court.base_price)}/hour base rate
                     </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-6 p-6">
+              <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
               {/* Date Selector with Toggle */}
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Select a date</h3>
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <h3 className="text-sm sm:text-base md:text-lg font-semibold">Select a date</h3>
                     <div className="flex gap-1 p-1 bg-muted rounded-lg">
                       <Button
                         variant={viewMode === 'scroll' ? 'default' : 'ghost'}
                         size="sm"
-                        className="h-8 px-3"
+                        className="h-7 sm:h-8 px-2 sm:px-3"
                         onClick={() => setViewMode('scroll')}
                       >
-                        <List className="h-4 w-4" />
+                        <List className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
                       <Button
                         variant={viewMode === 'calendar' ? 'default' : 'ghost'}
                         size="sm"
-                        className="h-8 px-3"
+                        className="h-7 sm:h-8 px-2 sm:px-3"
                         onClick={() => setViewMode('calendar')}
                       >
-                        <CalendarIcon className="h-4 w-4" />
+                        <CalendarIcon className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
                     </div>
                   </div>
@@ -805,15 +805,15 @@ export default function CourtDetail() {
                   <>
                     {/* Duration Selector */}
                     <div>
-                      <h3 className="text-sm font-medium mb-3">Duration</h3>
-                      <div className="grid grid-cols-4 gap-2">
+                      <h3 className="text-xs sm:text-sm font-medium mb-2 sm:mb-3">Duration</h3>
+                      <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
                         {[1, 2, 3, 4, 5, 6, 7, 8].map((hours) => (
                           <Button
                             key={hours}
                             variant={selectedHours === hours ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => setSelectedHours(hours)}
-                            className={`h-11 font-semibold transition-all ${
+                            className={`h-9 sm:h-11 text-xs sm:text-sm font-semibold transition-all ${
                               selectedHours === hours ? 'shadow-md' : ''
                             }`}
                           >
@@ -825,17 +825,17 @@ export default function CourtDetail() {
 
                     {/* Time Slots Grid */}
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-medium">Select a time slot</h3>
+                      <div className="flex items-center justify-between mb-2 sm:mb-3">
+                        <h3 className="text-xs sm:text-sm font-medium">Select a time slot</h3>
                         <Button
                           type="button"
                           variant={showAvailableOnly ? "default" : "outline"}
                           size="sm"
                           onClick={() => setShowAvailableOnly(!showAvailableOnly)}
-                          className="text-xs gap-1.5"
+                          className="text-[10px] sm:text-xs gap-1 sm:gap-1.5 h-7 sm:h-8 px-2 sm:px-3"
                         >
-                          <Filter className="h-3 w-3" />
-                          {showAvailableOnly ? "Show All" : "Available Only"}
+                          <Filter className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+                          {showAvailableOnly ? "All" : "Available"}
                         </Button>
                       </div>
                       
@@ -846,8 +846,8 @@ export default function CourtDetail() {
                         </div>
                       ) : (
                         <>
-                          <div className="max-h-[320px] overflow-y-auto pr-2 space-y-2">
-                            <div className="grid grid-cols-2 gap-2">
+                          <div className="max-h-[280px] sm:max-h-[320px] overflow-y-auto pr-1 sm:pr-2 space-y-1.5 sm:space-y-2">
+                            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                               {timeSlots
                                 .filter((time) => {
                                   // Apply filter if enabled
@@ -883,7 +883,7 @@ export default function CourtDetail() {
                                       }
                                     }}
                                     disabled={!slotStatus.available}
-                                    className={`relative p-4 rounded-xl border-2 transition-all text-left ${
+                                    className={`relative p-2.5 sm:p-4 rounded-lg sm:rounded-xl border-2 transition-all text-left ${
                                       isSelected
                                         ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-[1.02]'
                                         : slotStatus.available
@@ -894,21 +894,21 @@ export default function CourtDetail() {
                                     }`}
                                   >
                                     {hasPeakPricing && !isSelected && slotStatus.available && (
-                                      <div className="absolute -top-2 -right-2 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full">
+                                      <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 px-1 sm:px-1.5 py-0.5 bg-amber-500 text-white text-[8px] sm:text-[10px] font-bold rounded-full">
                                         {pricing.multiplier.toFixed(1)}×
                                       </div>
                                     )}
-                                    <div className={`text-base font-bold mb-1 ${
+                                    <div className={`text-xs sm:text-base font-bold mb-0.5 sm:mb-1 ${
                                       isSelected ? 'text-primary-foreground' : slotStatus.available ? 'text-primary' : 'text-muted-foreground'
                                     }`}>
                                       {convertTo12Hour(time)}
                                     </div>
                                     {slotStatus.available ? (
-                                      <div className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                      <div className={`text-[10px] sm:text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
                                         {selectedHours}h • {priceDisplay}/hr
                                       </div>
                                     ) : (
-                                      <div className="text-xs text-destructive font-medium">
+                                      <div className="text-[10px] sm:text-xs text-destructive font-medium">
                                         {slotStatus.reason}
                                       </div>
                                     )}
@@ -919,15 +919,15 @@ export default function CourtDetail() {
                           </div>
 
                           {selectedStartTime && totalPrice !== null && !isNaN(totalPrice) && (
-                            <div className="mt-4 p-4 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/20 rounded-xl">
+                            <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/20 rounded-lg sm:rounded-xl">
                               <div className="flex justify-between items-center mb-2">
                                 <div>
-                                  <div className="text-sm text-muted-foreground mb-1">Total Price</div>
-                                  <div className="text-xs text-muted-foreground">
+                                  <div className="text-xs sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">Total Price</div>
+                                  <div className="text-[10px] sm:text-xs text-muted-foreground">
                                     {convertTo12Hour(selectedStartTime)} - {convertTo12Hour(addHoursToTime(selectedStartTime, selectedHours))}
                                   </div>
                                 </div>
-                                <div className="text-3xl font-bold text-primary">
+                                <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">
                                   {formatPrice(totalPrice)}
                                 </div>
                               </div>
@@ -935,12 +935,12 @@ export default function CourtDetail() {
                               {/* Price Breakdown */}
                               {priceBreakdown && (
                                 <div className="pt-2 border-t border-primary/20 space-y-1">
-                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                  <div className="flex justify-between text-[10px] sm:text-xs text-muted-foreground">
                                     <span>Base: {formatPrice(priceBreakdown.basePrice)}/hr × {selectedHours}h</span>
                                     <span>{formatPrice(priceBreakdown.basePrice * selectedHours)}</span>
                                   </div>
                                   {priceBreakdown.multiplier > 1 && priceBreakdown.rules.length > 0 && (
-                                    <div className="flex justify-between text-xs">
+                                    <div className="flex justify-between text-[10px] sm:text-xs">
                                       <span className="text-amber-600 font-medium">
                                         {priceBreakdown.rules.join(', ')}
                                       </span>
@@ -960,28 +960,29 @@ export default function CourtDetail() {
                 )}
 
                 <Button
-                  className="w-full text-base py-6 shadow-lg hover:shadow-xl transition-all"
+                  className="w-full text-sm sm:text-base py-4 sm:py-6 shadow-lg hover:shadow-xl transition-all"
                   size="lg"
                   onClick={handleBooking}
                   disabled={!selectedDate || !selectedStartTime || bookingLoading || loadingPricing}
                 >
                   {bookingLoading ? (
                     <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Reserving slot...
+                      <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                      Reserving...
                     </>
                   ) : !selectedDate || !selectedStartTime ? (
                     'Select Date & Time'
                   ) : (
                     <>
-                      <Lock className="mr-2 h-5 w-5" />
-                      Reserve & Continue to Payment
+                      <Lock className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="hidden sm:inline">Reserve & Continue to Payment</span>
+                      <span className="sm:hidden">Reserve & Pay</span>
                     </>
                   )}
                 </Button>
                 {selectedDate && selectedStartTime && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    🔒 Slot will be reserved for 5 minutes
+                  <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
+                    🔒 Slot reserved for 5 mins
                   </p>
                 )}
               </CardContent>
