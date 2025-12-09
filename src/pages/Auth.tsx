@@ -156,21 +156,22 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 px-4 py-8">
-      <div className="w-full max-w-4xl space-y-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 px-4 py-4 sm:py-6 md:py-8">
+      <div className="w-full max-w-4xl space-y-3 sm:space-y-4">
         {/* Test Accounts Info */}
         <Card className="border-primary/20 bg-primary/5">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">🧪 Test Accounts Available</CardTitle>
-                <CardDescription className="mt-1">
-                  Quick login for testing different user roles
+          <CardHeader className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <CardTitle className="text-sm sm:text-base md:text-lg">🧪 Test Accounts</CardTitle>
+                <CardDescription className="mt-0.5 sm:mt-1 text-xs sm:text-sm">
+                  Quick login for testing
                 </CardDescription>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 flex-shrink-0"
                 onClick={() => setShowTestAccounts(!showTestAccounts)}
               >
                 {showTestAccounts ? 'Hide' : 'Show'}
@@ -178,77 +179,74 @@ export default function Auth() {
             </div>
           </CardHeader>
           {showTestAccounts && (
-            <CardContent className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border bg-background p-3">
-                  <div className="mb-2 text-sm font-semibold text-primary">👤 Customer</div>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div>Email: customer@test.com</div>
-                    <div>Pass: password123</div>
+            <CardContent className="space-y-2 sm:space-y-3 p-3 sm:p-4 md:p-6 pt-0">
+              <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-3">
+                <div className="rounded-lg border bg-background p-2 sm:p-3">
+                  <div className="mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-primary">👤 Customer</div>
+                  <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs text-muted-foreground">
+                    <div>customer@test.com</div>
+                    <div>password123</div>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="mt-2 w-full"
+                    className="mt-2 w-full h-7 sm:h-8 text-xs"
                     onClick={() => quickLogin('customer@test.com')}
                   >
-                    Use Account
+                    Use
                   </Button>
                 </div>
-                <div className="rounded-lg border bg-background p-3">
-                  <div className="mb-2 text-sm font-semibold text-primary">🏢 Court Owner</div>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div>Email: owner@test.com</div>
-                    <div>Pass: password123</div>
+                <div className="rounded-lg border bg-background p-2 sm:p-3">
+                  <div className="mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-primary">🏢 Owner</div>
+                  <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs text-muted-foreground">
+                    <div>owner@test.com</div>
+                    <div>password123</div>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="mt-2 w-full"
+                    className="mt-2 w-full h-7 sm:h-8 text-xs"
                     onClick={() => quickLogin('owner@test.com')}
                   >
-                    Use Account
+                    Use
                   </Button>
                 </div>
-                <div className="rounded-lg border bg-background p-3">
-                  <div className="mb-2 text-sm font-semibold text-primary">⚡ Admin</div>
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div>Email: admin@test.com</div>
-                    <div>Pass: password123</div>
+                <div className="rounded-lg border bg-background p-2 sm:p-3">
+                  <div className="mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-primary">⚡ Admin</div>
+                  <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs text-muted-foreground">
+                    <div>admin@test.com</div>
+                    <div>password123</div>
                   </div>
                   <Button
                     size="sm"
                     variant="outline"
-                    className="mt-2 w-full"
+                    className="mt-2 w-full h-7 sm:h-8 text-xs"
                     onClick={() => quickLogin('admin@test.com')}
                   >
-                    Use Account
+                    Use
                   </Button>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                💡 First time? Sign up with customer/owner emails in the Sign Up tab to activate their roles
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Note: Create these accounts via sign up first, then they will automatically get the correct roles.
+              <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
+                💡 Sign up first with these emails to activate roles
               </p>
             </CardContent>
           )}
         </Card>
 
         <Card className="w-full">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-              <Calendar className="h-6 w-6 text-primary" />
+          <CardHeader className="text-center p-4 sm:p-6">
+            <div className="mx-auto mb-2 sm:mb-4 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-primary/10">
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Welcome to CourtBook</CardTitle>
-            <CardDescription>Book sports venues with ease</CardDescription>
+            <CardTitle className="text-xl sm:text-2xl">Welcome to CourtBook</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Book sports venues with ease</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0">
             <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 h-9 sm:h-10">
+                <TabsTrigger value="signin" className="text-xs sm:text-sm">Sign In</TabsTrigger>
+                <TabsTrigger value="signup" className="text-xs sm:text-sm">Sign Up</TabsTrigger>
               </TabsList>
             
             <TabsContent value="signin">
