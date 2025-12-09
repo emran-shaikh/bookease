@@ -27,7 +27,7 @@ const RefundPolicy = () => {
             <h2 className="text-xl font-semibold text-foreground mb-4">2. How to Request a Refund</h2>
             <p className="text-muted-foreground mb-3">To request a refund:</p>
             <ol className="list-decimal pl-6 text-muted-foreground space-y-2">
-              <li>Log into your CourtBooker account</li>
+              <li>Log into your BookedHours account</li>
               <li>Go to your Dashboard and find the booking</li>
               <li>Click on "Cancel Booking" button</li>
               <li>Confirm the cancellation</li>

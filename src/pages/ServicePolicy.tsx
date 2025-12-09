@@ -13,7 +13,7 @@ const ServicePolicy = () => {
           <section className="mb-8">
             <h2 className="text-xl font-semibold text-foreground mb-4">1. Service Overview</h2>
             <p className="text-muted-foreground">
-              CourtBooker provides an online platform connecting sports enthusiasts with court facilities across Pakistan. 
+              BookedHours provides an online platform connecting sports enthusiasts with court facilities across Pakistan. 
               Our service includes court discovery, real-time availability checking, online booking, secure payment processing, 
               and booking management.
             </p>

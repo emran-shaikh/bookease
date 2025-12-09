@@ -8,7 +8,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-foreground">CourtBooker</h3>
+            <h3 className="text-lg font-semibold text-foreground">BookedHours</h3>
             <p className="text-sm text-muted-foreground">
               Your trusted platform for booking sports courts across Pakistan.
             </p>
@@ -30,8 +30,8 @@ const Footer = () => {
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Mail className="h-4 w-4 shrink-0 text-primary" />
-                <a href="mailto:support@courtbooker.pk" className="hover:text-primary transition-colors">
-                  support@courtbooker.pk
+                <a href="mailto:support@bookedhours.com" className="hover:text-primary transition-colors">
+                  support@bookedhours.com
                 </a>
               </div>
             </div>
@@ -88,7 +88,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-border mt-8 pt-6 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} CourtBooker. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} BookedHours. All rights reserved.</p>
         </div>
       </div>
     </footer>
