@@ -1,9 +1,15 @@
 import { Header } from "@/components/Header";
+import { SEO } from "@/components/SEO";
 import Footer from "@/components/Footer";
 
 const PrivacyPolicy = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SEO 
+        title="Privacy Policy"
+        description="Learn how BookedHours collects, uses, and protects your personal information. Your privacy is important to us."
+        keywords="privacy policy, data protection, personal information, BookedHours"
+      />
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-4xl mx-auto prose prose-sm md:prose-base dark:prose-invert">

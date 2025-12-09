@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Header } from '@/components/Header';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -223,6 +224,11 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Admin Dashboard"
+        description="BookedHours admin panel. Manage courts, users, bookings, and monitor platform activity."
+        keywords="admin dashboard, platform management, court approval, user management"
+      />
       <Header />
       
       <main className="container py-8">

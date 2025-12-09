@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { SEO } from '@/components/SEO';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 
@@ -69,6 +70,10 @@ export default function CompleteProfile() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <SEO 
+        title="Complete Your Profile"
+        description="Complete your BookedHours profile to start booking sports courts near you."
+      />
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Complete Your Profile</CardTitle>

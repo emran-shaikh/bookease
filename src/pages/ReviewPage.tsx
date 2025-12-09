@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Header } from '@/components/Header';
+import { SEO } from '@/components/SEO';
 import { ReviewForm } from '@/components/ReviewForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
@@ -95,6 +96,11 @@ export default function ReviewPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Write a Review"
+        description="Share your experience and help others find great sports courts. Leave a review for your recent booking."
+        keywords="review, feedback, court review, rating"
+      />
       <Header />
       
       <main className="container py-8">

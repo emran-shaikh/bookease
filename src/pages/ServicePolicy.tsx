@@ -1,9 +1,15 @@
 import { Header } from "@/components/Header";
+import { SEO } from "@/components/SEO";
 import Footer from "@/components/Footer";
 
 const ServicePolicy = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SEO 
+        title="Service Policy"
+        description="Learn about BookedHours service policies including booking process, payment methods, user responsibilities, and quality assurance."
+        keywords="service policy, booking process, payment methods, customer service"
+      />
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-4xl mx-auto prose prose-sm md:prose-base dark:prose-invert">

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { SEO } from '@/components/SEO';
 import { Loader2, Calendar } from 'lucide-react';
 import { z } from 'zod';
 
@@ -157,6 +158,11 @@ export default function Auth() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 px-4 py-4 sm:py-6 md:py-8">
+      <SEO 
+        title="Sign In or Create Account"
+        description="Sign in to BookedHours to book sports courts, manage your reservations, and save your favorite venues. Create a free account today."
+        keywords="sign in, login, register, create account, sports booking"
+      />
       <div className="w-full max-w-4xl space-y-3 sm:space-y-4">
         {/* Test Accounts Info */}
         <Card className="border-primary/20 bg-primary/5">
