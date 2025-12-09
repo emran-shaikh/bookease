@@ -75,79 +75,79 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container py-8">
-        <div className="mb-8">
-          <h1 className="mb-2 text-3xl font-bold">My Dashboard</h1>
-          <p className="text-muted-foreground">Manage your bookings and profile</p>
+      <main className="container py-4 sm:py-6 md:py-8 px-4">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <h1 className="mb-1 sm:mb-2 text-xl sm:text-2xl md:text-3xl font-bold">My Dashboard</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Manage your bookings and profile</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3 mb-8">
+        <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-3 mb-4 sm:mb-6 md:mb-8">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Bookings</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 md:p-6 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Total</CardTitle>
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{bookings.length}</div>
+            <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold">{bookings.length}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 md:p-6 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Upcoming</CardTitle>
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{upcomingBookings.length}</div>
+            <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold">{upcomingBookings.length}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <Star className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 md:p-6 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Done</CardTitle>
+              <Star className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pastBookings.length}</div>
+            <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+              <div className="text-lg sm:text-xl md:text-2xl font-bold">{pastBookings.length}</div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="upcoming" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="upcoming">Upcoming Bookings</TabsTrigger>
-            <TabsTrigger value="past">Past Bookings</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
+        <Tabs defaultValue="upcoming" className="space-y-3 sm:space-y-4">
+          <TabsList className="w-full grid grid-cols-3 h-9 sm:h-10">
+            <TabsTrigger value="upcoming" className="text-xs sm:text-sm px-1 sm:px-3">Upcoming</TabsTrigger>
+            <TabsTrigger value="past" className="text-xs sm:text-sm px-1 sm:px-3">Past</TabsTrigger>
+            <TabsTrigger value="profile" className="text-xs sm:text-sm px-1 sm:px-3">Profile</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="upcoming" className="space-y-4">
+          <TabsContent value="upcoming" className="space-y-3 sm:space-y-4">
             {upcomingBookings.length === 0 ? (
               <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
-                  <p className="mb-4 text-muted-foreground">No upcoming bookings</p>
-                  <Button onClick={() => navigate('/courts')}>Browse Courts</Button>
+                <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12">
+                  <Calendar className="mb-3 sm:mb-4 h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground" />
+                  <p className="mb-3 sm:mb-4 text-xs sm:text-sm text-muted-foreground">No upcoming bookings</p>
+                  <Button onClick={() => navigate('/courts')} size="sm" className="h-8 sm:h-9 text-xs sm:text-sm">Browse Courts</Button>
                 </CardContent>
               </Card>
             ) : (
               upcomingBookings.map((booking) => (
                 <Card key={booking.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>{booking.courts?.name}</CardTitle>
-                        <CardDescription>
+                  <CardHeader className="p-3 sm:p-4 md:p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm sm:text-base md:text-lg truncate">{booking.courts?.name}</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm truncate">
                           {booking.courts?.city}, {booking.courts?.location}
                         </CardDescription>
                       </div>
-                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
+                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'} className="text-[10px] sm:text-xs flex-shrink-0">
                         {booking.status}
                       </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-2 text-sm">
+                  <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                    <div className="grid gap-1 sm:gap-2 text-xs sm:text-sm">
                       <div>
                         <span className="font-medium">Date:</span>{' '}
-                        {format(new Date(booking.booking_date), 'MMMM d, yyyy')}
+                        {format(new Date(booking.booking_date), 'MMM d, yyyy')}
                       </div>
                       <div>
                         <span className="font-medium">Time:</span>{' '}
@@ -163,33 +163,33 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
-          <TabsContent value="past" className="space-y-4">
+          <TabsContent value="past" className="space-y-3 sm:space-y-4">
             {pastBookings.length === 0 ? (
               <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
-                  <p className="text-muted-foreground">No past bookings</p>
+                <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12">
+                  <Calendar className="mb-3 sm:mb-4 h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground" />
+                  <p className="text-xs sm:text-sm text-muted-foreground">No past bookings</p>
                 </CardContent>
               </Card>
             ) : (
               pastBookings.map((booking) => (
                 <Card key={booking.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle>{booking.courts?.name}</CardTitle>
-                        <CardDescription>
+                  <CardHeader className="p-3 sm:p-4 md:p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm sm:text-base md:text-lg truncate">{booking.courts?.name}</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm truncate">
                           {booking.courts?.city}, {booking.courts?.location}
                         </CardDescription>
                       </div>
-                      <Badge variant="secondary">{booking.status}</Badge>
+                      <Badge variant="secondary" className="text-[10px] sm:text-xs flex-shrink-0">{booking.status}</Badge>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-2 text-sm mb-4">
+                  <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                    <div className="grid gap-1 sm:gap-2 text-xs sm:text-sm mb-3 sm:mb-4">
                       <div>
                         <span className="font-medium">Date:</span>{' '}
-                        {format(new Date(booking.booking_date), 'MMMM d, yyyy')}
+                        {format(new Date(booking.booking_date), 'MMM d, yyyy')}
                       </div>
                       <div>
                         <span className="font-medium">Time:</span>{' '}
@@ -200,18 +200,19 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {reviews.some(r => r.booking_id === booking.id) ? (
-                      <Badge variant="default" className="gap-1">
-                        <Star className="h-3 w-3 fill-current" />
+                      <Badge variant="default" className="gap-1 text-[10px] sm:text-xs">
+                        <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-current" />
                         Reviewed
                       </Badge>
                     ) : (
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-7 sm:h-8 text-xs"
                         onClick={() => navigate(`/review/${booking.id}`)}
                       >
-                        <Star className="h-4 w-4 mr-1" />
-                        Leave Review
+                        <Star className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                        Review
                       </Button>
                     )}
                   </CardContent>
@@ -222,22 +223,22 @@ export default function Dashboard() {
 
           <TabsContent value="profile">
             <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>Manage your account details</CardDescription>
+              <CardHeader className="p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-base sm:text-lg">Profile Information</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Manage your account details</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6 pt-0">
                 <div>
-                  <label className="text-sm font-medium">Full Name</label>
-                  <p className="text-sm text-muted-foreground">{profile?.full_name || 'Not set'}</p>
+                  <label className="text-xs sm:text-sm font-medium">Full Name</label>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{profile?.full_name || 'Not set'}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Email</label>
-                  <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                  <label className="text-xs sm:text-sm font-medium">Email</label>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-all">{profile?.email}</p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium">Phone</label>
-                  <p className="text-sm text-muted-foreground">{profile?.phone || 'Not set'}</p>
+                  <label className="text-xs sm:text-sm font-medium">Phone</label>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{profile?.phone || 'Not set'}</p>
                 </div>
               </CardContent>
             </Card>

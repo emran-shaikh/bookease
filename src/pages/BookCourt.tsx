@@ -266,100 +266,100 @@ export default function BookCourt() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container py-8">
+      <main className="container py-4 sm:py-6 md:py-8 px-4">
         <div className="mx-auto max-w-3xl">
-          <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-3xl font-bold">Complete Your Booking</h1>
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4" />
+          <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Complete Booking</h1>
+            <div className="flex items-center gap-2 text-xs sm:text-sm">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
               <span className={timeRemaining < 60 ? 'text-destructive font-medium' : ''}>
-                {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')} remaining
+                {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')} left
               </span>
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <Card>
-              <CardHeader>
-                <CardTitle>Booking Details</CardTitle>
+              <CardHeader className="p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-base sm:text-lg">Booking Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6 pt-0">
                 <div>
-                  <p className="text-sm font-medium">Court</p>
-                  <p className="text-lg">{court.name}</p>
+                  <p className="text-xs sm:text-sm font-medium">Court</p>
+                  <p className="text-sm sm:text-base md:text-lg">{court.name}</p>
                 </div>
                 <Separator />
                 <div>
-                  <p className="text-sm font-medium">Date</p>
-                  <p className="text-lg">{format(date, 'MMMM d, yyyy')}</p>
+                  <p className="text-xs sm:text-sm font-medium">Date</p>
+                  <p className="text-sm sm:text-base md:text-lg">{format(date, 'MMMM d, yyyy')}</p>
                 </div>
                 <Separator />
                 <div>
-                  <p className="text-sm font-medium">Time</p>
-                  <p className="text-lg">{timeSlot}</p>
+                  <p className="text-xs sm:text-sm font-medium">Time</p>
+                  <p className="text-sm sm:text-base md:text-lg">{timeSlot}</p>
                 </div>
                 <Separator />
                 <div>
-                  <p className="text-sm font-medium mb-2">Price Breakdown</p>
+                  <p className="text-xs sm:text-sm font-medium mb-2">Price Breakdown</p>
                   {calculatingPrice ? (
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-muted-foreground">Calculating price...</span>
+                      <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                      <span className="text-xs sm:text-sm text-muted-foreground">Calculating...</span>
                     </div>
                   ) : priceCalculation ? (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Base Price (per hour)</span>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <div className="flex justify-between text-xs sm:text-sm">
+                        <span className="text-muted-foreground">Base (per hr)</span>
                         <span>{formatPrice(priceCalculation.basePrice)}</span>
                       </div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-xs sm:text-sm">
                         <span className="text-muted-foreground">Duration</span>
-                        <span>{priceCalculation.hours} {priceCalculation.hours === 1 ? 'hour' : 'hours'}</span>
+                        <span>{priceCalculation.hours} hr{priceCalculation.hours > 1 ? 's' : ''}</span>
                       </div>
                       {priceCalculation.appliedRules.length > 0 && (
-                        <div className="pt-2 border-t">
-                          <p className="text-xs font-medium text-amber-600 dark:text-amber-500 mb-1">
-                            💰 Special Pricing Applied:
+                        <div className="pt-1.5 sm:pt-2 border-t">
+                          <p className="text-[10px] sm:text-xs font-medium text-amber-600 dark:text-amber-500 mb-1">
+                            💰 Special Pricing:
                           </p>
                           {priceCalculation.appliedRules.map((rule, idx) => (
-                            <p key={idx} className="text-xs text-muted-foreground pl-4">
+                            <p key={idx} className="text-[10px] sm:text-xs text-muted-foreground pl-3 sm:pl-4">
                               • {rule}
                             </p>
                           ))}
                         </div>
                       )}
-                      <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                        <span>Total Price</span>
+                      <div className="flex justify-between text-base sm:text-lg font-bold pt-1.5 sm:pt-2 border-t">
+                        <span>Total</span>
                         <span className="text-primary">{formatPrice(priceCalculation.totalPrice)}</span>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-2xl font-bold">{formatPrice(court.base_price)}</p>
+                    <p className="text-lg sm:text-xl md:text-2xl font-bold">{formatPrice(court.base_price)}</p>
                   )}
                 </div>
                 <Separator />
                 <div>
-                  <Label htmlFor="notes">Additional Notes (Optional)</Label>
+                  <Label htmlFor="notes" className="text-xs sm:text-sm">Notes (Optional)</Label>
                   <Textarea
                     id="notes"
-                    placeholder="Any special requirements or notes..."
+                    placeholder="Any special requirements..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="mt-2"
+                    className="mt-1.5 sm:mt-2 text-sm min-h-[60px] sm:min-h-[80px]"
                   />
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Payment Method</CardTitle>
-                <CardDescription>Choose your preferred payment option (PKR only)</CardDescription>
+              <CardHeader className="p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-base sm:text-lg">Payment Method</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Choose your payment option (PKR)</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 pt-0">
                 <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
                   <div 
-                    className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-all ${
+                    className={`flex items-center space-x-2 sm:space-x-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-all ${
                       paymentMethod === 'bank_transfer' 
                         ? 'border-primary bg-primary/5' 
                         : 'hover:bg-accent'
@@ -369,17 +369,17 @@ export default function BookCourt() {
                     <RadioGroupItem value="bank_transfer" id="bank_transfer" />
                     <Label htmlFor="bank_transfer" className="flex-1 cursor-pointer">
                       <div className="flex items-center gap-2">
-                        <Banknote className="h-5 w-5 text-emerald-600" />
-                        <div>
-                          <p className="font-semibold">Bank Transfer</p>
-                          <p className="text-xs text-muted-foreground">Transfer to bank account (PKR)</p>
+                        <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm sm:text-base">Bank Transfer</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">Transfer to bank (PKR)</p>
                         </div>
                       </div>
                     </Label>
                   </div>
 
                   <div 
-                    className={`flex items-center space-x-3 rounded-lg border p-4 cursor-pointer transition-all ${
+                    className={`flex items-center space-x-2 sm:space-x-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-all ${
                       paymentMethod === 'payfast' 
                         ? 'border-primary bg-primary/5' 
                         : 'hover:bg-accent'
@@ -389,10 +389,10 @@ export default function BookCourt() {
                     <RadioGroupItem value="payfast" id="payfast" />
                     <Label htmlFor="payfast" className="flex-1 cursor-pointer">
                       <div className="flex items-center gap-2">
-                        <CreditCard className="h-5 w-5 text-blue-600" />
-                        <div>
-                          <p className="font-semibold">PayFast - Debit/Credit Card</p>
-                          <p className="text-xs text-muted-foreground">Instant payment via PayFast (PKR)</p>
+                        <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm sm:text-base">PayFast Card</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">Instant payment (PKR)</p>
                         </div>
                       </div>
                     </Label>

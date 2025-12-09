@@ -188,60 +188,62 @@ export default function Courts() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container py-8">
-        <div className="mb-8">
-          <h1 className="mb-2 text-4xl font-bold">Browse Courts</h1>
-          <p className="text-muted-foreground">Find and book sports venues near you</p>
+      <main className="container py-4 sm:py-6 md:py-8 px-4">
+        <div className="mb-4 sm:mb-6 md:mb-8">
+          <h1 className="mb-1 sm:mb-2 text-2xl sm:text-3xl md:text-4xl font-bold">Browse Courts</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Find and book sports venues near you</p>
         </div>
 
-        <div className="mb-6 space-y-4">
+        <div className="mb-4 sm:mb-6 space-y-3 sm:space-y-4">
           {userLocation && !locationLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Navigation className="h-4 w-4 text-primary" />
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+              <Navigation className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
               <span>Showing courts near your location</span>
             </div>
           )}
           
-          <div className="flex flex-col gap-4 lg:flex-row">
+          <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search courts..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-10 sm:h-11 text-sm"
               />
             </div>
             
-            <Select value={sportFilter} onValueChange={setSportFilter}>
-              <SelectTrigger className="w-full lg:w-[200px]">
-                <SelectValue placeholder="All Sports" />
-              </SelectTrigger>
-              <SelectContent>
-                {sportTypes.map(sport => (
-                  <SelectItem key={sport} value={sport}>
-                    {sport === 'all' ? 'All Sports' : sport}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Select value={locationFilter} onValueChange={setLocationFilter}>
-              <SelectTrigger className="w-full lg:w-[200px]">
-                <SelectValue placeholder="Location..." />
-              </SelectTrigger>
-              <SelectContent>
-                {locations.map(location => (
-                  <SelectItem key={location} value={location}>
-                    {location === 'all' ? 'All Locations' : location}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:flex">
+              <Select value={sportFilter} onValueChange={setSportFilter}>
+                <SelectTrigger className="w-full lg:w-[160px] h-10 sm:h-11 text-sm">
+                  <SelectValue placeholder="All Sports" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sportTypes.map(sport => (
+                    <SelectItem key={sport} value={sport}>
+                      {sport === 'all' ? 'All Sports' : sport}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={locationFilter} onValueChange={setLocationFilter}>
+                <SelectTrigger className="w-full lg:w-[160px] h-10 sm:h-11 text-sm">
+                  <SelectValue placeholder="Location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map(location => (
+                    <SelectItem key={location} value={location}>
+                      {location === 'all' ? 'All Locations' : location}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
               <span className="text-muted-foreground">Price Range</span>
               <span className="font-medium">{formatPrice(priceRange[0])} - {formatPrice(priceRange[1])}</span>
             </div>
@@ -256,7 +258,7 @@ export default function Courts() {
           </div>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filteredCourts.map((court) => (
             <Card key={court.id} className="overflow-hidden transition-shadow hover:shadow-lg group">
               <div className="aspect-video w-full overflow-hidden bg-muted relative">
@@ -271,12 +273,12 @@ export default function Courts() {
                       (e.target as HTMLImageElement).parentElement?.classList.add('flex', 'items-center', 'justify-center');
                       const placeholder = document.createElement('span');
                       placeholder.textContent = 'Image unavailable';
-                      placeholder.className = 'text-muted-foreground';
+                      placeholder.className = 'text-muted-foreground text-xs sm:text-sm';
                       (e.target as HTMLImageElement).parentElement?.appendChild(placeholder);
                     }}
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-muted-foreground">
+                  <div className="flex h-full items-center justify-center text-muted-foreground text-xs sm:text-sm">
                     No image
                   </div>
                 )}
@@ -284,54 +286,54 @@ export default function Courts() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-2 right-2 bg-background/80 hover:bg-background"
+                    className="absolute top-2 right-2 bg-background/80 hover:bg-background h-8 w-8 sm:h-9 sm:w-9"
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleFavorite(court.id);
                     }}
                   >
                     <Heart
-                      className={`h-5 w-5 ${
+                      className={`h-4 w-4 sm:h-5 sm:w-5 ${
                         isFavorite(court.id) ? 'fill-red-500 text-red-500' : 'text-foreground'
                       }`}
                     />
                   </Button>
                 )}
               </div>
-              <CardHeader>
-                <CardTitle className="line-clamp-1">{court.name}</CardTitle>
-                <CardDescription className="line-clamp-2">
+              <CardHeader className="p-3 sm:p-4">
+                <CardTitle className="line-clamp-1 text-base sm:text-lg">{court.name}</CardTitle>
+                <CardDescription className="line-clamp-2 text-xs sm:text-sm">
                   {court.description}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Badge variant="secondary">{court.sport_type}</Badge>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <MapPin className="mr-1 h-4 w-4" />
-                    {court.city}, {court.location}
+              <CardContent className="p-3 sm:p-4 pt-0">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Badge variant="secondary" className="text-xs">{court.sport_type}</Badge>
+                  <div className="flex items-center text-xs sm:text-sm text-muted-foreground flex-wrap">
+                    <MapPin className="mr-1 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    <span className="truncate">{court.city}, {court.location}</span>
                     {court.distance && (
-                      <span className="ml-2 text-primary">• {court.distance.toFixed(1)}km away</span>
+                      <span className="ml-2 text-primary">• {court.distance.toFixed(1)}km</span>
                     )}
                   </div>
                   {court.rating > 0 && (
-                    <div className="flex items-center text-sm">
-                      <Star className="mr-1 h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <div className="flex items-center text-xs sm:text-sm">
+                      <Star className="mr-1 h-3 w-3 sm:h-4 sm:w-4 fill-yellow-400 text-yellow-400" />
                       <span className="font-medium">{court.rating.toFixed(1)}</span>
                       <span className="ml-1 text-muted-foreground">
-                        ({court.reviews_count} reviews)
+                        ({court.reviews_count})
                       </span>
                     </div>
                   )}
-                  <p className="text-lg font-bold">{formatPrice(court.base_price)}/hour</p>
+                  <p className="text-base sm:text-lg font-bold">{formatPrice(court.base_price)}/hr</p>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="p-3 sm:p-4 pt-0">
                 <Button
-                  className="w-full"
+                  className="w-full h-9 sm:h-10 text-sm"
                   onClick={() => navigate(`/courts/${court.id}`)}
                 >
-                  View Details & Book
+                  View Details
                 </Button>
               </CardFooter>
             </Card>
