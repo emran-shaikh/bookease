@@ -19,6 +19,10 @@ import ReviewPage from "./pages/ReviewPage";
 import Favorites from "./pages/Favorites";
 import NotFound from "./pages/NotFound";
 import ChatBot from "./components/ChatBot";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsConditions from "./pages/TermsConditions";
+import RefundPolicy from "./pages/RefundPolicy";
+import ServicePolicy from "./pages/ServicePolicy";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -81,6 +85,18 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/favorites"
+              element={
+                <ProtectedRoute>
+                  <Favorites />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/terms-conditions" element={<TermsConditions />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/service-policy" element={<ServicePolicy />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
