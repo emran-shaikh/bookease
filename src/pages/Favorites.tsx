@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SEO } from '@/components/SEO';
 import { Heart, MapPin, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -82,6 +83,11 @@ export default function Favorites() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="My Favorite Courts"
+        description="View and manage your favorite sports courts. Get quick access to your preferred venues and receive updates on special offers."
+        keywords="favorite courts, saved venues, preferred courts"
+      />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2 text-foreground">My Favorite Courts</h1>

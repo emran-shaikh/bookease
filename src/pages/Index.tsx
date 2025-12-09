@@ -12,6 +12,7 @@ import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp } from 'lucid
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/currency';
+import { SEO } from '@/components/SEO';
 import Footer from '@/components/Footer';
 import heroImage from '@/assets/hero-sports.jpg';
 import tennisImage from '@/assets/tennis-court.jpg';
@@ -231,6 +232,11 @@ export default function Index() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
+      <SEO 
+        title="BookedHours - Book Sports Courts Online in Pakistan"
+        description="Find and book tennis, basketball, badminton courts near you with real-time availability and instant confirmation. Pakistan's premier sports court booking platform."
+        keywords="sports court booking, tennis court, basketball court, badminton court, Pakistan, Karachi, online booking"
+      />
       {/* Hero Section */}
       <div className="relative h-[60vh] sm:h-[65vh] md:h-[70vh] overflow-hidden">
         <div 

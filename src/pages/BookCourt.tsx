@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useSlotLock } from '@/hooks/useSlotLock';
 import { Header } from '@/components/Header';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -264,6 +265,11 @@ export default function BookCourt() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title={court ? `Book ${court.name}` : 'Complete Booking'}
+        description={court ? `Complete your booking for ${court.name}. Secure your court slot now with easy payment options.` : 'Complete your court booking on BookedHours.'}
+        keywords="book court, checkout, payment, court reservation"
+      />
       <Header />
       
       <main className="container py-4 sm:py-6 md:py-8 px-4">

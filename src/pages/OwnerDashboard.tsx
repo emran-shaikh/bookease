@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Header } from '@/components/Header';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -225,6 +226,11 @@ export default function OwnerDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Owner Dashboard"
+        description="Manage your sports courts, view bookings, set pricing rules, and track earnings on BookedHours."
+        keywords="owner dashboard, court management, bookings, pricing, earnings"
+      />
       <Header />
       
       <main className="container py-8">

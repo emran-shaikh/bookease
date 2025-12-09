@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useSlotLock } from '@/hooks/useSlotLock';
 import { Header } from '@/components/Header';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -494,6 +495,11 @@ export default function CourtDetail() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title={court ? `${court.name} - Book Now` : 'Court Details'}
+        description={court ? `Book ${court.name} in ${court.city}. ${court.sport_type} court with real-time availability. ${court.description?.slice(0, 100) || ''}` : 'View court details and book your slot.'}
+        keywords={court ? `${court.name}, ${court.sport_type}, ${court.city}, book court, sports venue` : 'court details, sports booking'}
+      />
       <Header />
       
       <main className="container py-8">

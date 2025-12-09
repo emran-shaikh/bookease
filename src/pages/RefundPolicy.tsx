@@ -1,9 +1,15 @@
 import { Header } from "@/components/Header";
+import { SEO } from "@/components/SEO";
 import Footer from "@/components/Footer";
 
 const RefundPolicy = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SEO 
+        title="Refund Policy"
+        description="Understand BookedHours refund and cancellation policy. Learn about our conditions for booking refunds and how to request one."
+        keywords="refund policy, cancellation, booking refund, return policy"
+      />
       <Header />
       <main className="flex-1 container mx-auto px-4 py-8 md:py-12">
         <div className="max-w-4xl mx-auto prose prose-sm md:prose-base dark:prose-invert">

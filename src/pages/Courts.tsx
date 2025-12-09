@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -186,6 +187,11 @@ export default function Courts() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="Browse Sports Courts"
+        description="Discover and book sports courts near you. Tennis, basketball, badminton and more. Filter by location, sport type, and price."
+        keywords="browse courts, sports venues, court booking, tennis, basketball, badminton, Pakistan"
+      />
       <Header />
       
       <main className="container py-4 sm:py-6 md:py-8 px-4">

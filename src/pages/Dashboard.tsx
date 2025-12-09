@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Header } from '@/components/Header';
+import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +74,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO 
+        title="My Dashboard"
+        description="View and manage your court bookings, upcoming reservations, and past bookings on BookedHours."
+        keywords="dashboard, my bookings, reservations, booking history"
+      />
       <Header />
       
       <main className="container py-4 sm:py-6 md:py-8 px-4">
