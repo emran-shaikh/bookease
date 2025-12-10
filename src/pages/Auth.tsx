@@ -22,18 +22,12 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
-  const [showTestAccounts, setShowTestAccounts] = useState(false);
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
 
   if (user) {
     return <RoleBasedRedirect />;
   }
-
-  const quickLogin = (testEmail: string) => {
-    setEmail(testEmail);
-    setPassword('password123');
-  };
 
   const validateEmail = (email: string) => {
     try {
@@ -163,83 +157,7 @@ export default function Auth() {
         description="Sign in to BookedHours to book sports courts, manage your reservations, and save your favorite venues. Create a free account today."
         keywords="sign in, login, register, create account, sports booking"
       />
-      <div className="w-full max-w-4xl space-y-3 sm:space-y-4">
-        {/* Test Accounts Info */}
-        <Card className="border-primary/20 bg-primary/5">
-          <CardHeader className="p-3 sm:p-4 md:p-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <CardTitle className="text-sm sm:text-base md:text-lg">🧪 Test Accounts</CardTitle>
-                <CardDescription className="mt-0.5 sm:mt-1 text-xs sm:text-sm">
-                  Quick login for testing
-                </CardDescription>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 flex-shrink-0"
-                onClick={() => setShowTestAccounts(!showTestAccounts)}
-              >
-                {showTestAccounts ? 'Hide' : 'Show'}
-              </Button>
-            </div>
-          </CardHeader>
-          {showTestAccounts && (
-            <CardContent className="space-y-2 sm:space-y-3 p-3 sm:p-4 md:p-6 pt-0">
-              <div className="grid gap-2 sm:gap-3 grid-cols-1 sm:grid-cols-3">
-                <div className="rounded-lg border bg-background p-2 sm:p-3">
-                  <div className="mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-primary">👤 Customer</div>
-                  <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs text-muted-foreground">
-                    <div>customer@test.com</div>
-                    <div>password123</div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 w-full h-7 sm:h-8 text-xs"
-                    onClick={() => quickLogin('customer@test.com')}
-                  >
-                    Use
-                  </Button>
-                </div>
-                <div className="rounded-lg border bg-background p-2 sm:p-3">
-                  <div className="mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-primary">🏢 Owner</div>
-                  <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs text-muted-foreground">
-                    <div>owner@test.com</div>
-                    <div>password123</div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 w-full h-7 sm:h-8 text-xs"
-                    onClick={() => quickLogin('owner@test.com')}
-                  >
-                    Use
-                  </Button>
-                </div>
-                <div className="rounded-lg border bg-background p-2 sm:p-3">
-                  <div className="mb-1 sm:mb-2 text-xs sm:text-sm font-semibold text-primary">⚡ Admin</div>
-                  <div className="space-y-0.5 sm:space-y-1 text-[10px] sm:text-xs text-muted-foreground">
-                    <div>admin@test.com</div>
-                    <div>password123</div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 w-full h-7 sm:h-8 text-xs"
-                    onClick={() => quickLogin('admin@test.com')}
-                  >
-                    Use
-                  </Button>
-                </div>
-              </div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-                💡 Sign up first with these emails to activate roles
-              </p>
-            </CardContent>
-          )}
-        </Card>
-
+      <div className="w-full max-w-md space-y-3 sm:space-y-4">
         <Card className="w-full">
           <CardHeader className="text-center p-4 sm:p-6">
             <div className="mx-auto mb-2 sm:mb-4 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full bg-primary/10">
