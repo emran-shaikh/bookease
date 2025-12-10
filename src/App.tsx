@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { RoleProtectedRoute } from "@/components/RoleProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import Courts from "./pages/Courts";
 import CourtDetail from "./pages/CourtDetail";
 import BookCourt from "./pages/BookCourt";
@@ -38,6 +39,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/courts" element={<Courts />} />
               <Route path="/courts/:id" element={<CourtDetail />} />
               <Route
