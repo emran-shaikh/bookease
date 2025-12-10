@@ -23,12 +23,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Clean up OAuth hash from URL after login
+    const cleanupHashFromUrl = () => {
+      if (window.location.hash && window.location.hash.includes('access_token')) {
+        // Use replaceState to remove the hash without triggering navigation
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    };
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Clean up URL hash after successful OAuth login
+        if (event === 'SIGNED_IN' && session) {
+          cleanupHashFromUrl();
+        }
       }
     );
 
@@ -37,6 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Also clean up on initial load if there's a session and hash
+      if (session) {
+        cleanupHashFromUrl();
+      }
     });
 
     return () => subscription.unsubscribe();
