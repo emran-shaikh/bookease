@@ -468,7 +468,17 @@ export default function CourtDetail() {
 
   const getSlotStatus = (time: string) => {
     const hour = parseInt(time.split(':')[0]);
-    if (hour + selectedHours > 22) return { available: false, reason: 'Outside hours' };
+    if (hour + selectedHours > 22) return { available: false, reason: 'Outside hours', hide: true };
+    
+    // Check if slot is in the past (for today)
+    if (selectedDate && isToday(selectedDate)) {
+      const now = new Date();
+      const slotTime = new Date(selectedDate);
+      slotTime.setHours(hour, 0, 0, 0);
+      if (slotTime <= now) {
+        return { available: false, reason: 'Past', hide: true };
+      }
+    }
     
     const available = isSlotAvailable(time);
     if (!available) {
@@ -479,18 +489,18 @@ export default function CourtDetail() {
         const slotKey = `${checkStart}-${checkEnd}`;
         
         if (bookedSlots.includes(slotKey)) {
-          return { available: false, reason: 'Booked' };
+          return { available: false, reason: 'Booked', hide: true };
         }
         if (blockedSlots.includes(slotKey)) {
-          return { available: false, reason: 'Unavailable' };
+          return { available: false, reason: 'Unavailable', hide: true };
         }
         if (isSlotLocked(checkStart, checkEnd)) {
-          return { available: false, reason: 'Being reserved' };
+          return { available: false, reason: 'Being reserved', hide: false };
         }
       }
     }
     
-    return { available: true, reason: '' };
+    return { available: true, reason: '', hide: false };
   };
 
   return (
@@ -850,16 +860,20 @@ export default function CourtDetail() {
                             <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                               {timeSlots
                                 .filter((time) => {
-                                  // Apply filter if enabled
-                                  if (!showAvailableOnly) return true;
                                   const hour = parseInt(time.split(':')[0]);
                                   if (hour + selectedHours > 22) return false;
+                                  
                                   const slotStatus = getSlotStatus(time);
-                                  return slotStatus.available;
+                                  
+                                  // Always hide past, booked, and blocked slots
+                                  if (slotStatus.hide) return false;
+                                  
+                                  // If filter is enabled, only show available slots
+                                  if (showAvailableOnly && !slotStatus.available) return false;
+                                  
+                                  return true;
                                 })
                                 .map((time) => {
-                                  const hour = parseInt(time.split(':')[0]);
-                                  if (hour + selectedHours > 22) return null;
                                 
                                 const slotKey = `${time}-${addHoursToTime(time, 1)}`;
                                 const pricing = slotPricing[slotKey];
