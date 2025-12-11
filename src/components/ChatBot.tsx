@@ -13,10 +13,10 @@ type Message = {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/court-assistant`;
 
 const QUICK_ACTIONS = [
+  { label: 'Check availability', message: 'What courts are available tomorrow afternoon?', icon: Clock },
   { label: 'Show courts', message: 'Show me available courts', icon: MapPin },
   { label: 'How to book?', message: 'How do I book a court?', icon: HelpCircle },
   { label: 'Pricing', message: 'What are the pricing options?', icon: DollarSign },
-  { label: 'Peak hours', message: 'What are the peak hours and prices?', icon: Clock },
 ];
 
 // Simple markdown-like formatting for chat messages
