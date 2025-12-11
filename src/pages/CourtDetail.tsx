@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
 import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, Filter, CalendarIcon, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, startOfDay, isBefore, isToday } from 'date-fns';
@@ -515,26 +516,57 @@ export default function CourtDetail() {
       <main className="container py-4 sm:py-6 md:py-8 px-4">
         <div className="grid gap-4 sm:gap-6 md:gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <div className="mb-4 sm:mb-6 aspect-video w-full overflow-hidden rounded-lg bg-muted relative">
-              {court.images && court.images.length > 0 ? (
-                <img
-                  src={court.images[0]}
-                  alt={court.name}
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    const parent = (e.target as HTMLImageElement).parentElement;
-                    if (parent && !parent.querySelector('.fallback-text')) {
-                      parent.classList.add('flex', 'items-center', 'justify-center');
-                      const fallback = document.createElement('span');
-                      fallback.className = 'fallback-text text-muted-foreground';
-                      fallback.textContent = 'Image unavailable';
-                      parent.appendChild(fallback);
-                    }
-                  }}
-                />
+            <div className="mb-4 sm:mb-6 relative">
+              {court.images && court.images.length > 1 ? (
+                <Carousel className="w-full">
+                  <CarouselContent>
+                    {court.images.map((image: string, index: number) => (
+                      <CarouselItem key={index}>
+                        <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
+                          <img
+                            src={image}
+                            alt={`${court.name} - Image ${index + 1}`}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              const parent = (e.target as HTMLImageElement).parentElement;
+                              if (parent && !parent.querySelector('.fallback-text')) {
+                                parent.classList.add('flex', 'items-center', 'justify-center');
+                                const fallback = document.createElement('span');
+                                fallback.className = 'fallback-text text-muted-foreground';
+                                fallback.textContent = 'Image unavailable';
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        </div>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                  <CarouselPrevious className="left-2 h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border-0" />
+                  <CarouselNext className="right-2 h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border-0" />
+                </Carousel>
+              ) : court.images && court.images.length === 1 ? (
+                <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
+                  <img
+                    src={court.images[0]}
+                    alt={court.name}
+                    className="h-full w-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const parent = (e.target as HTMLImageElement).parentElement;
+                      if (parent && !parent.querySelector('.fallback-text')) {
+                        parent.classList.add('flex', 'items-center', 'justify-center');
+                        const fallback = document.createElement('span');
+                        fallback.className = 'fallback-text text-muted-foreground';
+                        fallback.textContent = 'Image unavailable';
+                        parent.appendChild(fallback);
+                      }
+                    }}
+                  />
+                </div>
               ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
+                <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
                   No image available
                 </div>
               )}
@@ -542,7 +574,7 @@ export default function CourtDetail() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute top-4 right-4 bg-background/80 hover:bg-background"
+                  className="absolute top-4 right-4 z-10 bg-background/80 hover:bg-background"
                   onClick={() => toggleFavorite(court.id)}
                 >
                   <Heart
@@ -745,44 +777,53 @@ export default function CourtDetail() {
                         </Button>
                       </div>
 
-                      {/* Mobile view - touch scrollable */}
-                      <div className="sm:hidden overflow-x-auto overscroll-x-contain touch-pan-x pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
-                        <div className="flex gap-2 min-w-max px-1">
-                          {Array.from({ length: 30 }).map((_, index) => {
-                            const date = addDays(startOfDay(new Date()), index);
-                            const dateStr = format(date, 'yyyy-MM-dd');
-                            const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === dateStr;
-                            const status = dateBookingStatus[dateStr];
-                            
-                            return (
-                              <button
-                                key={dateStr}
-                                onClick={() => setSelectedDate(date)}
-                                className={`flex flex-col items-center justify-center min-w-[60px] p-2.5 rounded-xl border-2 transition-all ${
-                                  isSelected
-                                    ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-105'
-                                    : 'bg-card active:bg-muted border-border'
-                                }`}
-                              >
-                                <div className={`text-[10px] font-medium mb-0.5 ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
-                                  {format(date, 'EEE')}
-                                </div>
-                                <div className={`text-xl font-bold ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
-                                  {format(date, 'd')}
-                                </div>
-                                <div className={`text-[10px] ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                                  {format(date, 'MMM')}
-                                </div>
-                                {status && !isSelected && (
-                                  <div className="mt-0.5">
-                                    <div className={`h-1.5 w-1.5 rounded-full ${
-                                      status === 'full' ? 'bg-destructive' : 'bg-warning'
-                                    }`} />
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })}
+                      {/* Mobile view - touch scrollable with improved styling */}
+                      <div className="sm:hidden -mx-3 px-3">
+                        <div 
+                          className="overflow-x-auto overscroll-x-contain pb-3 scrollbar-hide" 
+                          style={{ 
+                            WebkitOverflowScrolling: 'touch',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none'
+                          }}
+                        >
+                          <div className="flex gap-2 w-max">
+                            {Array.from({ length: 30 }).map((_, index) => {
+                              const date = addDays(startOfDay(new Date()), index);
+                              const dateStr = format(date, 'yyyy-MM-dd');
+                              const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === dateStr;
+                              const status = dateBookingStatus[dateStr];
+                              
+                              return (
+                                <button
+                                  key={dateStr}
+                                  onClick={() => setSelectedDate(date)}
+                                  className={`flex flex-col items-center justify-center w-14 h-20 rounded-xl border-2 transition-all flex-shrink-0 ${
+                                    isSelected
+                                      ? 'bg-primary text-primary-foreground border-primary shadow-lg'
+                                      : 'bg-card active:bg-muted border-border'
+                                  }`}
+                                >
+                                  <span className={`text-[10px] font-medium ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
+                                    {format(date, 'EEE')}
+                                  </span>
+                                  <span className={`text-lg font-bold leading-tight ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
+                                    {format(date, 'd')}
+                                  </span>
+                                  <span className={`text-[10px] ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                    {format(date, 'MMM')}
+                                  </span>
+                                  {status && !isSelected && (
+                                    <div className="mt-0.5">
+                                      <div className={`h-1.5 w-1.5 rounded-full ${
+                                        status === 'full' ? 'bg-destructive' : 'bg-warning'
+                                      }`} />
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     </div>
