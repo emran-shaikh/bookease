@@ -416,7 +416,7 @@ export default function Index() {
                     </div>
                     {court.distance !== undefined && (
                       <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3">
-                        <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm text-xs">
+                        <Badge variant="secondary" className="bg-background/90 backdrop-blur-sm text-xs text-primary-foreground">
                           <MapPin className="h-3 w-3 mr-1" />
                           {court.distance.toFixed(1)} km
                         </Badge>
