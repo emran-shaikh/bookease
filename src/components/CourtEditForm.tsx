@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, X, Upload, Image as ImageIcon } from 'lucide-react';
 
@@ -20,6 +21,7 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
   const [uploadingImage, setUploadingImage] = useState(false);
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
+  const [is24Hours, setIs24Hours] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sport_type: '',
@@ -39,6 +41,11 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
 
   useEffect(() => {
     if (court) {
+      const openingTime = court.opening_time?.substring(0, 5) || '06:00';
+      const closingTime = court.closing_time?.substring(0, 5) || '22:00';
+      const is24 = openingTime === '00:00' && (closingTime === '23:59' || closingTime === '00:00');
+      
+      setIs24Hours(is24);
       setFormData({
         name: court.name || '',
         sport_type: court.sport_type || '',
@@ -52,8 +59,8 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         latitude: court.latitude?.toString() || '',
         longitude: court.longitude?.toString() || '',
         is_active: court.is_active ?? true,
-        opening_time: court.opening_time?.substring(0, 5) || '06:00',
-        closing_time: court.closing_time?.substring(0, 5) || '22:00',
+        opening_time: openingTime,
+        closing_time: closingTime,
       });
       setImages(court.images?.length > 0 ? court.images : ['']);
       setAmenities(court.amenities?.length > 0 ? court.amenities : ['']);
@@ -148,8 +155,28 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
     }
   }
 
+  function validateTimes(): boolean {
+    if (is24Hours) return true;
+    
+    const opening = formData.opening_time;
+    const closing = formData.closing_time;
+    
+    if (opening >= closing) {
+      toast({
+        title: 'Invalid Time',
+        description: 'Closing time must be after opening time',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    return true;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    
+    if (!validateTimes()) return;
+    
     setLoading(true);
 
     try {
@@ -173,8 +200,8 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
           images: filteredImages.length > 0 ? filteredImages : null,
           amenities: filteredAmenities.length > 0 ? filteredAmenities : null,
           is_active: formData.is_active,
-          opening_time: formData.opening_time,
-          closing_time: formData.closing_time,
+          opening_time: is24Hours ? '00:00' : formData.opening_time,
+          closing_time: is24Hours ? '23:59' : formData.closing_time,
         })
         .eq('id', court.id);
 
@@ -326,29 +353,44 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <Label htmlFor="opening_time">Opening Time *</Label>
-          <Input
-            id="opening_time"
-            name="opening_time"
-            type="time"
-            required
-            value={formData.opening_time}
-            onChange={handleInputChange}
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="is_24_hours"
+            checked={is24Hours}
+            onCheckedChange={(checked) => setIs24Hours(checked === true)}
           />
+          <Label htmlFor="is_24_hours" className="text-sm font-medium cursor-pointer">
+            Open 24 Hours
+          </Label>
         </div>
-        <div>
-          <Label htmlFor="closing_time">Closing Time *</Label>
-          <Input
-            id="closing_time"
-            name="closing_time"
-            type="time"
-            required
-            value={formData.closing_time}
-            onChange={handleInputChange}
-          />
-        </div>
+        
+        {!is24Hours && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="opening_time">Opening Time *</Label>
+              <Input
+                id="opening_time"
+                name="opening_time"
+                type="time"
+                required
+                value={formData.opening_time}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div>
+              <Label htmlFor="closing_time">Closing Time *</Label>
+              <Input
+                id="closing_time"
+                name="closing_time"
+                type="time"
+                required
+                value={formData.closing_time}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center space-x-2">
