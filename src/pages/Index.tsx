@@ -431,7 +431,7 @@ export default function Index() {
                     </CardDescription>
                   </CardHeader>
                   <CardFooter className="flex justify-between items-center p-3 sm:p-4 pt-0">
-                    <div className="flex items-center gap-1 text-base sm:text-lg font-bold text-primary">
+                    <div className="flex items-center gap-1 text-base sm:text-lg font-bold text-black">
                       {formatPrice(court.base_price)}
                       <span className="text-xs sm:text-sm font-normal text-muted-foreground">/hr</span>
                     </div>
