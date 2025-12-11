@@ -111,7 +111,7 @@ const handler = async (req: Request): Promise<Response> => {
       // Send reminder email
       try {
         await resend.emails.send({
-          from: "Court Booking <onboarding@resend.dev>",
+          from: "BookedHours <support@bookedhours.com>",
           to: [profile.email],
           subject: "Reminder: Your Court Booking is Tomorrow! ⏰",
           html: `
