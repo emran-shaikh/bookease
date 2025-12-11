@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, MapPin, HelpCircle, Clock, DollarSign, Mic, MicOff } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, MapPin, HelpCircle, Clock, DollarSign, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -76,10 +76,75 @@ const ChatBot: React.FC = () => {
   const [showQuickActions, setShowQuickActions] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const lastSpokenRef = useRef<string>('');
   const { toast } = useToast();
+
+  // Text-to-speech function
+  const speakText = useCallback((text: string) => {
+    if (!ttsEnabled || !window.speechSynthesis) return;
+    
+    // Clean text for speech (remove markdown, emojis)
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/[*-]\s/g, '')
+      .replace(/[👋🎉🔄✅❌⚡💡🏆📍💰🕐]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    
+    if (!cleanText || cleanText === lastSpokenRef.current) return;
+    lastSpokenRef.current = cleanText;
+    
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    
+    // Try to get a natural voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha')
+    ) || voices.find(v => v.lang.startsWith('en'));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+    
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
+    window.speechSynthesis.speak(utterance);
+  }, [ttsEnabled]);
+
+  // Stop speech when closing chat or when user starts talking
+  const stopSpeaking = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  // Stop speech when chat closes
+  useEffect(() => {
+    if (!isOpen) {
+      stopSpeaking();
+    }
+  }, [isOpen, stopSpeaking]);
+
+  // Stop speech when user starts listening
+  useEffect(() => {
+    if (isListening) {
+      stopSpeaking();
+    }
+  }, [isListening, stopSpeaking]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -251,6 +316,16 @@ const ChatBot: React.FC = () => {
 
     try {
       await streamChat(newMessages.slice(1)); // Skip the initial greeting
+      
+      // Speak the final response after streaming is done
+      setMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage?.role === 'assistant' && ttsEnabled) {
+          // Small delay to ensure UI is updated
+          setTimeout(() => speakText(lastMessage.content), 100);
+        }
+        return prev;
+      });
     } catch (error) {
       console.error('Chat error:', error);
       setMessages((prev) => [
@@ -315,17 +390,36 @@ const ChatBot: React.FC = () => {
                 Court Assistant
                 <Sparkles className="h-4 w-4 text-yellow-300" />
               </h3>
-              <p className="text-xs text-primary-foreground/80">Online • Ready to help</p>
+              <p className="text-xs text-primary-foreground/80">
+                {isSpeaking ? 'Speaking...' : 'Online • Ready to help'}
+              </p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsOpen(false)}
-            className="relative z-10 text-primary-foreground hover:bg-white/20 rounded-full"
-          >
-            <X className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-1 relative z-10">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setTtsEnabled(!ttsEnabled);
+                if (ttsEnabled) stopSpeaking();
+              }}
+              className={cn(
+                "text-primary-foreground hover:bg-white/20 rounded-full",
+                isSpeaking && "animate-pulse"
+              )}
+              title={ttsEnabled ? "Mute voice" : "Enable voice"}
+            >
+              {ttsEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsOpen(false)}
+              className="text-primary-foreground hover:bg-white/20 rounded-full"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {/* Messages */}
