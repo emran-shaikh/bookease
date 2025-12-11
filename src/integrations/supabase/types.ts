@@ -524,6 +524,7 @@ export type Database = {
         Args: { court_id: string; court_name: string }
         Returns: string
       }
+      get_court_booking_count: { Args: { court_uuid: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

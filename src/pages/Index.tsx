@@ -156,13 +156,12 @@ export default function Index() {
 
       if (courtsError) throw courtsError;
 
-      // Fetch booking counts for each court
+      // Fetch booking counts and ratings for each court
       const courtsWithStats = await Promise.all(
         (courtsData || []).map(async (court) => {
-          const { count: bookingCount } = await supabase
-            .from('bookings')
-            .select('*', { count: 'exact', head: true })
-            .eq('court_id', court.id);
+          // Use the database function to get booking count (bypasses RLS)
+          const { data: countData } = await supabase
+            .rpc('get_court_booking_count', { court_uuid: court.id });
 
           const { data: reviewsData } = await supabase
             .from('reviews')
@@ -175,7 +174,7 @@ export default function Index() {
 
           return {
             ...court,
-            booking_count: bookingCount || 0,
+            booking_count: countData || 0,
             average_rating: averageRating,
             review_count: reviewsData?.length || 0,
           };
