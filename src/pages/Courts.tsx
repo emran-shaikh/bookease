@@ -189,9 +189,10 @@ export default function Courts() {
   return (
     <div className="min-h-screen bg-background">
       <SEO 
-        title="Browse Sports Courts"
-        description="Discover and book sports courts near you. Tennis, basketball, badminton and more. Filter by location, sport type, and price."
-        keywords="browse courts, sports venues, court booking, tennis, basketball, badminton, Pakistan"
+        title="Indoor Sports Courts Near Me | Book Cricket, Futsal, Badminton Courts"
+        description="Find indoor cricket court, futsal ground, badminton court near you in Karachi. Online court booking system with hourly rates and instant reservation."
+        keywords="indoor sports hall booking, indoor court rental, rent sports facility, hourly sports court rate, indoor sports venue booking, cricket practice hall near me, futsal court near me, badminton court near me, shuttle court booking, badminton hall reservation"
+        canonical="https://bookedhours.com/courts"
       />
       <Header />
       
