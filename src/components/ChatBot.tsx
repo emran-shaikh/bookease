@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, MapPin, HelpCircle, Clock, DollarSign } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, MapPin, HelpCircle, Clock, DollarSign, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type Message = {
   role: 'user' | 'assistant';
@@ -18,6 +19,9 @@ const QUICK_ACTIONS = [
   { label: 'How to book?', message: 'How do I book a court?', icon: HelpCircle },
   { label: 'Pricing', message: 'What are the pricing options?', icon: DollarSign },
 ];
+
+// Check if browser supports speech recognition
+const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
 // Simple markdown-like formatting for chat messages
 const formatMessage = (content: string) => {
@@ -70,8 +74,12 @@ const ChatBot: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -84,6 +92,90 @@ const ChatBot: React.FC = () => {
       inputRef.current.focus();
     }
   }, [isOpen]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setInterimTranscript('');
+      };
+
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += transcript;
+          } else {
+            interim += transcript;
+          }
+        }
+
+        if (final) {
+          setInput(prev => prev + final);
+          setInterimTranscript('');
+        } else {
+          setInterimTranscript(interim);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        setInterimTranscript('');
+        
+        if (event.error === 'not-allowed') {
+          toast({
+            title: "Microphone Access Denied",
+            description: "Please allow microphone access to use voice input.",
+            variant: "destructive",
+          });
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setInterimTranscript('');
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, [toast]);
+
+  const toggleListening = useCallback(() => {
+    if (!SpeechRecognition) {
+      toast({
+        title: "Voice Input Not Supported",
+        description: "Your browser doesn't support voice input. Please try Chrome or Edge.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      try {
+        recognitionRef.current?.start();
+      } catch (error) {
+        console.error('Error starting recognition:', error);
+      }
+    }
+  }, [isListening, toast]);
 
   const streamChat = async (userMessages: Message[]) => {
     const resp = await fetch(CHAT_URL, {
@@ -335,14 +427,40 @@ const ChatBot: React.FC = () => {
             <div className="flex-1 relative">
               <Input
                 ref={inputRef}
-                value={input}
+                value={isListening ? input + interimTranscript : input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your message..."
+                placeholder={isListening ? "Listening..." : "Type or speak your message..."}
                 disabled={isLoading}
-                className="pr-4 rounded-xl border-border/50 bg-background/80 backdrop-blur-sm focus:ring-2 focus:ring-primary/20 transition-all"
+                className={cn(
+                  "pr-4 rounded-xl border-border/50 bg-background/80 backdrop-blur-sm focus:ring-2 focus:ring-primary/20 transition-all",
+                  isListening && "border-primary/50 bg-primary/5"
+                )}
               />
+              {isListening && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="flex gap-0.5">
+                    <span className="w-1 h-3 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                    <span className="w-1 h-4 bg-primary rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                    <span className="w-1 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              )}
             </div>
+            <Button
+              onClick={toggleListening}
+              disabled={isLoading}
+              size="icon"
+              variant={isListening ? "default" : "outline"}
+              className={cn(
+                "shrink-0 rounded-xl transition-all duration-200",
+                isListening 
+                  ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" 
+                  : "hover:bg-primary/10 hover:border-primary/30"
+              )}
+            >
+              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </Button>
             <Button
               onClick={() => handleSend()}
               disabled={!input.trim() || isLoading}
@@ -358,7 +476,7 @@ const ChatBot: React.FC = () => {
             </Button>
           </div>
           <p className="text-[10px] text-muted-foreground/60 text-center mt-2">
-            Powered by AI • Here to help 24/7
+            {SpeechRecognition ? "Tap mic to speak • Powered by AI" : "Powered by AI • Here to help 24/7"}
           </p>
         </div>
       </div>
