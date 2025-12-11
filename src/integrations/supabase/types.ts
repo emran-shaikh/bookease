@@ -121,6 +121,7 @@ export type Database = {
           amenities: string[] | null
           base_price: number
           city: string
+          closing_time: string | null
           created_at: string
           description: string | null
           id: string
@@ -130,6 +131,7 @@ export type Database = {
           location: string
           longitude: number | null
           name: string
+          opening_time: string | null
           owner_id: string
           slug: string
           sport_type: string
@@ -143,6 +145,7 @@ export type Database = {
           amenities?: string[] | null
           base_price: number
           city: string
+          closing_time?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -152,6 +155,7 @@ export type Database = {
           location: string
           longitude?: number | null
           name: string
+          opening_time?: string | null
           owner_id: string
           slug: string
           sport_type: string
@@ -165,6 +169,7 @@ export type Database = {
           amenities?: string[] | null
           base_price?: number
           city?: string
+          closing_time?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -174,6 +179,7 @@ export type Database = {
           location?: string
           longitude?: number | null
           name?: string
+          opening_time?: string | null
           owner_id?: string
           slug?: string
           sport_type?: string

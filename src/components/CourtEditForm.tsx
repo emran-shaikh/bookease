@@ -33,6 +33,8 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
     latitude: '',
     longitude: '',
     is_active: true,
+    opening_time: '06:00',
+    closing_time: '22:00',
   });
 
   useEffect(() => {
@@ -50,6 +52,8 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         latitude: court.latitude?.toString() || '',
         longitude: court.longitude?.toString() || '',
         is_active: court.is_active ?? true,
+        opening_time: court.opening_time?.substring(0, 5) || '06:00',
+        closing_time: court.closing_time?.substring(0, 5) || '22:00',
       });
       setImages(court.images?.length > 0 ? court.images : ['']);
       setAmenities(court.amenities?.length > 0 ? court.amenities : ['']);
@@ -169,6 +173,8 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
           images: filteredImages.length > 0 ? filteredImages : null,
           amenities: filteredAmenities.length > 0 ? filteredAmenities : null,
           is_active: formData.is_active,
+          opening_time: formData.opening_time,
+          closing_time: formData.closing_time,
         })
         .eq('id', court.id);
 
@@ -315,6 +321,31 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
             type="number"
             step="any"
             value={formData.longitude}
+            onChange={handleInputChange}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <Label htmlFor="opening_time">Opening Time *</Label>
+          <Input
+            id="opening_time"
+            name="opening_time"
+            type="time"
+            required
+            value={formData.opening_time}
+            onChange={handleInputChange}
+          />
+        </div>
+        <div>
+          <Label htmlFor="closing_time">Closing Time *</Label>
+          <Input
+            id="closing_time"
+            name="closing_time"
+            type="time"
+            required
+            value={formData.closing_time}
             onChange={handleInputChange}
           />
         </div>
