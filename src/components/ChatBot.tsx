@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, MapPin, HelpCircle, Clock, DollarSign, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
+import { MessageCircle, X, Send, Bot, User, Loader2, Sparkles, MapPin, HelpCircle, Clock, DollarSign, Mic, MicOff, Volume2, VolumeX, Settings2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -78,18 +78,58 @@ const ChatBot: React.FC = () => {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechRate, setSpeechRate] = useState(1.0);
+  const [speechPitch, setSpeechPitch] = useState(1.0);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [isVoiceInput, setIsVoiceInput] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
   const lastSpokenRef = useRef<string>('');
   const { toast } = useToast();
 
+  // Extract concise court info for voice responses
+  const extractConciseInfo = useCallback((text: string): string => {
+    // Extract court names, locations, dates, and times only
+    const lines = text.split('\n');
+    const conciseLines: string[] = [];
+    
+    for (const line of lines) {
+      const cleanLine = line.replace(/\*\*/g, '').replace(/[*-]\s/g, '').trim();
+      
+      // Look for court names (usually bold or at start)
+      if (cleanLine.match(/court|stadium|arena|field/i) && cleanLine.length < 100) {
+        conciseLines.push(cleanLine);
+      }
+      // Look for location info
+      else if (cleanLine.match(/location|address|at\s/i) && cleanLine.length < 80) {
+        conciseLines.push(cleanLine);
+      }
+      // Look for date/time info
+      else if (cleanLine.match(/\d{1,2}[:\-]\d{2}|am|pm|today|tomorrow|available|slot/i) && cleanLine.length < 80) {
+        conciseLines.push(cleanLine);
+      }
+    }
+    
+    // If we found relevant info, use it; otherwise use a brief summary
+    if (conciseLines.length > 0) {
+      return conciseLines.slice(0, 5).join('. ');
+    }
+    
+    // Fallback: just first 2 sentences
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim());
+    return sentences.slice(0, 2).join('. ');
+  }, []);
+
   // Text-to-speech function
-  const speakText = useCallback((text: string) => {
+  const speakText = useCallback((text: string, forVoiceInput: boolean = false) => {
     if (!ttsEnabled || !window.speechSynthesis) return;
     
+    // For voice input, extract only concise info
+    let textToSpeak = forVoiceInput ? extractConciseInfo(text) : text;
+    
     // Clean text for speech (remove markdown, emojis)
-    const cleanText = text
+    const cleanText = textToSpeak
       .replace(/\*\*/g, '')
       .replace(/[*-]\s/g, '')
       .replace(/[👋🎉🔄✅❌⚡💡🏆📍💰🕐]/g, '')
@@ -103,8 +143,8 @@ const ChatBot: React.FC = () => {
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.rate = speechRate;
+    utterance.pitch = speechPitch;
     utterance.volume = 1.0;
     
     // Try to get a natural voice
@@ -122,7 +162,7 @@ const ChatBot: React.FC = () => {
     utterance.onerror = () => setIsSpeaking(false);
     
     window.speechSynthesis.speak(utterance);
-  }, [ttsEnabled]);
+  }, [ttsEnabled, speechRate, speechPitch, extractConciseInfo]);
 
   // Stop speech when closing chat or when user starts talking
   const stopSpeaking = useCallback(() => {
@@ -185,7 +225,9 @@ const ChatBot: React.FC = () => {
         }
 
         if (final) {
-          setInput(prev => prev + final);
+          // Auto-send on voice input completion
+          setIsVoiceInput(true);
+          setInput(final);
           setInterimTranscript('');
         } else {
           setInterimTranscript(interim);
@@ -210,7 +252,6 @@ const ChatBot: React.FC = () => {
         setIsListening(false);
         setInterimTranscript('');
       };
-
       recognitionRef.current = recognition;
     }
 
@@ -220,6 +261,17 @@ const ChatBot: React.FC = () => {
       }
     };
   }, [toast]);
+
+  // Auto-send when voice input is captured
+  useEffect(() => {
+    if (isVoiceInput && input.trim() && !isLoading) {
+      const timer = setTimeout(() => {
+        handleSendWithVoice(input);
+        setIsVoiceInput(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isVoiceInput, input, isLoading]);
 
   const toggleListening = useCallback(() => {
     if (!SpeechRecognition) {
@@ -303,7 +355,7 @@ const ChatBot: React.FC = () => {
     }
   };
 
-  const handleSend = async (messageText?: string) => {
+  const handleSend = async (messageText?: string, forVoice: boolean = false) => {
     const text = messageText || input.trim();
     if (!text || isLoading) return;
 
@@ -322,7 +374,7 @@ const ChatBot: React.FC = () => {
         const lastMessage = prev[prev.length - 1];
         if (lastMessage?.role === 'assistant' && ttsEnabled) {
           // Small delay to ensure UI is updated
-          setTimeout(() => speakText(lastMessage.content), 100);
+          setTimeout(() => speakText(lastMessage.content, forVoice), 100);
         }
         return prev;
       });
@@ -338,6 +390,10 @@ const ChatBot: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSendWithVoice = async (text: string) => {
+    await handleSend(text, true);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -399,6 +455,15 @@ const ChatBot: React.FC = () => {
             <Button
               variant="ghost"
               size="icon"
+              onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+              className="text-primary-foreground hover:bg-white/20 rounded-full"
+              title="Voice settings"
+            >
+              <Settings2 className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setTtsEnabled(!ttsEnabled);
                 if (ttsEnabled) stopSpeaking();
@@ -421,6 +486,55 @@ const ChatBot: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {/* Voice Settings Panel */}
+        {showVoiceSettings && (
+          <div className="p-4 bg-muted/50 border-b border-border/50 space-y-4 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Voice Settings</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowVoiceSettings(false)}
+                className="h-6 w-6 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-muted-foreground">Speed</label>
+                  <span className="text-xs font-mono">{speechRate.toFixed(1)}x</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={speechRate}
+                  onChange={(e) => setSpeechRate(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs text-muted-foreground">Pitch</label>
+                  <span className="text-xs font-mono">{speechPitch.toFixed(1)}</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={speechPitch}
+                  onChange={(e) => setSpeechPitch(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Messages */}
         <ScrollArea className="h-[420px] p-4" ref={scrollRef}>
