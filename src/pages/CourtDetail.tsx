@@ -18,11 +18,12 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { formatPrice } from '@/lib/currency';
 
 export default function CourtDetail() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [court, setCourt] = useState<any>(null);
+  const [courtId, setCourtId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>();
@@ -40,30 +41,30 @@ export default function CourtDetail() {
   const { toggleFavorite, isFavorite } = useFavorites(user?.id);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(id || '', selectedDate || null);
+  const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(courtId || '', selectedDate || null);
 
   useEffect(() => {
-    if (id) {
+    if (slug) {
       fetchCourtDetails();
     }
-  }, [id]);
+  }, [slug]);
 
   useEffect(() => {
-    if (selectedDate && id) {
+    if (selectedDate && courtId) {
       fetchBookedSlots();
       fetchSlotPricing();
       
       // Set up real-time subscription for bookings
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const channel = supabase
-        .channel(`court-bookings-${id}-${dateStr}`)
+        .channel(`court-bookings-${courtId}-${dateStr}`)
         .on(
           'postgres_changes',
           {
             event: '*',
             schema: 'public',
             table: 'bookings',
-            filter: `court_id=eq.${id}`
+            filter: `court_id=eq.${courtId}`
           },
           (payload) => {
             console.log('Booking change detected:', payload);
@@ -83,7 +84,7 @@ export default function CourtDetail() {
             event: '*',
             schema: 'public',
             table: 'slot_locks',
-            filter: `court_id=eq.${id}`
+            filter: `court_id=eq.${courtId}`
           },
           (payload) => {
             console.log('Slot lock change detected:', payload);
@@ -96,14 +97,14 @@ export default function CourtDetail() {
         supabase.removeChannel(channel);
       };
     }
-  }, [selectedDate, id]);
+  }, [selectedDate, courtId]);
 
   // Calculate total price when time/hours change
   useEffect(() => {
-    if (selectedStartTime && selectedHours && selectedDate && id) {
+    if (selectedStartTime && selectedHours && selectedDate && courtId) {
       calculateTotalPrice();
     }
-  }, [selectedStartTime, selectedHours, selectedDate, id]);
+  }, [selectedStartTime, selectedHours, selectedDate, courtId]);
 
   async function fetchCourtDetails() {
     try {
@@ -113,11 +114,12 @@ export default function CourtDetail() {
           *,
           reviews (rating, comment, created_at, profiles (full_name))
         `)
-        .eq('id', id)
+        .eq('slug', slug)
         .single();
 
       if (error) throw error;
       setCourt(data);
+      setCourtId(data.id);
     } catch (error: any) {
       toast({
         title: 'Error loading court details',
@@ -138,14 +140,14 @@ export default function CourtDetail() {
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
         .select('start_time, end_time')
-        .eq('court_id', id)
+        .eq('court_id', courtId)
         .eq('booking_date', dateStr)
         .in('status', ['confirmed', 'pending']);
 
       const { data: blocked, error: blockedError } = await supabase
         .from('blocked_slots')
         .select('start_time, end_time')
-        .eq('court_id', id)
+        .eq('court_id', courtId)
         .eq('date', dateStr);
 
       if (bookingsError) throw bookingsError;
@@ -162,7 +164,7 @@ export default function CourtDetail() {
   }
 
   async function fetchSlotPricing() {
-    if (!selectedDate || !id) return;
+    if (!selectedDate || !courtId) return;
 
     setLoadingPricing(true);
     const pricing: { [key: string]: { price: number; multiplier: number; rules: string[] } } = {};
@@ -177,7 +179,7 @@ export default function CourtDetail() {
         try {
           const response = await supabase.functions.invoke('calculate-price', {
             body: {
-              courtId: id,
+              courtId: courtId,
               date: dateStr,
               startTime,
               endTime,
@@ -206,7 +208,7 @@ export default function CourtDetail() {
   }
 
   async function calculateTotalPrice() {
-    if (!selectedDate || !selectedStartTime || !id || selectedHours < 1) {
+    if (!selectedDate || !selectedStartTime || !courtId || selectedHours < 1) {
       setTotalPrice(null);
       setPriceBreakdown(null);
       return;
@@ -218,7 +220,7 @@ export default function CourtDetail() {
 
       const response = await supabase.functions.invoke('calculate-price', {
         body: {
-          courtId: id,
+          courtId: courtId,
           date: dateStr,
           startTime: selectedStartTime,
           endTime: endTime,
@@ -243,7 +245,7 @@ export default function CourtDetail() {
 
   // Fetch booking status for calendar dates
   async function fetchDateBookingStatus() {
-    if (!id) return;
+    if (!courtId) return;
 
     try {
       const today = new Date();
@@ -253,7 +255,7 @@ export default function CourtDetail() {
       const { data: bookings } = await supabase
         .from('bookings')
         .select('booking_date, start_time, end_time')
-        .eq('court_id', id)
+        .eq('court_id', courtId)
         .gte('booking_date', format(today, 'yyyy-MM-dd'))
         .lte('booking_date', format(nextMonth, 'yyyy-MM-dd'))
         .in('status', ['confirmed', 'pending']);
@@ -261,7 +263,7 @@ export default function CourtDetail() {
       const { data: blocked } = await supabase
         .from('blocked_slots')
         .select('date, start_time, end_time')
-        .eq('court_id', id)
+        .eq('court_id', courtId)
         .gte('date', format(today, 'yyyy-MM-dd'))
         .lte('date', format(nextMonth, 'yyyy-MM-dd'));
 
@@ -296,10 +298,10 @@ export default function CourtDetail() {
   }
 
   useEffect(() => {
-    if (id) {
+    if (courtId) {
       fetchDateBookingStatus();
     }
-  }, [id]);
+  }, [courtId]);
 
   const timeSlots = [
     '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
@@ -385,7 +387,7 @@ export default function CourtDetail() {
         const { data: existingBookings, error: checkError } = await supabase
           .from('bookings')
           .select('id')
-          .eq('court_id', id)
+          .eq('court_id', courtId)
           .eq('booking_date', dateStr)
           .eq('start_time', checkStart)
           .eq('end_time', checkEnd)
@@ -425,7 +427,7 @@ export default function CourtDetail() {
         });
       }
 
-      navigate(`/book/${id}`, {
+      navigate(`/book/${courtId}`, {
         state: {
           court,
           date: selectedDate,

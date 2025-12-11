@@ -100,7 +100,7 @@ export function CourtForm() {
         images: filteredImages.length > 0 ? filteredImages : null,
         amenities: filteredAmenities.length > 0 ? filteredAmenities : null,
         status: 'pending',
-      }).select();
+      } as any).select();
 
       if (error) throw error;
 
