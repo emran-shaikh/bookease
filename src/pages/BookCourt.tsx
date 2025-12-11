@@ -17,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { formatPrice } from '@/lib/currency';
 
 export default function BookCourt() {
-  const { id } = useParams();
+  const { slug } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -47,7 +47,7 @@ export default function BookCourt() {
         description: 'Please select a new time slot',
         variant: 'destructive',
       });
-      navigate(`/courts/${id}`);
+      navigate(`/courts/${court?.slug || slug}`);
       return;
     }
 
@@ -78,7 +78,7 @@ export default function BookCourt() {
         description: 'Please select a date and time',
         variant: 'destructive',
       });
-      navigate(`/courts/${id}`);
+      navigate(`/courts/${slug}`);
       return;
     }
 
@@ -203,7 +203,7 @@ export default function BookCourt() {
         } else {
           throw error;
         }
-        navigate(`/courts/${id}`);
+        navigate(`/courts/${court?.slug || slug}`);
         return;
       }
 

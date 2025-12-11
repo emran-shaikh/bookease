@@ -427,7 +427,7 @@ export default function CourtDetail() {
         });
       }
 
-      navigate(`/book/${courtId}`, {
+      navigate(`/book/${slug}`, {
         state: {
           court,
           date: selectedDate,
