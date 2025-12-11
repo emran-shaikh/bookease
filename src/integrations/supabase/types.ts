@@ -131,6 +131,7 @@ export type Database = {
           longitude: number | null
           name: string
           owner_id: string
+          slug: string
           sport_type: string
           state: string
           status: Database["public"]["Enums"]["court_status"]
@@ -152,6 +153,7 @@ export type Database = {
           longitude?: number | null
           name: string
           owner_id: string
+          slug: string
           sport_type: string
           state: string
           status?: Database["public"]["Enums"]["court_status"]
@@ -173,6 +175,7 @@ export type Database = {
           longitude?: number | null
           name?: string
           owner_id?: string
+          slug?: string
           sport_type?: string
           state?: string
           status?: Database["public"]["Enums"]["court_status"]
@@ -517,6 +520,10 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_slot_locks: { Args: never; Returns: undefined }
+      generate_court_slug: {
+        Args: { court_id: string; court_name: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

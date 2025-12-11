@@ -16,6 +16,7 @@ import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 interface Court {
   id: string;
+  slug: string;
   name: string;
   description: string;
   sport_type: string;
@@ -273,7 +274,7 @@ export default function Courts() {
                     src={court.images[0]}
                     alt={court.name}
                     className="h-full w-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
-                    onClick={() => navigate(`/courts/${court.id}`)}
+                    onClick={() => navigate(`/courts/${court.slug}`)}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                       (e.target as HTMLImageElement).parentElement?.classList.add('flex', 'items-center', 'justify-center');
@@ -337,7 +338,7 @@ export default function Courts() {
               <CardFooter className="p-3 sm:p-4 pt-0">
                 <Button
                   className="w-full h-9 sm:h-10 text-sm"
-                  onClick={() => navigate(`/courts/${court.id}`)}
+                  onClick={() => navigate(`/courts/${court.slug}`)}
                 >
                   View Details
                 </Button>

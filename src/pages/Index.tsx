@@ -21,6 +21,7 @@ import badmintonImage from '@/assets/badminton-court.jpg';
 
 interface Court {
   id: string;
+  slug: string;
   name: string;
   location: string;
   city: string;
@@ -246,8 +247,8 @@ export default function Index() {
   const uniqueCities = Array.from(new Set(courts.map(court => court.city)));
   const uniqueSports = Array.from(new Set(courts.map(court => court.sport_type)));
 
-  const handleCourtClick = (courtId: string) => {
-    navigate(`/courts/${courtId}`);
+  const handleCourtClick = (courtSlug: string) => {
+    navigate(`/courts/${courtSlug}`);
   };
 
   return (
@@ -397,7 +398,7 @@ export default function Index() {
                 <Card 
                   key={court.id} 
                   className="group overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-                  onClick={() => handleCourtClick(court.id)}
+                  onClick={() => handleCourtClick(court.slug)}
                 >
                   <div className="relative h-40 sm:h-48 overflow-hidden">
                     <img
@@ -469,7 +470,7 @@ export default function Index() {
                   <CarouselItem key={court.id} className="pl-2 md:pl-4 basis-[85%] sm:basis-1/2 lg:basis-1/3">
                     <Card 
                       className="group overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-2 cursor-pointer border-2"
-                      onClick={() => handleCourtClick(court.id)}
+                      onClick={() => handleCourtClick(court.slug)}
                     >
                       <div className="relative h-44 sm:h-56 overflow-hidden">
                         <img

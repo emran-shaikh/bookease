@@ -12,6 +12,7 @@ import { formatPrice } from '@/lib/currency';
 
 interface Court {
   id: string;
+  slug: string;
   name: string;
   sport_type: string;
   location: string;
@@ -113,7 +114,7 @@ export default function Favorites() {
                       src={court.images?.[0] || '/placeholder.svg'}
                       alt={court.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onClick={() => navigate(`/courts/${court.id}`)}
+                      onClick={() => navigate(`/courts/${court.slug}`)}
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = '/placeholder.svg';
                       }}
@@ -135,7 +136,7 @@ export default function Favorites() {
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="p-4" onClick={() => navigate(`/courts/${court.id}`)}>
+                <CardContent className="p-4" onClick={() => navigate(`/courts/${court.slug}`)}>
                   <CardTitle className="mb-2 text-foreground">{court.name}</CardTitle>
                   <CardDescription className="flex items-center gap-2 mb-3">
                     <MapPin className="h-4 w-4" />
