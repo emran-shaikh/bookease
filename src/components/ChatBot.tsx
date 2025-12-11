@@ -369,15 +369,17 @@ const ChatBot: React.FC = () => {
     try {
       await streamChat(newMessages.slice(1)); // Skip the initial greeting
       
-      // Speak the final response after streaming is done
-      setMessages((prev) => {
-        const lastMessage = prev[prev.length - 1];
-        if (lastMessage?.role === 'assistant' && ttsEnabled) {
-          // Small delay to ensure UI is updated
-          setTimeout(() => speakText(lastMessage.content, forVoice), 100);
-        }
-        return prev;
-      });
+      // Only speak the response if it was a voice input
+      if (forVoice && ttsEnabled) {
+        setMessages((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage?.role === 'assistant') {
+            // Small delay to ensure UI is updated
+            setTimeout(() => speakText(lastMessage.content, true), 100);
+          }
+          return prev;
+        });
+      }
     } catch (error) {
       console.error('Chat error:', error);
       setMessages((prev) => [
