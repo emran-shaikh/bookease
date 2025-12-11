@@ -254,9 +254,10 @@ export default function Index() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
       <SEO 
-        title="BookedHours - Book Sports Courts Online in Pakistan"
-        description="Find and book tennis, basketball, badminton courts near you with real-time availability and instant confirmation. Pakistan's premier sports court booking platform."
-        keywords="sports court booking, tennis court, basketball court, badminton court, Pakistan, Karachi, online booking"
+        title="Indoor Court Booking Karachi | Cricket, Futsal, Badminton - BookedHours"
+        description="Book indoor sports courts online in Karachi. Indoor cricket court booking, futsal ground booking, badminton court reservation. Real-time availability, instant confirmation."
+        keywords="indoor court booking, book indoor sports court, indoor cricket court booking, indoor futsal court booking, indoor badminton court booking, indoor tennis court booking, sports court reservation, online court booking system, indoor court booking in Karachi, cricket indoor academy Karachi, futsal ground booking Karachi, badminton court booking Karachi"
+        canonical="https://bookedhours.com"
       />
       {/* Hero Section */}
       <div className="relative h-[60vh] sm:h-[65vh] md:h-[70vh] overflow-hidden">
@@ -282,10 +283,10 @@ export default function Index() {
         <div className="container relative z-10 flex flex-col items-center justify-center space-y-4 sm:space-y-6 md:space-y-8 pt-8 sm:pt-12 md:pt-16 text-center px-4">
           <div className="space-y-3 sm:space-y-4 md:space-y-6 animate-fade-in">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-foreground leading-tight">
-              Book Sports Venues
+              Indoor Court Booking
               <br />
               <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                Anytime, Anywhere
+                Cricket, Futsal, Badminton
               </span>
             </h1>
             <p className="mx-auto max-w-xl md:max-w-2xl text-sm sm:text-base md:text-lg lg:text-xl text-muted-foreground leading-relaxed px-2">
