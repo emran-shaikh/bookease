@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export function CourtForm() {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ export function CourtForm() {
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
+  const [is24Hours, setIs24Hours] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sport_type: '',
@@ -68,6 +70,23 @@ export function CourtForm() {
     setAmenities(amenities.filter((_, i) => i !== index));
   }
 
+  function validateTimes(): boolean {
+    if (is24Hours) return true;
+    
+    const opening = formData.opening_time;
+    const closing = formData.closing_time;
+    
+    if (opening >= closing) {
+      toast({
+        title: 'Invalid Time',
+        description: 'Closing time must be after opening time',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    return true;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     
@@ -79,6 +98,8 @@ export function CourtForm() {
       });
       return;
     }
+
+    if (!validateTimes()) return;
 
     setLoading(true);
 
@@ -101,8 +122,8 @@ export function CourtForm() {
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         images: filteredImages.length > 0 ? filteredImages : null,
         amenities: filteredAmenities.length > 0 ? filteredAmenities : null,
-        opening_time: formData.opening_time,
-        closing_time: formData.closing_time,
+        opening_time: is24Hours ? '00:00' : formData.opening_time,
+        closing_time: is24Hours ? '23:59' : formData.closing_time,
         status: 'pending',
       } as any).select();
 
@@ -272,29 +293,44 @@ export function CourtForm() {
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="opening_time">Opening Time *</Label>
-              <Input
-                id="opening_time"
-                name="opening_time"
-                type="time"
-                required
-                value={formData.opening_time}
-                onChange={handleInputChange}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_24_hours"
+                checked={is24Hours}
+                onCheckedChange={(checked) => setIs24Hours(checked === true)}
               />
+              <Label htmlFor="is_24_hours" className="text-sm font-medium cursor-pointer">
+                Open 24 Hours
+              </Label>
             </div>
-            <div>
-              <Label htmlFor="closing_time">Closing Time *</Label>
-              <Input
-                id="closing_time"
-                name="closing_time"
-                type="time"
-                required
-                value={formData.closing_time}
-                onChange={handleInputChange}
-              />
-            </div>
+            
+            {!is24Hours && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="opening_time">Opening Time *</Label>
+                  <Input
+                    id="opening_time"
+                    name="opening_time"
+                    type="time"
+                    required
+                    value={formData.opening_time}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="closing_time">Closing Time *</Label>
+                  <Input
+                    id="closing_time"
+                    name="closing_time"
+                    type="time"
+                    required
+                    value={formData.closing_time}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
