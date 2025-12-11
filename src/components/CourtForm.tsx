@@ -29,6 +29,8 @@ export function CourtForm() {
     base_price: '',
     latitude: '',
     longitude: '',
+    opening_time: '06:00',
+    closing_time: '22:00',
   });
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
@@ -99,6 +101,8 @@ export function CourtForm() {
         longitude: formData.longitude ? parseFloat(formData.longitude) : null,
         images: filteredImages.length > 0 ? filteredImages : null,
         amenities: filteredAmenities.length > 0 ? filteredAmenities : null,
+        opening_time: formData.opening_time,
+        closing_time: formData.closing_time,
         status: 'pending',
       } as any).select();
 
@@ -264,6 +268,31 @@ export function CourtForm() {
                 value={formData.longitude}
                 onChange={handleInputChange}
                 placeholder="-74.0060"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="opening_time">Opening Time *</Label>
+              <Input
+                id="opening_time"
+                name="opening_time"
+                type="time"
+                required
+                value={formData.opening_time}
+                onChange={handleInputChange}
+              />
+            </div>
+            <div>
+              <Label htmlFor="closing_time">Closing Time *</Label>
+              <Input
+                id="closing_time"
+                name="closing_time"
+                type="time"
+                required
+                value={formData.closing_time}
+                onChange={handleInputChange}
               />
             </div>
           </div>

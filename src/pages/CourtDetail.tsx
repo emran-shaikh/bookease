@@ -303,10 +303,18 @@ export default function CourtDetail() {
     }
   }, [courtId]);
 
-  const timeSlots = [
-    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
-    '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00',
-  ];
+  // Generate time slots based on court's opening/closing hours
+  const generateTimeSlots = () => {
+    const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 6;
+    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
+    const slots: string[] = [];
+    for (let hour = openingHour; hour < closingHour; hour++) {
+      slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    }
+    return slots;
+  };
+  
+  const timeSlots = generateTimeSlots();
 
   const convertTo12Hour = (time24: string) => {
     const [hours, minutes] = time24.split(':').map(Number);
