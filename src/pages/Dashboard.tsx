@@ -8,10 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Calendar, Star, User } from 'lucide-react';
+import { Loader2, Calendar, Star, User, Upload, Clock, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, addMinutes, isAfter } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
+import { PaymentScreenshotUpload } from '@/components/PaymentScreenshotUpload';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -21,6 +23,7 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);
+  const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -63,6 +66,21 @@ export default function Dashboard() {
   const pastBookings = bookings.filter(b => 
     new Date(b.booking_date) < new Date() || b.status === 'completed'
   );
+
+  // Calculate time remaining for pending bookings (30 minutes from creation)
+  function getTimeRemaining(createdAt: string) {
+    const createdDate = new Date(createdAt);
+    const expiryDate = addMinutes(createdDate, 30);
+    const now = new Date();
+    
+    if (isAfter(now, expiryDate)) {
+      return { expired: true, minutes: 0 };
+    }
+    
+    const diffMs = expiryDate.getTime() - now.getTime();
+    const minutes = Math.ceil(diffMs / (1000 * 60));
+    return { expired: false, minutes };
+  }
 
   if (loading) {
     return (
@@ -134,38 +152,105 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             ) : (
-              upcomingBookings.map((booking) => (
-                <Card key={booking.id}>
-                  <CardHeader className="p-3 sm:p-4 md:p-6">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <CardTitle className="text-sm sm:text-base md:text-lg truncate">{booking.courts?.name}</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm truncate">
-                          {booking.courts?.city}, {booking.courts?.location}
-                        </CardDescription>
+              upcomingBookings.map((booking) => {
+                const isPending = booking.status === 'pending' && booking.payment_status === 'pending';
+                const timeInfo = isPending ? getTimeRemaining(booking.created_at) : null;
+                const hasScreenshot = !!booking.payment_screenshot;
+
+                return (
+                  <Card key={booking.id} className={isPending ? 'border-amber-500/50' : ''}>
+                    <CardHeader className="p-3 sm:p-4 md:p-6">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <CardTitle className="text-sm sm:text-base md:text-lg truncate">{booking.courts?.name}</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm truncate">
+                            {booking.courts?.city}, {booking.courts?.location}
+                          </CardDescription>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'} className="text-[10px] sm:text-xs flex-shrink-0">
+                            {booking.status}
+                          </Badge>
+                          {isPending && timeInfo && !timeInfo.expired && (
+                            <div className="flex items-center gap-1 text-amber-600 text-[10px]">
+                              <Clock className="h-3 w-3" />
+                              {timeInfo.minutes}m left
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'} className="text-[10px] sm:text-xs flex-shrink-0">
-                        {booking.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-                    <div className="grid gap-1 sm:gap-2 text-xs sm:text-sm">
-                      <div>
-                        <span className="font-medium">Date:</span>{' '}
-                        {format(new Date(booking.booking_date), 'MMM d, yyyy')}
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                      <div className="grid gap-1 sm:gap-2 text-xs sm:text-sm">
+                        <div>
+                          <span className="font-medium">Date:</span>{' '}
+                          {format(new Date(booking.booking_date), 'MMM d, yyyy')}
+                        </div>
+                        <div>
+                          <span className="font-medium">Time:</span>{' '}
+                          {booking.start_time} - {booking.end_time}
+                        </div>
+                        <div>
+                          <span className="font-medium">Total:</span> {formatPrice(booking.total_price)}
+                        </div>
                       </div>
-                      <div>
-                        <span className="font-medium">Time:</span>{' '}
-                        {booking.start_time} - {booking.end_time}
-                      </div>
-                      <div>
-                        <span className="font-medium">Total:</span> {formatPrice(booking.total_price)}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+
+                      {/* Pending booking - show upload option */}
+                      {isPending && (
+                        <Collapsible 
+                          open={expandedBooking === booking.id} 
+                          onOpenChange={(open) => setExpandedBooking(open ? booking.id : null)}
+                          className="mt-3"
+                        >
+                          {!hasScreenshot ? (
+                            <>
+                              <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-xs mb-2">
+                                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                                <span>Upload payment screenshot to confirm your booking</span>
+                              </div>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="outline" size="sm" className="w-full gap-2">
+                                  <Upload className="h-4 w-4" />
+                                  Add Payment Screenshot
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-3">
+                                <PaymentScreenshotUpload
+                                  bookingId={booking.id}
+                                  existingScreenshot={booking.payment_screenshot}
+                                  onUploadSuccess={fetchDashboardData}
+                                />
+                              </CollapsibleContent>
+                            </>
+                          ) : (
+                            <div className="space-y-2">
+                              <Badge variant="outline" className="gap-1 text-green-600 border-green-500">
+                                <Upload className="h-3 w-3" />
+                                Screenshot Uploaded
+                              </Badge>
+                              <p className="text-xs text-muted-foreground">
+                                Waiting for owner to verify and confirm your booking.
+                              </p>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="w-full text-xs">
+                                  View/Replace Screenshot
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-3">
+                                <PaymentScreenshotUpload
+                                  bookingId={booking.id}
+                                  existingScreenshot={booking.payment_screenshot}
+                                  onUploadSuccess={fetchDashboardData}
+                                />
+                              </CollapsibleContent>
+                            </div>
+                          )}
+                        </Collapsible>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </TabsContent>
 
