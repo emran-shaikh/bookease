@@ -483,6 +483,7 @@ export default function OwnerDashboard() {
 
                               if (updateError) throw updateError;
 
+                              // Create in-app notification
                               await supabase.from('notifications').insert([
                                 {
                                   user_id: booking.user_id,
@@ -493,9 +494,27 @@ export default function OwnerDashboard() {
                                 }
                               ]);
 
+                              // Send email notification to customer
+                              try {
+                                await supabase.functions.invoke('send-booking-confirmation', {
+                                  body: {
+                                    userEmail: booking.profiles?.email,
+                                    userName: booking.profiles?.full_name || 'Customer',
+                                    courtName: booking.courts?.name,
+                                    bookingDate: format(new Date(booking.booking_date), 'MMMM d, yyyy'),
+                                    startTime: booking.start_time,
+                                    endTime: booking.end_time,
+                                    totalPrice: parseFloat(booking.total_price),
+                                    isPendingPayment: false, // Payment is now confirmed
+                                  },
+                                });
+                              } catch (emailError) {
+                                console.error('Failed to send confirmation email:', emailError);
+                              }
+
                               toast({ 
                                 title: 'Success', 
-                                description: 'Booking confirmed and customer notified' 
+                                description: 'Booking confirmed and customer notified via email' 
                               });
                               fetchOwnerData();
                             } catch (error: any) {
