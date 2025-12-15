@@ -787,17 +787,31 @@ export default function CourtDetail() {
                         </Button>
                       </div>
 
-                      {/* Mobile view - touch scrollable with improved styling */}
-                      <div className="sm:hidden -mx-3 px-3">
+                      {/* Mobile view - with navigation arrows */}
+                      <div className="sm:hidden flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-8 w-8 rounded-full"
+                          onClick={() => {
+                            if (scrollContainerRef.current) {
+                              scrollContainerRef.current.scrollBy({ left: -150, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        
                         <div 
-                          className="overflow-x-auto overscroll-x-contain pb-3 scrollbar-hide" 
+                          ref={scrollContainerRef}
+                          className="flex-1 overflow-x-auto overscroll-x-contain scrollbar-hide" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
                             scrollbarWidth: 'none',
                             msOverflowStyle: 'none'
                           }}
                         >
-                          <div className="flex gap-2 w-max">
+                          <div className="flex gap-2 w-max px-1">
                             {Array.from({ length: 30 }).map((_, index) => {
                               const date = addDays(startOfDay(new Date()), index);
                               const dateStr = format(date, 'yyyy-MM-dd');
@@ -835,6 +849,19 @@ export default function CourtDetail() {
                             })}
                           </div>
                         </div>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0 h-8 w-8 rounded-full"
+                          onClick={() => {
+                            if (scrollContainerRef.current) {
+                              scrollContainerRef.current.scrollBy({ left: 150, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ) : (
