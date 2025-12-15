@@ -342,9 +342,10 @@ export default function CourtDetail() {
   const isSlotAvailable = (startTime: string) => {
     const endTime = addHoursToTime(startTime, selectedHours);
     
-    // Check if end time is within operating hours
+    // Check if end time is within operating hours (use court's closing time)
+    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
     const endHour = parseInt(endTime.split(':')[0]);
-    if (endHour > 22) return false;
+    if (endHour > closingHour) return false;
     
     // Check if any slot in the range is booked or blocked
     for (let i = 0; i < selectedHours; i++) {
@@ -489,7 +490,8 @@ export default function CourtDetail() {
 
   const getSlotStatus = (time: string) => {
     const hour = parseInt(time.split(':')[0]);
-    if (hour + selectedHours > 22) return { available: false, reason: 'Outside hours', hide: true };
+    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
+    if (hour + selectedHours > closingHour) return { available: false, reason: 'Outside hours', hide: true };
     
     // Check if slot is in the past (for today)
     if (selectedDate && isToday(selectedDate)) {
