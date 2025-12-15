@@ -19,6 +19,9 @@ interface BookingConfirmationRequest {
   endTime: string;
   totalPrice: number;
   userPhone?: string;
+  ownerEmail?: string;
+  ownerName?: string;
+  isPendingPayment?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -42,6 +45,9 @@ const handler = async (req: Request): Promise<Response> => {
       endTime,
       totalPrice,
       userPhone,
+      ownerEmail,
+      ownerName,
+      isPendingPayment,
     }: BookingConfirmationRequest = body;
 
     // Validate required fields
@@ -195,6 +201,159 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email sent successfully! ID:", emailResponse.data?.id);
 
+    // Send notification email to court owner for pending payments
+    let ownerEmailId = null;
+    if (ownerEmail && isPendingPayment) {
+      console.log("Sending notification to court owner:", ownerEmail);
+      
+      const ownerEmailResponse = await resend.emails.send({
+        from: "BookedHours <support@bookedhours.com>",
+        to: [ownerEmail],
+        subject: "🔔 New Booking - Payment Pending",
+        html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <style>
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                  line-height: 1.6;
+                  color: #333;
+                  max-width: 600px;
+                  margin: 0 auto;
+                  padding: 20px;
+                }
+                .header {
+                  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                  color: white;
+                  padding: 30px;
+                  border-radius: 10px 10px 0 0;
+                  text-align: center;
+                }
+                .content {
+                  background: #f9fafb;
+                  padding: 30px;
+                  border-radius: 0 0 10px 10px;
+                }
+                .booking-details {
+                  background: white;
+                  padding: 20px;
+                  border-radius: 8px;
+                  margin: 20px 0;
+                  border-left: 4px solid #f59e0b;
+                }
+                .detail-row {
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 10px 0;
+                  border-bottom: 1px solid #e5e7eb;
+                }
+                .detail-row:last-child {
+                  border-bottom: none;
+                }
+                .detail-label {
+                  font-weight: 600;
+                  color: #6b7280;
+                }
+                .detail-value {
+                  color: #111827;
+                }
+                .total {
+                  font-size: 1.25rem;
+                  font-weight: bold;
+                  color: #f59e0b;
+                }
+                .action-btn {
+                  display: inline-block;
+                  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                  color: white;
+                  padding: 12px 24px;
+                  border-radius: 8px;
+                  text-decoration: none;
+                  font-weight: 600;
+                  margin-top: 20px;
+                }
+                .footer {
+                  text-align: center;
+                  margin-top: 30px;
+                  color: #6b7280;
+                  font-size: 0.875rem;
+                }
+                .pending-badge {
+                  background: #fef3c7;
+                  color: #92400e;
+                  padding: 4px 12px;
+                  border-radius: 9999px;
+                  font-size: 0.875rem;
+                  font-weight: 600;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <h1 style="margin: 0;">🔔 New Booking Received</h1>
+                <p style="margin: 10px 0 0 0;">Payment pending confirmation</p>
+              </div>
+              <div class="content">
+                <p>Hi ${ownerName || 'Court Owner'},</p>
+                <p>You have a new booking request for <strong>${courtName || 'your court'}</strong>. The customer has submitted their booking and payment is pending.</p>
+                
+                <div class="booking-details">
+                  <div class="detail-row">
+                    <span class="detail-label">Customer:</span>
+                    <span class="detail-value">${userName || 'N/A'}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Email:</span>
+                    <span class="detail-value">${userEmail || 'N/A'}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Date:</span>
+                    <span class="detail-value">${bookingDate || 'N/A'}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Time:</span>
+                    <span class="detail-value">${startTime || 'N/A'} - ${endTime || 'N/A'}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Amount:</span>
+                    <span class="detail-value total">Rs. ${(totalPrice || 0).toLocaleString()}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Status:</span>
+                    <span class="pending-badge">⏳ Payment Pending</span>
+                  </div>
+                </div>
+
+                <p><strong>What to do next:</strong></p>
+                <ul>
+                  <li>Wait for the customer to send payment or screenshot via WhatsApp</li>
+                  <li>Verify the payment in your bank account</li>
+                  <li>Confirm the booking from your Owner Dashboard</li>
+                </ul>
+
+                <center>
+                  <a href="https://bookedhours.com/owner" class="action-btn">Go to Owner Dashboard</a>
+                </center>
+
+                <div class="footer">
+                  <p>This booking will be held for 30 minutes. If payment is not received, it will expire automatically.</p>
+                  <p>Thank you for using BookedHours!</p>
+                </div>
+              </div>
+            </body>
+          </html>
+        `,
+      });
+
+      if (ownerEmailResponse.error) {
+        console.error("Failed to send owner email:", ownerEmailResponse.error);
+      } else {
+        console.log("Owner email sent successfully! ID:", ownerEmailResponse.data?.id);
+        ownerEmailId = ownerEmailResponse.data?.id;
+      }
+    }
+
     // Note: SMS/Phone notifications would require additional service like Twilio
     if (userPhone) {
       console.log("Phone notification would be sent to:", userPhone);
@@ -203,8 +362,9 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Confirmation email sent successfully",
-        emailId: emailResponse.data?.id
+        message: "Confirmation email(s) sent successfully",
+        emailId: emailResponse.data?.id,
+        ownerEmailId
       }),
       {
         status: 200,

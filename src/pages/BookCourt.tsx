@@ -180,6 +180,41 @@ export default function BookCourt() {
         await unlockSlot(lock.id);
       }
 
+      // Send email notifications to user and owner
+      try {
+        // Fetch owner email
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', court.owner_id)
+          .single();
+
+        // Fetch user profile
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('email, full_name, phone')
+          .eq('id', user?.id)
+          .single();
+
+        await supabase.functions.invoke('send-booking-confirmation', {
+          body: {
+            userEmail: userProfile?.email || user?.email,
+            userName: userProfile?.full_name || 'Customer',
+            courtName: court.name,
+            bookingDate: format(date, 'MMMM d, yyyy'),
+            startTime,
+            endTime,
+            totalPrice: priceCalculation ? parseFloat(priceCalculation.totalPrice) : court.base_price,
+            userPhone: userProfile?.phone,
+            ownerEmail: ownerProfile?.email,
+            ownerName: ownerProfile?.full_name,
+            isPendingPayment: true,
+          },
+        });
+      } catch (emailError) {
+        console.error('Failed to send notification emails:', emailError);
+      }
+
       // Show success dialog with payment instructions
       setShowSuccessDialog(true);
     } catch (error: any) {
