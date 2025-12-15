@@ -133,29 +133,31 @@ export default function CourtDetail() {
   }
 
   async function fetchBookedSlots() {
-    if (!selectedDate) return;
+    if (!selectedDate || !courtId) return;
 
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      const { data: bookings, error: bookingsError } = await supabase
-        .from('bookings')
-        .select('start_time, end_time')
-        .eq('court_id', courtId)
-        .eq('booking_date', dateStr)
-        .in('status', ['confirmed', 'pending']);
+      // Batch both queries for better performance
+      const [bookingsResult, blockedResult] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select('start_time, end_time')
+          .eq('court_id', courtId)
+          .eq('booking_date', dateStr)
+          .in('status', ['confirmed', 'pending']),
+        supabase
+          .from('blocked_slots')
+          .select('start_time, end_time')
+          .eq('court_id', courtId)
+          .eq('date', dateStr)
+      ]);
 
-      const { data: blocked, error: blockedError } = await supabase
-        .from('blocked_slots')
-        .select('start_time, end_time')
-        .eq('court_id', courtId)
-        .eq('date', dateStr);
+      if (bookingsResult.error) throw bookingsResult.error;
+      if (blockedResult.error) throw blockedResult.error;
 
-      if (bookingsError) throw bookingsError;
-      if (blockedError) throw blockedError;
-
-      const booked = bookings?.map(b => `${b.start_time}-${b.end_time}`) || [];
-      const blockedTimes = blocked?.map(b => `${b.start_time}-${b.end_time}`) || [];
+      const booked = bookingsResult.data?.map(b => `${b.start_time}-${b.end_time}`) || [];
+      const blockedTimes = blockedResult.data?.map(b => `${b.start_time}-${b.end_time}`) || [];
       
       setBookedSlots(booked);
       setBlockedSlots(blockedTimes);
@@ -253,31 +255,38 @@ export default function CourtDetail() {
       const nextMonth = new Date(today);
       nextMonth.setMonth(today.getMonth() + 2);
 
-      const { data: bookings } = await supabase
-        .from('bookings')
-        .select('booking_date, start_time, end_time')
-        .eq('court_id', courtId)
-        .gte('booking_date', format(today, 'yyyy-MM-dd'))
-        .lte('booking_date', format(nextMonth, 'yyyy-MM-dd'))
-        .in('status', ['confirmed', 'pending']);
+      const todayStr = format(today, 'yyyy-MM-dd');
+      const nextMonthStr = format(nextMonth, 'yyyy-MM-dd');
 
-      const { data: blocked } = await supabase
-        .from('blocked_slots')
-        .select('date, start_time, end_time')
-        .eq('court_id', courtId)
-        .gte('date', format(today, 'yyyy-MM-dd'))
-        .lte('date', format(nextMonth, 'yyyy-MM-dd'));
+      // Batch both queries for better performance
+      const [bookingsResult, blockedResult] = await Promise.all([
+        supabase
+          .from('bookings')
+          .select('booking_date')
+          .eq('court_id', courtId)
+          .gte('booking_date', todayStr)
+          .lte('booking_date', nextMonthStr)
+          .in('status', ['confirmed', 'pending']),
+        supabase
+          .from('blocked_slots')
+          .select('date')
+          .eq('court_id', courtId)
+          .gte('date', todayStr)
+          .lte('date', nextMonthStr)
+      ]);
 
       const dateStatus: { [key: string]: 'full' | 'partial' | 'available' } = {};
-      const totalSlots = 16;
+      const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 6;
+      const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
+      const totalSlots = closingHour - openingHour;
 
       const bookingsByDate: { [key: string]: number } = {};
-      bookings?.forEach(b => {
+      bookingsResult.data?.forEach(b => {
         const key = b.booking_date;
         bookingsByDate[key] = (bookingsByDate[key] || 0) + 1;
       });
 
-      blocked?.forEach(b => {
+      blockedResult.data?.forEach(b => {
         const key = b.date;
         bookingsByDate[key] = (bookingsByDate[key] || 0) + 1;
       });
