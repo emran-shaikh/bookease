@@ -9,11 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit } from 'lucide-react';
+import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
 import { CourtEditForm } from '@/components/CourtEditForm';
+import { OwnerBankSettings } from '@/components/OwnerBankSettings';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -270,9 +271,13 @@ export default function OwnerDashboard() {
         </div>
 
         <Tabs defaultValue="courts" className="space-y-4">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="courts">My Courts</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1">
+              <CreditCard className="h-3 w-3" />
+              Payment
+            </TabsTrigger>
             <TabsTrigger value="notifications">
               Notifications
               {notifications.filter(n => !n.read).length > 0 && (
@@ -284,6 +289,10 @@ export default function OwnerDashboard() {
             <TabsTrigger value="blocked">Blocked Slots</TabsTrigger>
             <TabsTrigger value="pricing">Pricing Rules</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="settings">
+            <OwnerBankSettings />
+          </TabsContent>
 
           <TabsContent value="courts" className="space-y-4">
             <div className="flex justify-end mb-4">
@@ -439,6 +448,21 @@ export default function OwnerDashboard() {
                         <div>
                           <span className="font-medium">Notes:</span>{' '}
                           <span className="text-muted-foreground">{booking.notes}</span>
+                        </div>
+                      )}
+                      {booking.payment_screenshot && (
+                        <div className="mt-2">
+                          <span className="font-medium flex items-center gap-1 mb-1">
+                            <Image className="h-3 w-3" />
+                            Payment Screenshot:
+                          </span>
+                          <a href={booking.payment_screenshot} target="_blank" rel="noopener noreferrer">
+                            <img 
+                              src={booking.payment_screenshot} 
+                              alt="Payment screenshot" 
+                              className="w-32 h-24 object-cover rounded border hover:opacity-80 transition-opacity cursor-pointer"
+                            />
+                          </a>
                         </div>
                       )}
                     </div>

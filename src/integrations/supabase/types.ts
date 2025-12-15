@@ -61,6 +61,7 @@ export type Database = {
           id: string
           notes: string | null
           payment_intent_id: string | null
+          payment_screenshot: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           start_time: string
           status: Database["public"]["Enums"]["booking_status"]
@@ -76,6 +77,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_intent_id?: string | null
+          payment_screenshot?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           start_time: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -91,6 +93,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_intent_id?: string | null
+          payment_screenshot?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           start_time?: string
           status?: Database["public"]["Enums"]["booking_status"]
@@ -351,7 +354,10 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_number: string | null
+          account_title: string | null
           avatar_url: string | null
+          bank_name: string | null
           city: string | null
           created_at: string
           email: string
@@ -359,9 +365,13 @@ export type Database = {
           id: string
           phone: string | null
           updated_at: string
+          whatsapp_number: string | null
         }
         Insert: {
+          account_number?: string | null
+          account_title?: string | null
           avatar_url?: string | null
+          bank_name?: string | null
           city?: string | null
           created_at?: string
           email: string
@@ -369,9 +379,13 @@ export type Database = {
           id: string
           phone?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Update: {
+          account_number?: string | null
+          account_title?: string | null
           avatar_url?: string | null
+          bank_name?: string | null
           city?: string | null
           created_at?: string
           email?: string
@@ -379,6 +393,7 @@ export type Database = {
           id?: string
           phone?: string | null
           updated_at?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }

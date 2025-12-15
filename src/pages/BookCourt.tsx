@@ -10,11 +10,24 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Clock, Banknote, CreditCard, Shield } from 'lucide-react';
+import { Loader2, Clock, Banknote, Building, MessageCircle, ExternalLink, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { formatPrice } from '@/lib/currency';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+
+interface OwnerPaymentInfo {
+  bank_name: string | null;
+  account_title: string | null;
+  account_number: string | null;
+  whatsapp_number: string | null;
+}
 
 export default function BookCourt() {
   const { slug } = useParams();
@@ -25,7 +38,6 @@ export default function BookCourt() {
   const [loading, setLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
-  const [paymentMethod, setPaymentMethod] = useState<'payfast' | 'bank_transfer'>('bank_transfer');
   const [priceCalculation, setPriceCalculation] = useState<{
     basePrice: number;
     hours: number;
@@ -34,7 +46,8 @@ export default function BookCourt() {
     appliedRules: string[];
   } | null>(null);
   const [calculatingPrice, setCalculatingPrice] = useState(true);
-  const [processingPayfast, setProcessingPayfast] = useState(false);
+  const [ownerPaymentInfo, setOwnerPaymentInfo] = useState<OwnerPaymentInfo | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const { court, date, timeSlot, lockId } = location.state || {};
   const { unlockSlot, getCurrentUserLock } = useSlotLock(court?.id || '', date || null);
@@ -83,7 +96,23 @@ export default function BookCourt() {
     }
 
     calculatePrice();
+    fetchOwnerPaymentInfo();
   }, [court, date, timeSlot]);
+
+  async function fetchOwnerPaymentInfo() {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('bank_name, account_title, account_number, whatsapp_number')
+        .eq('id', court.owner_id)
+        .single();
+
+      if (error) throw error;
+      setOwnerPaymentInfo(data);
+    } catch (error: any) {
+      console.error('Error fetching owner payment info:', error);
+    }
+  }
 
   async function calculatePrice() {
     try {
@@ -113,71 +142,11 @@ export default function BookCourt() {
     }
   }
 
-  async function handlePayfastPayment() {
-    if (!priceCalculation) return;
-    
-    setProcessingPayfast(true);
-    try {
-      const [startTime, endTime] = timeSlot.split('-').map((t: string) => t.trim());
-      
-      const response = await supabase.functions.invoke('create-payfast-payment', {
-        body: {
-          courtId: court.id,
-          courtName: court.name,
-          date: format(date, 'yyyy-MM-dd'),
-          startTime,
-          endTime,
-          totalPrice: parseFloat(priceCalculation.totalPrice),
-        },
-      });
-
-      if (response.error) throw response.error;
-
-      if (response.data.success) {
-        // Create a form and submit to PayFast
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = response.data.paymentUrl;
-        form.target = '_blank';
-
-        Object.entries(response.data.formData).forEach(([key, value]) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = String(value);
-          form.appendChild(input);
-        });
-
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
-
-        toast({
-          title: 'Redirecting to PayFast',
-          description: 'Complete your payment in the new window',
-        });
-      } else {
-        throw new Error(response.data.error || 'Failed to create payment');
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Payment Error',
-        description: error.message || 'Failed to initiate payment. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setProcessingPayfast(false);
-    }
-  }
-
-  async function handleBookingSuccess(paymentIntentId?: string) {
+  async function handleBookingSubmit() {
     setLoading(true);
     
     try {
       const [startTime, endTime] = timeSlot.split('-');
-      
-      const bookingStatus = paymentMethod === 'payfast' ? 'confirmed' : 'pending';
-      const paymentStatus = paymentMethod === 'payfast' ? 'succeeded' : 'pending';
       
       const { error } = await supabase.from('bookings').insert({
         court_id: court.id,
@@ -186,10 +155,9 @@ export default function BookCourt() {
         start_time: startTime,
         end_time: endTime,
         total_price: priceCalculation ? parseFloat(priceCalculation.totalPrice) : court.base_price,
-        status: bookingStatus,
-        payment_status: paymentStatus,
-        payment_intent_id: paymentIntentId || null,
-        notes: notes ? `Payment Method: ${paymentMethod.toUpperCase()}${notes ? ' | ' + notes : ''}` : `Payment Method: ${paymentMethod.toUpperCase()}`,
+        status: 'pending',
+        payment_status: 'pending',
+        notes: notes || null,
       });
 
       if (error) {
@@ -207,43 +175,13 @@ export default function BookCourt() {
         return;
       }
 
-      // Send booking confirmation email
-      if (bookingStatus === 'confirmed') {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email, full_name, phone')
-          .eq('id', user?.id)
-          .single();
-
-        if (profile?.email) {
-          await supabase.functions.invoke('send-booking-confirmation', {
-            body: {
-              userEmail: profile.email,
-              userName: profile.full_name || 'Customer',
-              courtName: court.name,
-              bookingDate: format(date, 'MMMM d, yyyy'),
-              startTime: startTime,
-              endTime: endTime,
-              totalPrice: priceCalculation ? parseFloat(priceCalculation.totalPrice) : court.base_price,
-              userPhone: profile.phone,
-            }
-          });
-        }
-      }
-
       const lock = getCurrentUserLock(startTime, endTime);
       if (lock) {
         await unlockSlot(lock.id);
       }
 
-      toast({
-        title: paymentMethod === 'payfast' ? '🎉 Booking Confirmed!' : '⏳ Booking Pending',
-        description: paymentMethod === 'payfast' 
-          ? `Your court is booked for ${format(date, 'MMM d, yyyy')} at ${timeSlot}` 
-          : `Your booking request is received. It will be confirmed once payment is verified.`,
-      });
-      
-      navigate('/dashboard');
+      // Show success dialog with payment instructions
+      setShowSuccessDialog(true);
     } catch (error: any) {
       toast({
         title: 'Booking Error',
@@ -255,19 +193,33 @@ export default function BookCourt() {
     }
   }
 
-  async function handleBankTransferBooking() {
-    await handleBookingSuccess();
+  function handleWhatsAppClick() {
+    if (!ownerPaymentInfo?.whatsapp_number) return;
+    
+    // Format WhatsApp number (remove spaces and special chars except +)
+    const phone = ownerPaymentInfo.whatsapp_number.replace(/[^\d+]/g, '');
+    const message = encodeURIComponent(
+      `Hi! I just booked ${court.name} for ${format(date, 'MMMM d, yyyy')} at ${timeSlot}. Total: ${priceCalculation ? formatPrice(priceCalculation.totalPrice) : formatPrice(court.base_price)}. I'll send the payment screenshot shortly.`
+    );
+    window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
+  }
+
+  function handleDialogClose() {
+    setShowSuccessDialog(false);
+    navigate('/dashboard');
   }
 
   if (!court || !date || !timeSlot) {
     return null;
   }
 
+  const hasPaymentInfo = ownerPaymentInfo?.bank_name && ownerPaymentInfo?.account_number;
+
   return (
     <div className="min-h-screen bg-background">
       <SEO 
         title={court ? `Book ${court.name}` : 'Complete Booking'}
-        description={court ? `Complete your booking for ${court.name}. Secure your court slot now with easy payment options.` : 'Complete your court booking on BookedHours.'}
+        description={court ? `Complete your booking for ${court.name}. Secure your court slot now.` : 'Complete your court booking on BookedHours.'}
         keywords="book court, checkout, payment, court reservation"
       />
       <Header />
@@ -359,130 +311,152 @@ export default function BookCourt() {
 
             <Card>
               <CardHeader className="p-3 sm:p-4 md:p-6">
-                <CardTitle className="text-base sm:text-lg">Payment Method</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Choose your payment option (PKR)</CardDescription>
+                <CardTitle className="text-base sm:text-lg">Payment Information</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Transfer payment to confirm your booking</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 pt-0">
-                <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
-                  <div 
-                    className={`flex items-center space-x-2 sm:space-x-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-all ${
-                      paymentMethod === 'bank_transfer' 
-                        ? 'border-primary bg-primary/5' 
-                        : 'hover:bg-accent'
-                    }`} 
-                    onClick={() => setPaymentMethod('bank_transfer')}
-                  >
-                    <RadioGroupItem value="bank_transfer" id="bank_transfer" />
-                    <Label htmlFor="bank_transfer" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm sm:text-base">Bank Transfer</p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">Transfer to bank (PKR)</p>
+                {hasPaymentInfo ? (
+                  <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-4 text-sm space-y-3">
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                      <Banknote className="h-4 w-4" />
+                      Bank Account Details
+                    </p>
+                    <div className="space-y-2 text-muted-foreground">
+                      <div className="flex items-start gap-2">
+                        <Building className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-medium text-foreground">Bank Name</p>
+                          <p>{ownerPaymentInfo?.bank_name}</p>
                         </div>
                       </div>
-                    </Label>
-                  </div>
-
-                  <div 
-                    className={`flex items-center space-x-2 sm:space-x-3 rounded-lg border p-3 sm:p-4 cursor-pointer transition-all ${
-                      paymentMethod === 'payfast' 
-                        ? 'border-primary bg-primary/5' 
-                        : 'hover:bg-accent'
-                    }`} 
-                    onClick={() => setPaymentMethod('payfast')}
-                  >
-                    <RadioGroupItem value="payfast" id="payfast" />
-                    <Label htmlFor="payfast" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm sm:text-base">PayFast Card</p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">Instant payment (PKR)</p>
+                      <div className="grid grid-cols-2 gap-4 mt-3">
+                        <div>
+                          <p className="font-medium text-foreground text-xs">Title</p>
+                          <p className="text-sm">{ownerPaymentInfo?.account_title}</p>
                         </div>
-                      </div>
-                    </Label>
-                  </div>
-                </RadioGroup>
-
-                <Separator />
-
-                {paymentMethod === 'payfast' ? (
-                  <div className="space-y-4">
-                    <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-4 text-sm space-y-3">
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-5 w-5 text-blue-600" />
-                        <p className="font-semibold">Secure Payment via PayFast</p>
-                      </div>
-                      <p className="text-muted-foreground">
-                        You will be redirected to PayFast's secure payment gateway to complete your payment using your debit or credit card.
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>✓ 256-bit SSL encryption</span>
-                        <span>✓ PCI DSS compliant</span>
+                        <div>
+                          <p className="font-medium text-foreground text-xs">Account#</p>
+                          <p className="text-sm font-mono">{ownerPaymentInfo?.account_number}</p>
+                        </div>
                       </div>
                     </div>
-                    <Button 
-                      onClick={handlePayfastPayment} 
-                      disabled={processingPayfast || calculatingPrice} 
-                      className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-                      size="lg"
-                    >
-                      {processingPayfast ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Connecting to PayFast...
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          Pay {priceCalculation ? formatPrice(priceCalculation.totalPrice) : ''} with PayFast
-                        </>
-                      )}
-                    </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 p-4 text-sm space-y-3">
-                      <p className="font-semibold text-emerald-700 dark:text-emerald-400">Bank Transfer Instructions:</p>
-                      <div className="space-y-2 text-muted-foreground">
-                        <p><span className="font-medium">Bank:</span> National Bank of Pakistan</p>
-                        <p><span className="font-medium">Account Title:</span> CourtConnect</p>
-                        <p><span className="font-medium">Account Number:</span> 1234567890123</p>
-                        <p><span className="font-medium">IBAN:</span> PK36NBPA0000001234567890</p>
-                        <p className="text-xs mt-2 text-amber-600 dark:text-amber-400">⚠️ Please include your name and booking reference in the transfer description.</p>
-                        <p className="text-xs">Your booking will be confirmed within 24 hours after payment verification.</p>
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={handleBankTransferBooking} 
-                      disabled={loading || calculatingPrice} 
-                      className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800"
-                      size="lg"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Banknote className="mr-2 h-4 w-4" />
-                          Submit Booking Request
-                        </>
-                      )}
-                    </Button>
+                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 p-4 text-sm">
+                    <p className="text-amber-700 dark:text-amber-400">
+                      ⚠️ The court owner hasn't added their payment details yet. Please contact them via WhatsApp after booking.
+                    </p>
                   </div>
                 )}
 
+                {ownerPaymentInfo?.whatsapp_number && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2 border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20"
+                    onClick={handleWhatsAppClick}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Contact via WhatsApp
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                )}
+
+                <Separator />
+
+                <div className="rounded-lg bg-muted/50 p-4 text-sm space-y-2">
+                  <p className="font-medium">How it works:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-muted-foreground text-xs">
+                    <li>Submit your booking request below</li>
+                    <li>Transfer the payment to the bank account shown</li>
+                    <li>Upload payment screenshot from your dashboard or send via WhatsApp</li>
+                    <li>Owner will confirm your booking after verifying payment</li>
+                  </ol>
+                </div>
+
+                <Button 
+                  onClick={handleBookingSubmit} 
+                  disabled={loading || calculatingPrice} 
+                  className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                  size="lg"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Submit Booking ({priceCalculation ? formatPrice(priceCalculation.totalPrice) : ''})
+                    </>
+                  )}
+                </Button>
+
                 <p className="text-xs text-center text-muted-foreground">
-                  By proceeding, you agree to our terms and conditions. All prices are in Pakistani Rupees (PKR).
+                  Your booking will be on hold for 30 minutes. Please complete payment promptly.
                 </p>
               </CardContent>
             </Card>
           </div>
         </div>
       </main>
+
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-600">
+              <CheckCircle className="h-5 w-5" />
+              Booking Successful!
+            </DialogTitle>
+            <DialogDescription className="text-base font-medium pt-2">
+              Your Booking is on hold for 30 minute(s).
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              To confirm and reserve your booking, please transfer the <strong>Advance Payment</strong> to the bank account below:
+            </p>
+
+            {hasPaymentInfo && (
+              <div className="rounded-lg border p-4">
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <div className="font-medium">Bank Name</div>
+                  <div className="font-medium">Title</div>
+                  <div className="font-medium">Account#</div>
+                  <div className="text-muted-foreground">{ownerPaymentInfo?.bank_name}</div>
+                  <div className="text-muted-foreground">{ownerPaymentInfo?.account_title}</div>
+                  <div className="text-muted-foreground font-mono text-xs">{ownerPaymentInfo?.account_number}</div>
+                </div>
+              </div>
+            )}
+
+            <p className="text-sm text-muted-foreground">
+              Once the payment is made, kindly send a confirmation screenshot via <strong>WhatsApp</strong> or upload it directly from your <strong>Profile</strong>.
+            </p>
+
+            <div className="flex gap-2">
+              <Button 
+                className="flex-1"
+                onClick={handleDialogClose}
+              >
+                Done!
+              </Button>
+              {ownerPaymentInfo?.whatsapp_number && (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  className="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20"
+                  onClick={handleWhatsAppClick}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
