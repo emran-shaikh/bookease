@@ -39,7 +39,8 @@ export default function CourtDetail() {
   const [priceBreakdown, setPriceBreakdown] = useState<{ basePrice: number; multiplier: number; rules: string[] } | null>(null);
   const [viewMode, setViewMode] = useState<'scroll' | 'calendar'>('scroll');
   const { toggleFavorite, isFavorite } = useFavorites(user?.id);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const desktopScrollRef = useRef<HTMLDivElement>(null);
+  const mobileScrollRef = useRef<HTMLDivElement>(null);
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(courtId || '', selectedDate || null);
 
@@ -725,15 +726,15 @@ export default function CourtDetail() {
                           size="icon"
                           className="shrink-0 h-10 w-10 rounded-full"
                           onClick={() => {
-                            if (scrollContainerRef.current) {
-                              scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+                            if (desktopScrollRef.current) {
+                              desktopScrollRef.current.scrollBy({ left: -200, behavior: 'smooth' });
                             }
                           }}
                         >
                           <ChevronLeft className="h-5 w-5" />
                         </Button>
                         
-                        <div ref={scrollContainerRef} className="flex-1 overflow-x-auto hide-scrollbar scroll-smooth">
+                        <div ref={desktopScrollRef} className="flex-1 overflow-x-auto hide-scrollbar scroll-smooth">
                           <div className="flex gap-2 min-w-max px-1">
                             {Array.from({ length: 30 }).map((_, index) => {
                               const date = addDays(startOfDay(new Date()), index);
@@ -778,8 +779,8 @@ export default function CourtDetail() {
                           size="icon"
                           className="shrink-0 h-10 w-10 rounded-full"
                           onClick={() => {
-                            if (scrollContainerRef.current) {
-                              scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+                            if (desktopScrollRef.current) {
+                              desktopScrollRef.current.scrollBy({ left: 200, behavior: 'smooth' });
                             }
                           }}
                         >
@@ -794,8 +795,8 @@ export default function CourtDetail() {
                           size="icon"
                           className="shrink-0 h-8 w-8 rounded-full"
                           onClick={() => {
-                            if (scrollContainerRef.current) {
-                              scrollContainerRef.current.scrollBy({ left: -150, behavior: 'smooth' });
+                            if (mobileScrollRef.current) {
+                              mobileScrollRef.current.scrollBy({ left: -150, behavior: 'smooth' });
                             }
                           }}
                         >
@@ -803,7 +804,7 @@ export default function CourtDetail() {
                         </Button>
                         
                         <div 
-                          ref={scrollContainerRef}
+                          ref={mobileScrollRef}
                           className="flex-1 overflow-x-auto overscroll-x-contain scrollbar-hide" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
@@ -855,8 +856,8 @@ export default function CourtDetail() {
                           size="icon"
                           className="shrink-0 h-8 w-8 rounded-full"
                           onClick={() => {
-                            if (scrollContainerRef.current) {
-                              scrollContainerRef.current.scrollBy({ left: 150, behavior: 'smooth' });
+                            if (mobileScrollRef.current) {
+                              mobileScrollRef.current.scrollBy({ left: 150, behavior: 'smooth' });
                             }
                           }}
                         >
