@@ -50,6 +50,45 @@ The system now includes:
   - Independence Day (Jul 4) - 1.8x multiplier
   - Thanksgiving (Nov 28) - 1.7x multiplier
 
+## 🚀 Running Automated Tests
+
+### Install Dependencies
+```bash
+npm install
+```
+
+### Run All Tests
+```bash
+npm run test
+```
+
+### Run Tests with Coverage
+```bash
+npm run test:coverage
+```
+
+### Run Tests in Watch Mode
+```bash
+npm run test:watch
+```
+
+### Test Files Structure
+```
+src/test/
+├── setup.ts                    # Test environment setup
+├── test-utils.tsx              # Custom render utilities
+├── mocks/
+│   ├── supabase.ts            # Mock data and Supabase client
+│   ├── handlers.ts            # MSW request handlers
+│   └── server.ts              # MSW server setup
+├── flows/
+│   ├── customer-booking.test.ts    # Customer workflow tests
+│   ├── owner-flow.test.ts          # Court owner workflow tests
+│   └── admin-flow.test.ts          # Admin workflow tests
+└── utils/
+    └── helpers.test.ts              # Utility function tests
+```
+
 ## 🚀 Testing the Booking Flow
 
 ### As a Customer:
@@ -62,10 +101,10 @@ The system now includes:
    - Select a date
    - Choose a time slot
    - View calculated price (with any pricing rules applied)
-   - Complete payment with Stripe test card: `4242 4242 4242 4242`
-   - Any future date for expiry, any 3-digit CVC
+   - Upload payment screenshot
+   - Wait for owner confirmation
 6. **View Bookings** - Check your dashboard to see active bookings
-7. **Leave a Review** - After booking, go back to the court detail page and submit a review
+7. **Leave a Review** - After booking is completed, go back to the court detail page and submit a review
 
 ### As a Court Owner:
 
@@ -77,15 +116,19 @@ The system now includes:
    - Set base price
    - Add amenities
    - Submit for admin approval
-4. **Manage Bookings** - View all bookings for your courts
-5. **View Analytics** - See revenue and booking statistics
+4. **Configure Bank Settings** - Add your bank details for receiving payments
+5. **Manage Bookings** - View all bookings for your courts
+6. **Confirm Payments** - Review payment screenshots and confirm bookings
+7. **Block Slots** - Block time slots for maintenance
+8. **Set Pricing Rules** - Configure peak/weekend pricing
 
 ### As an Admin:
 
 1. **Sign up/Login** with `admin@test.com`
 2. **Access Admin Dashboard** - Approve/reject pending courts
 3. **Manage Users** - View all users and their roles
-4. **View Analytics** - See system-wide statistics and revenue
+4. **Manage Holidays** - Add/edit holiday pricing
+5. **View Analytics** - See system-wide statistics and revenue
 
 ## 🔒 Security Features Implemented
 
@@ -95,16 +138,7 @@ The system now includes:
 - ✅ **Role-Based Access Control** - Users can only access features appropriate to their role
 - ✅ **Row Level Security** - Database policies prevent unauthorized data access
 - ✅ **Profiles Privacy** - Users can only view their own profile data (admins can view all)
-
-## 🧪 Stripe Test Cards
-
-For testing payments, use these Stripe test cards:
-
-- **Successful payment**: `4242 4242 4242 4242`
-- **Requires authentication**: `4000 0025 0000 3155`
-- **Declined card**: `4000 0000 0000 9995`
-- Any future expiry date (e.g., 12/34)
-- Any 3-digit CVC (e.g., 123)
+- ✅ **Slot Locking** - Prevents double bookings with 5-minute locks
 
 ## 📊 Features to Test
 
@@ -121,6 +155,7 @@ For testing payments, use these Stripe test cards:
 
 3. **Reviews System**
    - Create a booking first
+   - Wait for confirmation
    - Go to court detail page
    - Submit a review with rating and comment
    - View reviews from other users
@@ -128,7 +163,18 @@ For testing payments, use these Stripe test cards:
 4. **Admin Functions**
    - Approve/reject new courts
    - View user list with roles
+   - Manage holidays
    - See system analytics
+
+5. **Favorites System**
+   - Add courts to favorites
+   - View favorites page
+   - Remove from favorites
+
+6. **Notifications**
+   - Receive booking notifications
+   - Receive payment confirmation notifications
+   - View notification bell updates
 
 ## 🐛 Troubleshooting
 
@@ -138,14 +184,19 @@ For testing payments, use these Stripe test cards:
 - Courts are approved and visible to all users
 
 ### Payment not working?
-- Ensure you're using Stripe test card numbers
-- Check browser console for errors
+- Ensure you upload a valid image file
+- Check file size is under 5MB
 - Verify your session is active
 
 ### Role not assigned?
 - Log out and log back in
 - Check that you used the exact test email addresses
 - Roles are assigned automatically on account creation
+
+### Blank screen after login?
+- Clear browser cache
+- Check browser console for errors
+- Verify environment variables are set correctly
 
 ## 📞 Support
 
