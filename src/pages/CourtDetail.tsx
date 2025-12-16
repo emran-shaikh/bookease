@@ -167,41 +167,80 @@ export default function CourtDetail() {
   }
 
   async function fetchSlotPricing() {
-    if (!selectedDate || !courtId) return;
+    if (!selectedDate || !courtId || !court) return;
 
     setLoadingPricing(true);
     const pricing: { [key: string]: { price: number; multiplier: number; rules: string[] } } = {};
 
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      
-      const pricingPromises = timeSlots.map(async (startTime) => {
+      const dayOfWeek = selectedDate.getDay();
+      const basePrice = parseFloat(court.base_price) || 0;
+
+      // Fetch pricing rules and holidays in parallel (once for all slots)
+      const [rulesResult, holidayResult] = await Promise.all([
+        supabase
+          .from('pricing_rules')
+          .select('*')
+          .eq('court_id', courtId)
+          .eq('is_active', true),
+        supabase
+          .from('holidays')
+          .select('*')
+          .eq('date', dateStr)
+          .eq('is_active', true)
+          .maybeSingle()
+      ]);
+
+      const pricingRules = rulesResult.data || [];
+      const holiday = holidayResult.data;
+
+      // Calculate price for each slot locally
+      timeSlots.forEach((startTime) => {
         const endTime = addHoursToTime(startTime, 1);
         const slotKey = `${startTime}-${endTime}`;
         
-        try {
-          const response = await supabase.functions.invoke('calculate-price', {
-            body: {
-              courtId: courtId,
-              date: dateStr,
-              startTime,
-              endTime,
-            },
-          });
+        let priceMultiplier = 1.0;
+        const appliedRules: string[] = [];
 
-          if (!response.error && response.data) {
-            pricing[slotKey] = {
-              price: parseFloat(response.data.totalPrice) / 1, // totalPrice is already calculated for 1 hour
-              multiplier: response.data.priceMultiplier || 1,
-              rules: response.data.appliedRules || []
-            };
+        // Apply pricing rules
+        for (const rule of pricingRules) {
+          if (rule.rule_type === 'peak_hours') {
+            const ruleStart = rule.start_time;
+            const ruleEnd = rule.end_time;
+            
+            if (ruleStart && ruleEnd && startTime >= ruleStart && endTime <= ruleEnd) {
+              if (rule.days_of_week && rule.days_of_week.includes(dayOfWeek)) {
+                priceMultiplier = Math.max(priceMultiplier, Number(rule.price_multiplier));
+                appliedRules.push(`Peak Hours (${rule.price_multiplier}x)`);
+              }
+            }
+          } else if (rule.rule_type === 'weekend') {
+            if (dayOfWeek === 0 || dayOfWeek === 6) {
+              priceMultiplier = Math.max(priceMultiplier, Number(rule.price_multiplier));
+              appliedRules.push(`Weekend (${rule.price_multiplier}x)`);
+            }
+          } else if (rule.rule_type === 'custom') {
+            if (rule.days_of_week && rule.days_of_week.includes(dayOfWeek)) {
+              priceMultiplier = Math.max(priceMultiplier, Number(rule.price_multiplier));
+              appliedRules.push(`Custom (${rule.price_multiplier}x)`);
+            }
           }
-        } catch (error) {
-          console.error(`Error fetching price for slot ${slotKey}:`, error);
         }
+
+        // Apply holiday pricing
+        if (holiday) {
+          priceMultiplier = Math.max(priceMultiplier, Number(holiday.price_multiplier));
+          appliedRules.push(`Holiday: ${holiday.name} (${holiday.price_multiplier}x)`);
+        }
+
+        pricing[slotKey] = {
+          price: basePrice * priceMultiplier,
+          multiplier: priceMultiplier,
+          rules: appliedRules
+        };
       });
 
-      await Promise.all(pricingPromises);
       setSlotPricing(pricing);
     } catch (error: any) {
       console.error('Error fetching slot pricing:', error);
@@ -467,7 +506,7 @@ export default function CourtDetail() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );

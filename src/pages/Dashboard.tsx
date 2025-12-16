@@ -34,7 +34,7 @@ export default function Dashboard() {
   async function fetchDashboardData() {
     try {
       const [profileData, bookingsData, reviewsData] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user?.id).single(),
+        supabase.from('profiles').select('*').eq('id', user?.id).maybeSingle(),
         supabase.from('bookings').select(`
           *,
           courts (name, location, city, images)
@@ -42,7 +42,10 @@ export default function Dashboard() {
         supabase.from('reviews').select('booking_id').eq('user_id', user?.id),
       ]);
 
-      if (profileData.error) throw profileData.error;
+      // Profile can be null for new users
+      if (profileData.error && profileData.error.code !== 'PGRST116') {
+        console.error('Error fetching profile:', profileData.error);
+      }
       if (bookingsData.error) throw bookingsData.error;
 
       setProfile(profileData.data);

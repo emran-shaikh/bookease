@@ -105,7 +105,7 @@ export default function BookCourt() {
         .from('profiles')
         .select('bank_name, account_title, account_number, whatsapp_number')
         .eq('id', court.owner_id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       setOwnerPaymentInfo(data);
@@ -187,14 +187,14 @@ export default function BookCourt() {
           .from('profiles')
           .select('email, full_name')
           .eq('id', court.owner_id)
-          .single();
+          .maybeSingle();
 
         // Fetch user profile
         const { data: userProfile } = await supabase
           .from('profiles')
           .select('email, full_name, phone')
           .eq('id', user?.id)
-          .single();
+          .maybeSingle();
 
         await supabase.functions.invoke('send-booking-confirmation', {
           body: {
