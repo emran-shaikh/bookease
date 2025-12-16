@@ -122,15 +122,15 @@ serve(async (req) => {
       }
     }
 
-    // Check for holidays
-    const { data: holiday, error: holidayError } = await supabaseAdmin
+    // Check for holidays (use maybeSingle to avoid 406 when no holiday)
+    const { data: holiday } = await supabaseAdmin
       .from('holidays')
       .select('*')
       .eq('date', date)
       .eq('is_active', true)
-      .single();
+      .maybeSingle();
 
-    if (!holidayError && holiday) {
+    if (holiday) {
       priceMultiplier = Math.max(priceMultiplier, parseFloat(holiday.price_multiplier));
       appliedRules.push(`Holiday: ${holiday.name} (${holiday.price_multiplier}x)`);
     }

@@ -39,7 +39,7 @@ export function OwnerBankSettings() {
         .from('profiles')
         .select('bank_name, account_title, account_number, whatsapp_number')
         .eq('id', user?.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
 

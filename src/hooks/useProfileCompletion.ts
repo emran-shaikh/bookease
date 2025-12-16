@@ -19,7 +19,7 @@ export function useProfileCompletion() {
         .from('profiles')
         .select('full_name, phone, city')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching profile:', error);
