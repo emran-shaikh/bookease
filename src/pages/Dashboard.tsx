@@ -59,13 +59,24 @@ export default function Dashboard() {
     }
   }
 
-  const upcomingBookings = bookings.filter(b => 
-    new Date(b.booking_date) >= new Date() && b.status !== 'cancelled'
-  );
-  
-  const pastBookings = bookings.filter(b => 
-    new Date(b.booking_date) < new Date() || b.status === 'completed'
-  );
+  function bookingStartDateTime(booking: any) {
+    // booking_date is YYYY-MM-DD, start_time is HH:mm:ss
+    return new Date(`${booking.booking_date}T${String(booking.start_time).slice(0, 8)}`);
+  }
+
+  function bookingEndDateTime(booking: any) {
+    return new Date(`${booking.booking_date}T${String(booking.end_time).slice(0, 8)}`);
+  }
+
+  const upcomingBookings = bookings.filter((b) => {
+    const end = bookingEndDateTime(b);
+    return end >= new Date() && b.status !== 'cancelled';
+  });
+
+  const pastBookings = bookings.filter((b) => {
+    const end = bookingEndDateTime(b);
+    return end < new Date() || b.status === 'completed';
+  });
 
   // Calculate time remaining for pending bookings (30 minutes from creation)
   function getTimeRemaining(createdAt: string) {
@@ -290,22 +301,43 @@ export default function Dashboard() {
                         <span className="font-medium">Total:</span> {formatPrice(booking.total_price)}
                       </div>
                     </div>
-                    {reviews.some(r => r.booking_id === booking.id) ? (
-                      <Badge variant="default" className="gap-1 text-[10px] sm:text-xs">
-                        <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-current" />
-                        Reviewed
-                      </Badge>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 sm:h-8 text-xs"
-                        onClick={() => navigate(`/review/${booking.id}`)}
-                      >
-                        <Star className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                        Review
-                      </Button>
-                    )}
+                    {(() => {
+                      const alreadyReviewed = reviews.some((r) => r.booking_id === booking.id);
+                      const canReview =
+                        booking.status === 'completed' ||
+                        (booking.status === 'confirmed' &&
+                          booking.payment_status === 'succeeded' &&
+                          bookingEndDateTime(booking) < new Date());
+
+                      if (alreadyReviewed) {
+                        return (
+                          <Badge variant="default" className="gap-1 text-[10px] sm:text-xs">
+                            <Star className="h-2.5 w-2.5 sm:h-3 sm:w-3 fill-current" />
+                            Reviewed
+                          </Badge>
+                        );
+                      }
+
+                      if (!canReview) {
+                        return (
+                          <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                            Not eligible for review
+                          </Badge>
+                        );
+                      }
+
+                      return (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 sm:h-8 text-xs"
+                          onClick={() => navigate(`/review/${booking.id}`)}
+                        >
+                          <Star className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          Review
+                        </Button>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               ))
