@@ -355,15 +355,18 @@ export default function CourtDetail() {
   // Generate time slots based on court's opening/closing hours
   // If court closes at 23:00 (11 PM), last bookable slot starts at 23:00
   const generateTimeSlots = () => {
-    const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 6;
-    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
+    const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 0;
+    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 23;
     const slots: string[] = [];
     
-    // Handle 24-hour operation (23:59 means open until midnight, allow 23:00 slot)
+    // Handle 24-hour operation (00:00 to 23:59 or 00:00 to 00:00)
     const is24Hours = court?.opening_time === '00:00' && (court?.closing_time === '23:59' || court?.closing_time === '00:00');
-    const maxHour = is24Hours ? 24 : closingHour;
     
-    for (let hour = openingHour; hour < maxHour; hour++) {
+    // For regular courts: generate slots from opening to closing (inclusive)
+    // For 24-hour courts: generate all 24 slots (0-23)
+    const maxHour = is24Hours ? 23 : closingHour;
+    
+    for (let hour = openingHour; hour <= maxHour; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`);
     }
     return slots;
