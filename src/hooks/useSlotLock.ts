@@ -48,6 +48,22 @@ export function useSlotLock(courtId: string, date: Date | null) {
     if (!user || !date) return null;
 
     try {
+      // First check if user has a profile (required for foreign key)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        // Create profile if it doesn't exist
+        await supabase.from('profiles').insert({
+          id: user.id,
+          email: user.email || '',
+          full_name: user.user_metadata?.full_name || user.email || '',
+        });
+      }
+
       const { data, error } = await supabase
         .from('slot_locks')
         .insert({
@@ -66,8 +82,12 @@ export function useSlotLock(courtId: string, date: Date | null) {
       await fetchLockedSlots();
       
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error locking slot:', error);
+      // Handle specific conflict error (slot already locked)
+      if (error.code === '23505') {
+        console.log('Slot is already locked by another user');
+      }
       return null;
     }
   };
