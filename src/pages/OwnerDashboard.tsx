@@ -21,6 +21,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { XCircle, Info } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
+import { formatTimeSlot } from '@/lib/utils';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -433,7 +434,7 @@ export default function OwnerDashboard() {
                       </div>
                       <div>
                         <span className="font-medium">Time:</span>{' '}
-                        {booking.start_time} - {booking.end_time}
+                        {formatTimeSlot(booking.start_time, booking.end_time)}
                       </div>
                       <div>
                         <span className="font-medium">Amount:</span> {formatPrice(booking.total_price)}

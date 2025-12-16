@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Check if booking is overnight (end time < start time means it wraps to next day)
+const isOvernightBooking = (startTime: string, endTime: string): boolean => {
+  return endTime < startTime || endTime === '00:00';
+};
+
+// Calculate hours considering overnight bookings
+const calculateHours = (startTime: string, endTime: string): number => {
+  const [startH] = startTime.split(':').map(Number);
+  const [endH] = endTime.split(':').map(Number);
+  
+  if (isOvernightBooking(startTime, endTime)) {
+    // Overnight: hours until midnight + hours after midnight
+    return (24 - startH) + endH;
+  }
+  
+  return endH - startH;
+};
+
 // Input validation
 const validatePriceRequest = (data: any) => {
   if (!data.courtId || typeof data.courtId !== 'string') {
@@ -21,9 +39,15 @@ const validatePriceRequest = (data: any) => {
     throw new Error('Invalid endTime format (expected HH:MM)');
   }
   
-  // Validate that endTime is after startTime
-  if (data.endTime <= data.startTime) {
-    throw new Error('End time must be after start time');
+  // Calculate hours (handles overnight)
+  const hours = calculateHours(data.startTime, data.endTime);
+  
+  // Validate reasonable booking duration (max 12 hours)
+  if (hours > 12) {
+    throw new Error('Booking duration cannot exceed 12 hours');
+  }
+  if (hours <= 0) {
+    throw new Error('Invalid booking duration');
   }
   
   // Validate date is not in the past
@@ -32,17 +56,6 @@ const validatePriceRequest = (data: any) => {
   today.setHours(0, 0, 0, 0);
   if (bookingDate < today) {
     throw new Error('Cannot book dates in the past');
-  }
-  
-  // Validate reasonable booking duration (max 12 hours)
-  const start = new Date(`2000-01-01T${data.startTime}`);
-  const end = new Date(`2000-01-01T${data.endTime}`);
-  const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-  if (hours > 12) {
-    throw new Error('Booking duration cannot exceed 12 hours');
-  }
-  if (hours <= 0) {
-    throw new Error('Invalid booking duration');
   }
 };
 
@@ -74,13 +87,18 @@ serve(async (req) => {
 
     let basePrice = parseFloat(court.base_price);
 
-    // Calculate hours
-    const start = new Date(`${date}T${startTime}`);
-    const end = new Date(`${date}T${endTime}`);
-    const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    // Calculate hours (handles overnight bookings)
+    const hours = calculateHours(startTime, endTime);
+    const overnight = isOvernightBooking(startTime, endTime);
 
     // Get day of week (0 = Sunday, 6 = Saturday)
-    const dayOfWeek = new Date(date).getDay();
+    const bookingDate = new Date(date);
+    const dayOfWeek = bookingDate.getDay();
+    
+    // For overnight, also get next day's day of week
+    const nextDate = new Date(bookingDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    const nextDayOfWeek = nextDate.getDay();
 
     // Get active pricing rules for this court
     const { data: pricingRules, error: rulesError } = await supabaseAdmin
@@ -101,28 +119,38 @@ serve(async (req) => {
         const ruleStart = rule.start_time;
         const ruleEnd = rule.end_time;
         
-        if (ruleStart && ruleEnd && startTime >= ruleStart && endTime <= ruleEnd) {
-          if (rule.days_of_week && rule.days_of_week.includes(dayOfWeek)) {
+        if (ruleStart && ruleEnd) {
+          // For overnight bookings, check both days
+          const matchesDay1 = rule.days_of_week && rule.days_of_week.includes(dayOfWeek);
+          const matchesDay2 = overnight && rule.days_of_week && rule.days_of_week.includes(nextDayOfWeek);
+          
+          if ((matchesDay1 || matchesDay2) && startTime >= ruleStart) {
             priceMultiplier = Math.max(priceMultiplier, parseFloat(rule.price_multiplier));
             appliedRules.push(`Peak Hours (${rule.price_multiplier}x)`);
           }
         }
       } else if (rule.rule_type === 'weekend') {
         // Check if it's weekend (Saturday=6, Sunday=0)
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const nextIsWeekend = overnight && (nextDayOfWeek === 0 || nextDayOfWeek === 6);
+        
+        if (isWeekend || nextIsWeekend) {
           priceMultiplier = Math.max(priceMultiplier, parseFloat(rule.price_multiplier));
           appliedRules.push(`Weekend (${rule.price_multiplier}x)`);
         }
       } else if (rule.rule_type === 'custom') {
         // Check custom day of week rules
-        if (rule.days_of_week && rule.days_of_week.includes(dayOfWeek)) {
+        const matchesDay1 = rule.days_of_week && rule.days_of_week.includes(dayOfWeek);
+        const matchesDay2 = overnight && rule.days_of_week && rule.days_of_week.includes(nextDayOfWeek);
+        
+        if (matchesDay1 || matchesDay2) {
           priceMultiplier = Math.max(priceMultiplier, parseFloat(rule.price_multiplier));
           appliedRules.push(`Custom (${rule.price_multiplier}x)`);
         }
       }
     }
 
-    // Check for holidays (use maybeSingle to avoid 406 when no holiday)
+    // Check for holidays (check both days for overnight)
     const { data: holiday } = await supabaseAdmin
       .from('holidays')
       .select('*')
@@ -135,6 +163,22 @@ serve(async (req) => {
       appliedRules.push(`Holiday: ${holiday.name} (${holiday.price_multiplier}x)`);
     }
 
+    // For overnight, also check next day's holidays
+    if (overnight) {
+      const nextDateStr = nextDate.toISOString().split('T')[0];
+      const { data: nextHoliday } = await supabaseAdmin
+        .from('holidays')
+        .select('*')
+        .eq('date', nextDateStr)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (nextHoliday && !holiday) {
+        priceMultiplier = Math.max(priceMultiplier, parseFloat(nextHoliday.price_multiplier));
+        appliedRules.push(`Holiday: ${nextHoliday.name} (${nextHoliday.price_multiplier}x)`);
+      }
+    }
+
     const finalPrice = basePrice * hours * priceMultiplier;
 
     console.log('Price calculation:', {
@@ -142,6 +186,7 @@ serve(async (req) => {
       date,
       startTime,
       endTime,
+      overnight,
       basePrice,
       hours,
       priceMultiplier,
@@ -156,6 +201,7 @@ serve(async (req) => {
         priceMultiplier,
         totalPrice: finalPrice.toFixed(2),
         appliedRules,
+        overnight,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

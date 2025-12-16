@@ -353,11 +353,17 @@ export default function CourtDetail() {
   }, [courtId]);
 
   // Generate time slots based on court's opening/closing hours
+  // If court closes at 23:00 (11 PM), last bookable slot starts at 23:00
   const generateTimeSlots = () => {
     const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 6;
     const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
     const slots: string[] = [];
-    for (let hour = openingHour; hour < closingHour; hour++) {
+    
+    // Handle 24-hour operation (23:59 means open until midnight, allow 23:00 slot)
+    const is24Hours = court?.opening_time === '00:00' && (court?.closing_time === '23:59' || court?.closing_time === '00:00');
+    const maxHour = is24Hours ? 24 : closingHour;
+    
+    for (let hour = openingHour; hour < maxHour; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`);
     }
     return slots;
@@ -378,14 +384,33 @@ export default function CourtDetail() {
     return `${newHours.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
   };
 
+  // Check if end time is past midnight (overnight booking)
+  const isOvernightBooking = (startTime: string, hours: number) => {
+    const startHour = parseInt(startTime.split(':')[0]);
+    return startHour + hours > 24;
+  };
+
+  // Get the end time with indication if it's next day
+  const getEndTimeWithContext = (startTime: string, hours: number) => {
+    const endTime = addHoursToTime(startTime, hours);
+    const isOvernight = isOvernightBooking(startTime, hours);
+    return { endTime, isOvernight };
+  };
+
   const isSlotAvailable = (startTime: string) => {
-    const endTime = addHoursToTime(startTime, selectedHours);
+    const { endTime, isOvernight } = getEndTimeWithContext(startTime, selectedHours);
     
-    // Check if end time is within operating hours (use court's closing time)
     const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
-    const endHour = parseInt(endTime.split(':')[0]);
-    if (endHour > closingHour) return false;
+    const startHour = parseInt(startTime.split(':')[0]);
+    const is24Hours = court?.opening_time === '00:00' && (court?.closing_time === '23:59' || court?.closing_time === '00:00');
     
+    // For non-24h courts, check if booking would exceed closing time without being overnight
+    if (!is24Hours && !isOvernight) {
+      const endHour = parseInt(endTime.split(':')[0]);
+      if (endHour > closingHour || (endHour === 0 && selectedHours < 24)) return false;
+    }
+    
+    // For 24-hour courts or overnight bookings, allow the booking
     // Check if any slot in the range is booked or blocked
     for (let i = 0; i < selectedHours; i++) {
       const checkStart = addHoursToTime(startTime, i);
