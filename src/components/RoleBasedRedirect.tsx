@@ -8,25 +8,23 @@ export function RoleBasedRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!loading && role) {
-      // Redirect based on primary role
+    if (!loading) {
+      // Redirect based on primary role, default to dashboard if no role found
       if (role === 'admin') {
         navigate('/admin');
       } else if (role === 'court_owner') {
         navigate('/owner');
       } else {
+        // Default redirect for 'customer' role or when no role is assigned
         navigate('/dashboard');
       }
     }
   }, [role, loading, navigate]);
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  return null;
+  // Always show loading spinner while determining redirect
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
 }

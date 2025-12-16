@@ -33,6 +33,9 @@ export function useUserRole() {
         } else {
           setRole('customer');
         }
+      } else {
+        // Default to customer if no role found (new user or missing role)
+        setRole('customer');
       }
       setLoading(false);
     }
