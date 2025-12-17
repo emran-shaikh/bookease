@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, CheckCircle, XCircle, Users, Building2, DollarSign, Calendar, CreditCard, ArrowUpDown, Edit } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Users, Building2, Calendar, CreditCard, ArrowUpDown, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -260,10 +260,10 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${analytics.totalRevenue.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{formatPrice(analytics.totalRevenue)}</div>
             </CardContent>
           </Card>
           <Card>

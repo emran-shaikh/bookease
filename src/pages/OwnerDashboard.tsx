@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, DollarSign, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard } from 'lucide-react';
+import { Loader2, Building2, Calendar, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
@@ -263,10 +263,10 @@ export default function OwnerDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Earnings</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${earnings.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{formatPrice(earnings)}</div>
             </CardContent>
           </Card>
         </div>
