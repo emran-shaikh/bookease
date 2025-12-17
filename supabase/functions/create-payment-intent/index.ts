@@ -95,8 +95,8 @@ serve(async (req) => {
     console.log("Calculated price:", calculatedPrice);
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(calculatedPrice * 100), // Convert to cents using server-calculated price
-      currency: "usd",
+      amount: Math.round(calculatedPrice * 100), // Convert to paisa (PKR smallest unit)
+      currency: "pkr",
       automatic_payment_methods: {
         enabled: true,
       },

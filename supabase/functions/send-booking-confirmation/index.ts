@@ -162,7 +162,7 @@ const handler = async (req: Request): Promise<Response> => {
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Total Amount:</span>
-                  <span class="detail-value total">$${(totalPrice || 0).toFixed(2)}</span>
+                  <span class="detail-value total">Rs. ${(totalPrice || 0).toLocaleString()}</span>
                 </div>
               </div>
 
