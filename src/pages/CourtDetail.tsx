@@ -315,9 +315,9 @@ export default function CourtDetail() {
       ]);
 
       const dateStatus: { [key: string]: 'full' | 'partial' | 'available' } = {};
-      const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 6;
-      const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
-      const totalSlots = closingHour - openingHour;
+      const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 0;
+      const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 23;
+      const totalSlots = closingHour - openingHour + 1; // +1 because closing hour is inclusive
 
       const bookingsByDate: { [key: string]: number } = {};
       bookingsResult.data?.forEach(b => {
@@ -352,21 +352,29 @@ export default function CourtDetail() {
     }
   }, [courtId]);
 
+  // Helper function to parse time string (handles both HH:MM and HH:MM:SS formats)
+  const parseTimeHour = (timeStr: string | null | undefined, defaultHour: number): number => {
+    if (!timeStr) return defaultHour;
+    return parseInt(timeStr.split(':')[0]) || defaultHour;
+  };
+
+  // Check if court operates 24 hours (opening at 00:00 and closing at 23:00/23:59 or later)
+  const is24HourCourt = (): boolean => {
+    const opening = parseTimeHour(court?.opening_time, 0);
+    const closing = parseTimeHour(court?.closing_time, 23);
+    return opening === 0 && closing >= 23;
+  };
+
   // Generate time slots based on court's opening/closing hours
-  // If court closes at 23:00 (11 PM), last bookable slot starts at 23:00
+  // Last bookable slot is the closing hour (e.g., 23:00 slot if closing at 23:00)
   const generateTimeSlots = () => {
-    const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 0;
-    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 23;
+    const openingHour = parseTimeHour(court?.opening_time, 0);
+    const closingHour = parseTimeHour(court?.closing_time, 23);
     const slots: string[] = [];
     
-    // Handle 24-hour operation (00:00 to 23:59 or 00:00 to 00:00)
-    const is24Hours = court?.opening_time === '00:00' && (court?.closing_time === '23:59' || court?.closing_time === '00:00');
-    
-    // For regular courts: generate slots from opening to closing (inclusive)
-    // For 24-hour courts: generate all 24 slots (0-23)
-    const maxHour = is24Hours ? 23 : closingHour;
-    
-    for (let hour = openingHour; hour <= maxHour; hour++) {
+    // Generate slots from opening to closing (inclusive)
+    // For 24-hour courts (00:00 - 23:00), this creates 24 slots
+    for (let hour = openingHour; hour <= closingHour; hour++) {
       slots.push(`${hour.toString().padStart(2, '0')}:00`);
     }
     return slots;
@@ -403,17 +411,18 @@ export default function CourtDetail() {
   const isSlotAvailable = (startTime: string) => {
     const { endTime, isOvernight } = getEndTimeWithContext(startTime, selectedHours);
     
-    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
+    const closingHour = parseTimeHour(court?.closing_time, 23);
     const startHour = parseInt(startTime.split(':')[0]);
-    const is24Hours = court?.opening_time === '00:00' && (court?.closing_time === '23:59' || court?.closing_time === '00:00');
+    const is24Hours = is24HourCourt();
     
-    // For non-24h courts, check if booking would exceed closing time without being overnight
-    if (!is24Hours && !isOvernight) {
+    // For 24h courts, allow overnight bookings (e.g., 23:00 - 01:00)
+    // For non-24h courts, check if booking exceeds operating hours
+    if (!is24Hours) {
       const endHour = parseInt(endTime.split(':')[0]);
-      if (endHour > closingHour || (endHour === 0 && selectedHours < 24)) return false;
+      // If booking ends after closing and it's not an overnight wrap
+      if (!isOvernight && endHour > closingHour + 1) return false;
     }
     
-    // For 24-hour courts or overnight bookings, allow the booking
     // Check if any slot in the range is booked or blocked
     for (let i = 0; i < selectedHours; i++) {
       const checkStart = addHoursToTime(startTime, i);
@@ -557,8 +566,18 @@ export default function CourtDetail() {
 
   const getSlotStatus = (time: string) => {
     const hour = parseInt(time.split(':')[0]);
-    const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 22;
-    if (hour + selectedHours > closingHour) return { available: false, reason: 'Outside hours', hide: true };
+    const closingHour = parseTimeHour(court?.closing_time, 23);
+    const is24Hours = is24HourCourt();
+    
+    // For non-24h courts, hide slots that would extend beyond closing
+    // For 24h courts, allow overnight bookings
+    if (!is24Hours && selectedHours > 1) {
+      const endHour = (hour + selectedHours) % 24;
+      // If booking would exceed closing and doesn't wrap overnight
+      if (hour + selectedHours > closingHour + 1 && hour < closingHour) {
+        return { available: false, reason: 'Outside hours', hide: true };
+      }
+    }
     
     // Check if slot is in the past (for today)
     if (selectedDate && isToday(selectedDate)) {
