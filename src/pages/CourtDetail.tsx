@@ -700,9 +700,9 @@ export default function CourtDetail() {
               <Badge variant="secondary" className="text-xs sm:text-sm">{court.sport_type}</Badge>
               <Badge variant="outline" className="text-xs sm:text-sm flex items-center gap-1">
                 <Clock className="h-3 w-3" />
-                {court.opening_time === '00:00:00' && court.closing_time === '23:59:00' 
+                {is24HourCourt() 
                   ? 'Open 24 Hours' 
-                  : `${convertTo12Hour(court.opening_time || '06:00')} - ${convertTo12Hour(court.closing_time || '22:00')}`}
+                  : `${convertTo12Hour(court.opening_time || '00:00')} - ${convertTo12Hour(court.closing_time || '23:00')}`}
               </Badge>
               <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
                 <MapPin className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
