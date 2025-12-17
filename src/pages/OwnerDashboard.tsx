@@ -21,7 +21,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { XCircle, Info } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
-import { formatTimeSlot } from '@/lib/utils';
+import { formatTimeSlot12h } from '@/lib/utils';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -430,11 +430,11 @@ export default function OwnerDashboard() {
                     <div className="grid gap-2 text-sm mb-4">
                       <div>
                         <span className="font-medium">Customer:</span>{' '}
-                        {booking.profiles?.full_name || booking.profiles?.email}
+                        {booking.profiles?.full_name || booking.profiles?.email || 'N/A'}
                       </div>
                       <div>
                         <span className="font-medium">Time:</span>{' '}
-                        {formatTimeSlot(booking.start_time, booking.end_time)}
+                        {formatTimeSlot12h(booking.start_time, booking.end_time)}
                       </div>
                       <div>
                         <span className="font-medium">Amount:</span> {formatPrice(booking.total_price)}
@@ -706,7 +706,7 @@ export default function OwnerDashboard() {
                   <CardContent>
                     <div className="grid gap-2 text-sm">
                       <div>
-                        <span className="font-medium">Time:</span> {slot.start_time} - {slot.end_time}
+                        <span className="font-medium">Time:</span> {formatTimeSlot12h(slot.start_time, slot.end_time)}
                       </div>
                       {slot.reason && (
                         <div>
@@ -882,7 +882,7 @@ export default function OwnerDashboard() {
                       {rule.start_time && rule.end_time && (
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">Time:</span> {rule.start_time} - {rule.end_time}
+                          <span className="font-medium">Time:</span> {formatTimeSlot12h(rule.start_time, rule.end_time)}
                         </div>
                       )}
                       {rule.days_of_week && rule.days_of_week.length > 0 && (
