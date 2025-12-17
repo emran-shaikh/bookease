@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { formatTimeSlot12h } from '@/lib/utils';
 
 export default function ReviewPage() {
   const { bookingId } = useParams();
@@ -134,7 +135,7 @@ export default function ReviewPage() {
                     </p>
                     <p className="text-sm">
                       <span className="font-medium">Time:</span>{' '}
-                      {booking.start_time} - {booking.end_time}
+                      {formatTimeSlot12h(booking.start_time, booking.end_time)}
                     </p>
                   </div>
                 </div>

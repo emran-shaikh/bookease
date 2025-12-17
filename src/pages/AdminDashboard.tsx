@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
 import { CourtEditForm } from '@/components/CourtEditForm';
+import { formatTimeSlot12h } from '@/lib/utils';
 
 type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'amount-desc' | 'amount-asc' | 'status';
 
@@ -393,7 +394,7 @@ export default function AdminDashboard() {
                               <div className="text-xs text-muted-foreground">{booking.profiles?.email}</div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-sm">{booking.start_time} - {booking.end_time}</TableCell>
+                          <TableCell className="text-sm">{formatTimeSlot12h(booking.start_time, booking.end_time)}</TableCell>
                           <TableCell>{formatPrice(booking.total_price)}</TableCell>
                           <TableCell>
                             <Badge variant={booking.status === 'confirmed' ? 'default' : booking.status === 'cancelled' ? 'destructive' : 'secondary'}>

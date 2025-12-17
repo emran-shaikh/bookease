@@ -12,6 +12,7 @@ import { Loader2, Calendar, Star, User, Upload, Clock, AlertCircle } from 'lucid
 import { useToast } from '@/hooks/use-toast';
 import { format, addMinutes, isAfter } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
+import { formatTimeSlot12h } from '@/lib/utils';
 import { PaymentScreenshotUpload } from '@/components/PaymentScreenshotUpload';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -202,7 +203,7 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <span className="font-medium">Time:</span>{' '}
-                          {booking.start_time} - {booking.end_time}
+                          {formatTimeSlot12h(booking.start_time, booking.end_time)}
                         </div>
                         <div>
                           <span className="font-medium">Total:</span> {formatPrice(booking.total_price)}
@@ -298,7 +299,7 @@ export default function Dashboard() {
                       </div>
                       <div>
                         <span className="font-medium">Time:</span>{' '}
-                        {booking.start_time} - {booking.end_time}
+                        {formatTimeSlot12h(booking.start_time, booking.end_time)}
                       </div>
                       <div>
                         <span className="font-medium">Total:</span> {formatPrice(booking.total_price)}
