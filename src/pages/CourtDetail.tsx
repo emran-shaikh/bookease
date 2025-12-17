@@ -132,6 +132,12 @@ export default function CourtDetail() {
     }
   }
 
+  // Helper to normalize time to HH:MM format (strips seconds if present)
+  const normalizeTime = (time: string): string => {
+    const parts = time.split(':');
+    return `${parts[0]}:${parts[1]}`;
+  };
+
   async function fetchBookedSlots() {
     if (!selectedDate || !courtId) return;
 
@@ -156,8 +162,16 @@ export default function CourtDetail() {
       if (bookingsResult.error) throw bookingsResult.error;
       if (blockedResult.error) throw blockedResult.error;
 
-      const booked = bookingsResult.data?.map(b => `${b.start_time}-${b.end_time}`) || [];
-      const blockedTimes = blockedResult.data?.map(b => `${b.start_time}-${b.end_time}`) || [];
+      // Normalize time format to HH:MM (database stores HH:MM:SS)
+      const booked = bookingsResult.data?.map(b => 
+        `${normalizeTime(b.start_time)}-${normalizeTime(b.end_time)}`
+      ) || [];
+      const blockedTimes = blockedResult.data?.map(b => 
+        `${normalizeTime(b.start_time)}-${normalizeTime(b.end_time)}`
+      ) || [];
+      
+      console.log('Booked slots:', booked);
+      console.log('Blocked slots:', blockedTimes);
       
       setBookedSlots(booked);
       setBlockedSlots(blockedTimes);
