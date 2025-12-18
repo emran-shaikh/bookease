@@ -930,23 +930,23 @@ export default function CourtDetail() {
                       </div>
 
                       {/* Mobile view - with navigation arrows */}
-                      <div className="sm:hidden flex items-center gap-1 overflow-hidden">
+                      <div className="sm:hidden flex items-center gap-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="icon"
-                          className="shrink-0 h-8 w-8 rounded-full"
+                          className="shrink-0 h-9 w-9 rounded-full border-primary/30 bg-background shadow-sm"
                           onClick={() => {
                             if (mobileScrollRef.current) {
-                              mobileScrollRef.current.scrollBy({ left: -150, behavior: 'smooth' });
+                              mobileScrollRef.current.scrollBy({ left: -180, behavior: 'smooth' });
                             }
                           }}
                         >
-                          <ChevronLeft className="h-4 w-4" />
+                          <ChevronLeft className="h-5 w-5 text-primary" />
                         </Button>
                         
                         <div 
                           ref={mobileScrollRef}
-                          className="flex-1 min-w-0 overflow-x-auto overscroll-x-contain scrollbar-hide" 
+                          className="flex-1 overflow-x-auto snap-x snap-mandatory touch-pan-x hide-scrollbar" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
                             scrollbarWidth: 'none',
@@ -964,10 +964,10 @@ export default function CourtDetail() {
                                 <button
                                   key={dateStr}
                                   onClick={() => setSelectedDate(date)}
-                                  className={`flex flex-col items-center justify-center w-14 h-20 rounded-xl border-2 transition-all flex-shrink-0 ${
+                                  className={`flex flex-col items-center justify-center w-[56px] h-[76px] rounded-xl border-2 transition-all flex-shrink-0 snap-start ${
                                     isSelected
-                                      ? 'bg-primary text-primary-foreground border-primary shadow-lg'
-                                      : 'bg-card active:bg-muted border-border'
+                                      ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-105'
+                                      : 'bg-card active:bg-muted border-border active:border-primary/50'
                                   }`}
                                 >
                                   <span className={`text-[10px] font-medium ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
@@ -993,16 +993,16 @@ export default function CourtDetail() {
                         </div>
                         
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="icon"
-                          className="shrink-0 h-8 w-8 rounded-full"
+                          className="shrink-0 h-9 w-9 rounded-full border-primary/30 bg-background shadow-sm"
                           onClick={() => {
                             if (mobileScrollRef.current) {
-                              mobileScrollRef.current.scrollBy({ left: 150, behavior: 'smooth' });
+                              mobileScrollRef.current.scrollBy({ left: 180, behavior: 'smooth' });
                             }
                           }}
                         >
-                          <ChevronRight className="h-4 w-4" />
+                          <ChevronRight className="h-5 w-5 text-primary" />
                         </Button>
                       </div>
                     </div>
