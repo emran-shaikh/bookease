@@ -930,7 +930,7 @@ export default function CourtDetail() {
                       </div>
 
                       {/* Mobile view - with navigation arrows */}
-                      <div className="sm:hidden flex items-center gap-2">
+                      <div className="sm:hidden flex items-center gap-2 overflow-hidden">
                         <Button
                           variant="outline"
                           size="icon"
@@ -946,7 +946,7 @@ export default function CourtDetail() {
                         
                         <div 
                           ref={mobileScrollRef}
-                          className="flex-1 overflow-x-auto snap-x snap-mandatory touch-pan-x hide-scrollbar" 
+                          className="flex-1 min-w-0 overflow-x-auto snap-x snap-mandatory touch-pan-x hide-scrollbar" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
                             scrollbarWidth: 'none',
