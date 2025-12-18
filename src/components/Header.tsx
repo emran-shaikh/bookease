@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/hooks/useUserRole';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu, X } from 'lucide-react';
+import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 
 export function Header() {
@@ -25,6 +26,23 @@ export function Header() {
   const { role } = useUserRole();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchUserName() {
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', user.id)
+          .maybeSingle();
+        setUserName(data?.full_name || user.email?.split('@')[0] || null);
+      } else {
+        setUserName(null);
+      }
+    }
+    fetchUserName();
+  }, [user]);
 
   const getDashboardPath = () => {
     if (role === 'admin') return '/admin';
@@ -59,8 +77,9 @@ export function Header() {
               <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <User className="h-5 w-5" />
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <User className="h-4 w-4" />
+                    <span className="max-w-[100px] truncate">{userName}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -101,6 +120,12 @@ export function Header() {
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-2 mt-6">
+                {user && userName && (
+                  <div className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    {userName}
+                  </div>
+                )}
                 <Button
                   variant="ghost"
                   className="justify-start h-12 text-base"
