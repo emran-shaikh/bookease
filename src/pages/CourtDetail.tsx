@@ -1056,17 +1056,22 @@ export default function CourtDetail() {
                             <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                               {timeSlots
                                 .filter((time) => {
-                                  const hour = parseInt(time.split(':')[0]);
-                                  if (hour + selectedHours > 22) return false;
-                                  
+                                  const startHour = parseInt(time.split(':')[0]);
+                                  const closingHour = parseTimeHour(court?.closing_time, 23);
+                                  const is24Hours = is24HourCourt();
+
+                                  // For non-24h courts, don't allow selections that exceed the last generated slot hour
+                                  // (for 24h courts, allow late starts like 11 PM even if booking ends after midnight)
+                                  if (!is24Hours && startHour + (selectedHours - 1) > closingHour) return false;
+
                                   const slotStatus = getSlotStatus(time);
-                                  
+
                                   // Always hide past, booked, and blocked slots
                                   if (slotStatus.hide) return false;
-                                  
+
                                   // If filter is enabled, only show available slots
                                   if (showAvailableOnly && !slotStatus.available) return false;
-                                  
+
                                   return true;
                                 })
                                 .map((time) => {
