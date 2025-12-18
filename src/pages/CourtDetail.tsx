@@ -36,7 +36,25 @@ export default function CourtDetail() {
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [totalPrice, setTotalPrice] = useState<number | null>(null);
-  const [priceBreakdown, setPriceBreakdown] = useState<{ basePrice: number; multiplier: number; rules: string[] } | null>(null);
+  const [priceBreakdown, setPriceBreakdown] = useState<{
+    basePrice: number;
+    hourlyBreakdown: Array<{
+      hour: number;
+      startTime: string;
+      endTime: string;
+      multiplier: number;
+      hourPrice: number;
+      rules: string[];
+      isNextDay: boolean;
+    }>;
+    summary: {
+      normalHours: number;
+      normalTotal: number;
+      peakHours: number;
+      peakTotal: number;
+      appliedRules: string[];
+    };
+  } | null>(null);
   const [viewMode, setViewMode] = useState<'scroll' | 'calendar'>('scroll');
   const { toggleFavorite, isFavorite } = useFavorites(user?.id);
   const desktopScrollRef = useRef<HTMLDivElement>(null);
@@ -288,8 +306,14 @@ export default function CourtDetail() {
         setTotalPrice(isNaN(total) ? null : total);
         setPriceBreakdown({
           basePrice: parseFloat(response.data.basePrice) || court?.base_price || 0,
-          multiplier: response.data.priceMultiplier || 1,
-          rules: response.data.appliedRules || []
+          hourlyBreakdown: response.data.hourlyBreakdown || [],
+          summary: response.data.summary || {
+            normalHours: 0,
+            normalTotal: 0,
+            peakHours: 0,
+            peakTotal: 0,
+            appliedRules: []
+          }
         });
       }
     } catch (error) {
@@ -1135,11 +1159,14 @@ export default function CourtDetail() {
 
                           {selectedStartTime && totalPrice !== null && !isNaN(totalPrice) && (
                             <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-gradient-to-br from-primary/10 to-secondary/10 border-2 border-primary/20 rounded-lg sm:rounded-xl">
-                              <div className="flex justify-between items-center mb-2">
+                              <div className="flex justify-between items-center mb-3">
                                 <div>
                                   <div className="text-xs sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">Total Price</div>
                                   <div className="text-[10px] sm:text-xs text-muted-foreground">
                                     {convertTo12Hour(selectedStartTime)} - {convertTo12Hour(addHoursToTime(selectedStartTime, selectedHours))}
+                                    {priceBreakdown?.hourlyBreakdown?.some(h => h.isNextDay) && (
+                                      <span className="ml-1 text-amber-600">(overnight)</span>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary">
@@ -1147,21 +1174,62 @@ export default function CourtDetail() {
                                 </div>
                               </div>
                               
-                              {/* Price Breakdown */}
-                              {priceBreakdown && (
-                                <div className="pt-2 border-t border-primary/20 space-y-1">
-                                  <div className="flex justify-between text-[10px] sm:text-xs text-muted-foreground">
-                                    <span>Base: {formatPrice(priceBreakdown.basePrice)}/hr × {selectedHours}h</span>
-                                    <span>{formatPrice(priceBreakdown.basePrice * selectedHours)}</span>
+                              {/* Detailed Hourly Breakdown */}
+                              {priceBreakdown && priceBreakdown.hourlyBreakdown && priceBreakdown.hourlyBreakdown.length > 0 && (
+                                <div className="pt-3 border-t border-primary/20 space-y-2">
+                                  <div className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
+                                    Hourly Breakdown:
                                   </div>
-                                  {priceBreakdown.multiplier > 1 && priceBreakdown.rules.length > 0 && (
-                                    <div className="flex justify-between text-[10px] sm:text-xs">
-                                      <span className="text-amber-600 font-medium">
-                                        {priceBreakdown.rules.join(', ')}
-                                      </span>
-                                      <span className="text-amber-600 font-medium">
-                                        ×{priceBreakdown.multiplier.toFixed(1)}
-                                      </span>
+                                  
+                                  {/* Each hour row */}
+                                  <div className="space-y-1.5">
+                                    {priceBreakdown.hourlyBreakdown.map((hour, index) => (
+                                      <div 
+                                        key={index} 
+                                        className={`flex justify-between items-center text-[10px] sm:text-xs px-2 py-1.5 rounded ${
+                                          hour.multiplier > 1 
+                                            ? 'bg-amber-500/10 border border-amber-500/30' 
+                                            : 'bg-muted/50'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium">
+                                            Hour {hour.hour}: {convertTo12Hour(hour.startTime)} - {convertTo12Hour(hour.endTime)}
+                                            {hour.isNextDay && <span className="text-amber-600 ml-1">(next day)</span>}
+                                          </span>
+                                          {hour.multiplier > 1 && (
+                                            <span className="text-[9px] sm:text-[10px] px-1.5 py-0.5 bg-amber-500 text-white rounded font-bold">
+                                              {hour.multiplier.toFixed(1)}×
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-muted-foreground text-[9px] sm:text-[10px]">
+                                            {hour.rules[0]}
+                                          </span>
+                                          <span className={`font-bold ${hour.multiplier > 1 ? 'text-amber-600' : 'text-foreground'}`}>
+                                            {formatPrice(hour.hourPrice)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Summary section */}
+                                  {priceBreakdown.summary && (priceBreakdown.summary.normalHours > 0 || priceBreakdown.summary.peakHours > 0) && (
+                                    <div className="mt-3 pt-2 border-t border-primary/10 space-y-1">
+                                      {priceBreakdown.summary.normalHours > 0 && (
+                                        <div className="flex justify-between text-[10px] sm:text-xs text-muted-foreground">
+                                          <span>Standard Rate ({priceBreakdown.summary.normalHours}h × {formatPrice(priceBreakdown.basePrice)})</span>
+                                          <span>{formatPrice(priceBreakdown.summary.normalTotal)}</span>
+                                        </div>
+                                      )}
+                                      {priceBreakdown.summary.peakHours > 0 && (
+                                        <div className="flex justify-between text-[10px] sm:text-xs text-amber-600">
+                                          <span>Peak/Special Rate ({priceBreakdown.summary.peakHours}h)</span>
+                                          <span>{formatPrice(priceBreakdown.summary.peakTotal)}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>
