@@ -930,7 +930,7 @@ export default function CourtDetail() {
                       </div>
 
                       {/* Mobile view - with navigation arrows */}
-                      <div className="sm:hidden flex w-full items-center gap-2 overflow-hidden">
+                      <div className="sm:hidden flex w-full min-w-0 items-center gap-2 overflow-hidden">
                         <Button
                           variant="outline"
                           size="icon"
@@ -946,14 +946,14 @@ export default function CourtDetail() {
                         
                         <div 
                           ref={mobileScrollRef}
-                          className="flex-1 min-w-0 max-w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory touch-pan-x hide-scrollbar" 
+                          className="contain-x flex-1 min-w-0 max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-mandatory touch-pan-x hide-scrollbar"
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
                             scrollbarWidth: 'none',
                             msOverflowStyle: 'none'
                           }}
                         >
-                          <div className="flex gap-2 w-max px-1 py-1">
+                          <div className="inline-flex gap-2 min-w-max px-1 py-1">
                             {Array.from({ length: 30 }).map((_, index) => {
                               const date = addDays(startOfDay(new Date()), index);
                               const dateStr = format(date, 'yyyy-MM-dd');
