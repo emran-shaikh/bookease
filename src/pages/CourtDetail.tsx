@@ -651,7 +651,7 @@ export default function CourtDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <SEO 
         title={court ? `${court.name} - Book Now` : 'Court Details'}
         description={court ? `Book ${court.name} in ${court.city}. ${court.sport_type} court with real-time availability. ${court.description?.slice(0, 100) || ''}` : 'View court details and book your slot.'}
@@ -659,7 +659,7 @@ export default function CourtDetail() {
       />
       <Header />
       
-      <main className="container py-4 sm:py-6 md:py-8 px-4">
+      <main className="container py-4 sm:py-6 md:py-8 px-4 overflow-x-hidden">
         <div className="grid gap-4 sm:gap-6 md:gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="mb-4 sm:mb-6 relative">
@@ -834,8 +834,8 @@ export default function CourtDetail() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
-              {/* Date Selector with Toggle */}
-                <div>
+                {/* Date Selector with Toggle */}
+                <div className="w-full overflow-x-hidden">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <h3 className="text-sm sm:text-base md:text-lg font-semibold">Select a date</h3>
                     <div className="flex gap-1 p-1 bg-muted rounded-lg">
@@ -859,7 +859,7 @@ export default function CourtDetail() {
                   </div>
 
                   {viewMode === 'scroll' ? (
-                    <div className="relative">
+                    <div className="relative w-full overflow-hidden">
                       {/* Desktop view with arrows */}
                       <div className="hidden sm:flex items-center justify-between gap-2">
                         <Button
@@ -930,7 +930,7 @@ export default function CourtDetail() {
                       </div>
 
                       {/* Mobile view - with navigation arrows */}
-                      <div className="sm:hidden flex items-center gap-2 overflow-hidden">
+                      <div className="sm:hidden flex w-full items-center gap-2 overflow-hidden">
                         <Button
                           variant="outline"
                           size="icon"
@@ -946,7 +946,7 @@ export default function CourtDetail() {
                         
                         <div 
                           ref={mobileScrollRef}
-                          className="flex-1 min-w-0 overflow-x-auto snap-x snap-mandatory touch-pan-x hide-scrollbar" 
+                          className="flex-1 min-w-0 max-w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory touch-pan-x hide-scrollbar" 
                           style={{ 
                             WebkitOverflowScrolling: 'touch',
                             scrollbarWidth: 'none',
@@ -966,7 +966,7 @@ export default function CourtDetail() {
                                   onClick={() => setSelectedDate(date)}
                                   className={`flex flex-col items-center justify-center w-[56px] h-[76px] rounded-xl border-2 transition-all flex-shrink-0 snap-start ${
                                     isSelected
-                                      ? 'bg-primary text-primary-foreground border-primary shadow-lg scale-105'
+                                      ? 'bg-primary text-primary-foreground border-primary shadow-lg sm:scale-105'
                                       : 'bg-card active:bg-muted border-border active:border-primary/50'
                                   }`}
                                 >
