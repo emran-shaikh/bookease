@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
 import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, Filter, CalendarIcon, List } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +33,7 @@ export default function CourtDetail() {
   const [selectedHours, setSelectedHours] = useState(1);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
-  const [dateBookingStatus, setDateBookingStatus] = useState<{ [key: string]: 'full' | 'partial' | 'available' }>({});
+  const [dateBookingStatus, setDateBookingStatus] = useState<{ [key: string]: { status: 'full' | 'partial' | 'available'; availableSlots: number; totalSlots: number } }>({});
   const [slotPricing, setSlotPricing] = useState<{ [key: string]: { price: number; multiplier: number; rules: string[] } }>({});
   const [loadingPricing, setLoadingPricing] = useState(false);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
@@ -63,6 +64,49 @@ export default function CourtDetail() {
   const mobileScrollRef = useRef<HTMLDivElement>(null);
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(courtId || '', selectedDate || null);
+
+  // Custom Day component with tooltip for partially booked days
+  const DayWithTooltip = (props: any) => {
+    const { date, displayMonth, ...rest } = props;
+    
+    // Only render if date exists and belongs to the current display month
+    if (!date) return null;
+    
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const bookingData = dateBookingStatus[dateStr];
+    const isPartiallyBooked = bookingData?.status === 'partial';
+    
+    // Check if this day is in the current display month
+    const isOutsideMonth = displayMonth && date.getMonth() !== displayMonth.getMonth();
+    
+    const dayButton = (
+      <button
+        {...rest}
+        className={rest.className}
+        onClick={rest.onClick}
+        disabled={rest.disabled}
+        aria-selected={rest['aria-selected']}
+        tabIndex={rest.tabIndex}
+      >
+        {date.getDate()}
+      </button>
+    );
+
+    if (isPartiallyBooked && bookingData && !isOutsideMonth) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {dayButton}
+          </TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            <p>{bookingData.availableSlots} of {bookingData.totalSlots} slots available</p>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return dayButton;
+  };
 
   useEffect(() => {
     // On mobile we only show the calendar view (no horizontal date list)
@@ -361,7 +405,7 @@ export default function CourtDetail() {
           .lte('date', nextMonthStr)
       ]);
 
-      const dateStatus: { [key: string]: 'full' | 'partial' | 'available' } = {};
+      const dateStatus: { [key: string]: { status: 'full' | 'partial' | 'available'; availableSlots: number; totalSlots: number } } = {};
       const openingHour = court?.opening_time ? parseInt(court.opening_time.split(':')[0]) : 0;
       const closingHour = court?.closing_time ? parseInt(court.closing_time.split(':')[0]) : 23;
       const totalSlots = closingHour - openingHour + 1; // +1 because closing hour is inclusive
@@ -378,12 +422,13 @@ export default function CourtDetail() {
       });
 
       Object.entries(bookingsByDate).forEach(([date, count]) => {
+        const availableSlots = Math.max(0, totalSlots - count);
         if (count >= totalSlots) {
-          dateStatus[date] = 'full';
+          dateStatus[date] = { status: 'full', availableSlots: 0, totalSlots };
         } else if (count > 0) {
-          dateStatus[date] = 'partial';
+          dateStatus[date] = { status: 'partial', availableSlots, totalSlots };
         } else {
-          dateStatus[date] = 'available';
+          dateStatus[date] = { status: 'available', availableSlots: totalSlots, totalSlots };
         }
       });
 
@@ -869,25 +914,30 @@ export default function CourtDetail() {
 
                   {/* Mobile: calendar only */}
                   <div className="flex flex-col items-center sm:hidden">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => date && setSelectedDate(date)}
-                      disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
-                      className="rounded-md border pointer-events-auto"
-                      modifiers={{
-                        full: Object.entries(dateBookingStatus)
-                          .filter(([_, status]) => status === 'full')
-                          .map(([date]) => new Date(date)),
-                        partial: Object.entries(dateBookingStatus)
-                          .filter(([_, status]) => status === 'partial')
-                          .map(([date]) => new Date(date)),
-                      }}
-                      modifiersStyles={{
-                        full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
-                        partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
-                      }}
-                    />
+                    <TooltipProvider>
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
+                        className="rounded-md border pointer-events-auto"
+                        modifiers={{
+                          full: Object.entries(dateBookingStatus)
+                            .filter(([_, data]) => data.status === 'full')
+                            .map(([date]) => new Date(date)),
+                          partial: Object.entries(dateBookingStatus)
+                            .filter(([_, data]) => data.status === 'partial')
+                            .map(([date]) => new Date(date)),
+                        }}
+                        modifiersStyles={{
+                          full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
+                          partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
+                        }}
+                        components={{
+                          Day: DayWithTooltip,
+                        }}
+                      />
+                    </TooltipProvider>
                     {/* Legend */}
                     <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5">
@@ -904,25 +954,30 @@ export default function CourtDetail() {
                   {/* Desktop/tablet: user can toggle */}
                   {viewMode === 'calendar' ? (
                     <div className="hidden flex-col items-center sm:flex">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => date && setSelectedDate(date)}
-                        disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
-                        className="rounded-md border pointer-events-auto"
-                        modifiers={{
-                          full: Object.entries(dateBookingStatus)
-                            .filter(([_, status]) => status === 'full')
-                            .map(([date]) => new Date(date)),
-                          partial: Object.entries(dateBookingStatus)
-                            .filter(([_, status]) => status === 'partial')
-                            .map(([date]) => new Date(date)),
-                        }}
-                        modifiersStyles={{
-                          full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
-                          partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
-                        }}
-                      />
+                      <TooltipProvider>
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => date && setSelectedDate(date)}
+                          disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
+                          className="rounded-md border pointer-events-auto"
+                          modifiers={{
+                            full: Object.entries(dateBookingStatus)
+                              .filter(([_, data]) => data.status === 'full')
+                              .map(([date]) => new Date(date)),
+                            partial: Object.entries(dateBookingStatus)
+                              .filter(([_, data]) => data.status === 'partial')
+                              .map(([date]) => new Date(date)),
+                          }}
+                          modifiersStyles={{
+                            full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
+                            partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
+                          }}
+                          components={{
+                            Day: DayWithTooltip,
+                          }}
+                        />
+                      </TooltipProvider>
                       {/* Legend */}
                       <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1.5">
@@ -982,7 +1037,7 @@ export default function CourtDetail() {
                                   {status && !isSelected && (
                                     <div className="mt-1">
                                       <div className={`h-1.5 w-1.5 rounded-full ${
-                                        status === 'full' ? 'bg-destructive' : 'bg-warning'
+                                        status.status === 'full' ? 'bg-destructive' : 'bg-warning'
                                       }`} />
                                     </div>
                                   )}
