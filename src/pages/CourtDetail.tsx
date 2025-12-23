@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useSlotLock } from '@/hooks/useSlotLock';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Header } from '@/components/Header';
 import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,12 +56,20 @@ export default function CourtDetail() {
       appliedRules: string[];
     };
   } | null>(null);
-  const [viewMode, setViewMode] = useState<'scroll' | 'calendar'>('scroll');
+  const isMobile = useIsMobile();
+  const [viewMode, setViewMode] = useState<'scroll' | 'calendar'>(() => (isMobile ? 'calendar' : 'scroll'));
   const { toggleFavorite, isFavorite } = useFavorites(user?.id);
   const desktopScrollRef = useRef<HTMLDivElement>(null);
   const mobileScrollRef = useRef<HTMLDivElement>(null);
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(courtId || '', selectedDate || null);
+
+  useEffect(() => {
+    // On mobile we only show the calendar view (no horizontal date list)
+    if (isMobile && viewMode !== 'calendar') {
+      setViewMode('calendar');
+    }
+  }, [isMobile, viewMode]);
 
   useEffect(() => {
     if (slug) {
@@ -838,7 +847,7 @@ export default function CourtDetail() {
                 <div className="w-full min-w-0 overflow-x-hidden">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <h3 className="text-sm sm:text-base md:text-lg font-semibold">Select a date</h3>
-                    <div className="flex gap-1 p-1 bg-muted rounded-lg">
+                    <div className="hidden sm:flex gap-1 p-1 bg-muted rounded-lg">
                       <Button
                         variant={viewMode === 'scroll' ? 'default' : 'ghost'}
                         size="sm"
@@ -858,8 +867,54 @@ export default function CourtDetail() {
                     </div>
                   </div>
 
-                  {viewMode === 'scroll' ? (
-                    <div className="relative w-full overflow-hidden">
+                  {/* Mobile: calendar only */}
+                  <div className="flex justify-center sm:hidden">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => date && setSelectedDate(date)}
+                      disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
+                      className="rounded-md border pointer-events-auto"
+                      modifiers={{
+                        full: Object.entries(dateBookingStatus)
+                          .filter(([_, status]) => status === 'full')
+                          .map(([date]) => new Date(date)),
+                        partial: Object.entries(dateBookingStatus)
+                          .filter(([_, status]) => status === 'partial')
+                          .map(([date]) => new Date(date)),
+                      }}
+                      modifiersStyles={{
+                        full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
+                        partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
+                      }}
+                    />
+                  </div>
+
+                  {/* Desktop/tablet: user can toggle */}
+                  {viewMode === 'calendar' ? (
+                    <div className="hidden justify-center sm:flex">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(date) => date && setSelectedDate(date)}
+                        disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
+                        className="rounded-md border pointer-events-auto"
+                        modifiers={{
+                          full: Object.entries(dateBookingStatus)
+                            .filter(([_, status]) => status === 'full')
+                            .map(([date]) => new Date(date)),
+                          partial: Object.entries(dateBookingStatus)
+                            .filter(([_, status]) => status === 'partial')
+                            .map(([date]) => new Date(date)),
+                        }}
+                        modifiersStyles={{
+                          full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
+                          partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="relative hidden w-full overflow-hidden sm:block">
                       {/* Desktop view with arrows */}
                       <div className="hidden sm:flex items-center justify-between gap-2">
                         <Button
@@ -929,104 +984,7 @@ export default function CourtDetail() {
                         </Button>
                       </div>
 
-                      {/* Mobile view - with navigation arrows */}
-                      <div className="sm:hidden flex w-full min-w-0 items-center gap-2 overflow-hidden">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="shrink-0 h-9 w-9 rounded-full border-primary/30 bg-background shadow-sm"
-                          onClick={() => {
-                            if (mobileScrollRef.current) {
-                              mobileScrollRef.current.scrollBy({ left: -180, behavior: 'smooth' });
-                            }
-                          }}
-                        >
-                          <ChevronLeft className="h-5 w-5 text-primary" />
-                        </Button>
-                        
-                        <div 
-                          ref={mobileScrollRef}
-                          className="contain-x flex-1 min-w-0 max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain snap-x snap-mandatory touch-pan-x hide-scrollbar"
-                          style={{ 
-                            WebkitOverflowScrolling: 'touch',
-                            scrollbarWidth: 'none',
-                            msOverflowStyle: 'none'
-                          }}
-                        >
-                          <div className="inline-flex gap-2 min-w-max px-1 py-1">
-                            {Array.from({ length: 30 }).map((_, index) => {
-                              const date = addDays(startOfDay(new Date()), index);
-                              const dateStr = format(date, 'yyyy-MM-dd');
-                              const isSelected = selectedDate && format(selectedDate, 'yyyy-MM-dd') === dateStr;
-                              const status = dateBookingStatus[dateStr];
-                              
-                              return (
-                                <button
-                                  key={dateStr}
-                                  onClick={() => setSelectedDate(date)}
-                                  className={`flex flex-col items-center justify-center w-[56px] h-[76px] rounded-xl border-2 transition-all flex-shrink-0 snap-start ${
-                                    isSelected
-                                      ? 'bg-primary text-primary-foreground border-primary shadow-lg sm:scale-105'
-                                      : 'bg-card active:bg-muted border-border active:border-primary/50'
-                                  }`}
-                                >
-                                  <span className={`text-[10px] font-medium ${isSelected ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
-                                    {format(date, 'EEE')}
-                                  </span>
-                                  <span className={`text-lg font-bold leading-tight ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
-                                    {format(date, 'd')}
-                                  </span>
-                                  <span className={`text-[10px] ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                                    {format(date, 'MMM')}
-                                  </span>
-                                  {status && !isSelected && (
-                                    <div className="mt-0.5">
-                                      <div className={`h-1.5 w-1.5 rounded-full ${
-                                        status === 'full' ? 'bg-destructive' : 'bg-warning'
-                                      }`} />
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="shrink-0 h-9 w-9 rounded-full border-primary/30 bg-background shadow-sm"
-                          onClick={() => {
-                            if (mobileScrollRef.current) {
-                              mobileScrollRef.current.scrollBy({ left: 180, behavior: 'smooth' });
-                            }
-                          }}
-                        >
-                          <ChevronRight className="h-5 w-5 text-primary" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-center">
-                      <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={(date) => date && setSelectedDate(date)}
-                        disabled={(date) => isBefore(date, startOfDay(new Date())) && !isToday(date)}
-                        className="rounded-md border pointer-events-auto"
-                        modifiers={{
-                          full: Object.entries(dateBookingStatus)
-                            .filter(([_, status]) => status === 'full')
-                            .map(([date]) => new Date(date)),
-                          partial: Object.entries(dateBookingStatus)
-                            .filter(([_, status]) => status === 'partial')
-                            .map(([date]) => new Date(date)),
-                        }}
-                        modifiersStyles={{
-                          full: { backgroundColor: 'hsl(var(--destructive) / 0.2)' },
-                          partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
-                        }}
-                      />
+                      {/* Mobile scroll view removed (calendar-only on mobile) */}
                     </div>
                   )}
                 </div>
