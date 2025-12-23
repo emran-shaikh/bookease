@@ -835,7 +835,7 @@ export default function CourtDetail() {
               </CardHeader>
               <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6">
                 {/* Date Selector with Toggle */}
-                <div className="w-full overflow-x-hidden">
+                <div className="w-full min-w-0 overflow-x-hidden">
                   <div className="flex items-center justify-between mb-3 sm:mb-4">
                     <h3 className="text-sm sm:text-base md:text-lg font-semibold">Select a date</h3>
                     <div className="flex gap-1 p-1 bg-muted rounded-lg">
