@@ -868,7 +868,7 @@ export default function CourtDetail() {
                   </div>
 
                   {/* Mobile: calendar only */}
-                  <div className="flex justify-center sm:hidden">
+                  <div className="flex flex-col items-center sm:hidden">
                     <Calendar
                       mode="single"
                       selected={selectedDate}
@@ -888,11 +888,22 @@ export default function CourtDetail() {
                         partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
                       }}
                     />
+                    {/* Legend */}
+                    <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-3 w-3 rounded-sm bg-destructive/20 border border-destructive/30" />
+                        <span>Fully Booked</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="h-3 w-3 rounded-sm bg-warning/20 border border-warning/30" />
+                        <span>Partially Booked</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Desktop/tablet: user can toggle */}
                   {viewMode === 'calendar' ? (
-                    <div className="hidden justify-center sm:flex">
+                    <div className="hidden flex-col items-center sm:flex">
                       <Calendar
                         mode="single"
                         selected={selectedDate}
@@ -912,6 +923,17 @@ export default function CourtDetail() {
                           partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
                         }}
                       />
+                      {/* Legend */}
+                      <div className="flex items-center justify-center gap-4 mt-3 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-3 w-3 rounded-sm bg-destructive/20 border border-destructive/30" />
+                          <span>Fully Booked</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-3 w-3 rounded-sm bg-warning/20 border border-warning/30" />
+                          <span>Partially Booked</span>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="relative hidden w-full overflow-hidden sm:block">
