@@ -32,6 +32,7 @@
   /* Prevent horizontal overflow from internal scrollers on mobile */
   .contain-x {
     contain: layout paint;
+    max-width: 100%;
   }
 }
 
