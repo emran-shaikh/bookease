@@ -65,47 +65,34 @@ export default function CourtDetail() {
   
   const { isSlotLocked, lockSlot, getCurrentUserLock } = useSlotLock(courtId || '', selectedDate || null);
 
-  // Custom Day component with tooltip for partially booked days
-  const DayWithTooltip = (props: any) => {
-    const { date, displayMonth, ...rest } = props;
-    
-    // Only render if date exists and belongs to the current display month
+  // Tooltip content for partially booked days (without overriding the Day button)
+  const DayContentWithTooltip = (props: any) => {
+    const { date, displayMonth } = props;
+
     if (!date) return null;
-    
+
     const dateStr = format(date, 'yyyy-MM-dd');
     const bookingData = dateBookingStatus[dateStr];
     const isPartiallyBooked = bookingData?.status === 'partial';
-    
-    // Check if this day is in the current display month
+
     const isOutsideMonth = displayMonth && date.getMonth() !== displayMonth.getMonth();
-    
-    const dayButton = (
-      <button
-        {...rest}
-        className={rest.className}
-        onClick={rest.onClick}
-        disabled={rest.disabled}
-        aria-selected={rest['aria-selected']}
-        tabIndex={rest.tabIndex}
-      >
-        {date.getDate()}
-      </button>
-    );
+
+    const content = <span>{date.getDate()}</span>;
 
     if (isPartiallyBooked && bookingData && !isOutsideMonth) {
       return (
         <Tooltip>
-          <TooltipTrigger asChild>
-            {dayButton}
-          </TooltipTrigger>
+          <TooltipTrigger asChild>{content}</TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
-            <p>{bookingData.availableSlots} of {bookingData.totalSlots} slots available</p>
+            <p>
+              {bookingData.availableSlots} of {bookingData.totalSlots} slots available
+            </p>
           </TooltipContent>
         </Tooltip>
       );
     }
 
-    return dayButton;
+    return content;
   };
 
   useEffect(() => {
@@ -934,7 +921,7 @@ export default function CourtDetail() {
                           partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
                         }}
                         components={{
-                          Day: DayWithTooltip,
+                          DayContent: DayContentWithTooltip,
                         }}
                       />
                     </TooltipProvider>
@@ -974,7 +961,7 @@ export default function CourtDetail() {
                             partial: { backgroundColor: 'hsl(var(--warning) / 0.2)' },
                           }}
                           components={{
-                            Day: DayWithTooltip,
+                            DayContent: DayContentWithTooltip,
                           }}
                         />
                       </TooltipProvider>
