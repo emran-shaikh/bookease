@@ -38,6 +38,7 @@ export default function OwnerDashboard() {
   const [showPricingForm, setShowPricingForm] = useState(false);
   const [editingCourt, setEditingCourt] = useState<any>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingPricingRule, setEditingPricingRule] = useState<any>(null);
 
   // Block slot form state
   const [blockSlotData, setBlockSlotData] = useState({
@@ -194,6 +195,70 @@ export default function OwnerDashboard() {
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
+  }
+
+  function handleEditPricingRule(rule: any) {
+    setEditingPricingRule(rule);
+    setPricingData({
+      court_id: rule.court_id,
+      rule_type: rule.rule_type,
+      price_multiplier: rule.price_multiplier.toString(),
+      start_time: rule.start_time || '',
+      end_time: rule.end_time || '',
+      days_of_week: rule.days_of_week || [],
+      specific_date: rule.specific_date || '',
+    });
+    setShowPricingForm(true);
+  }
+
+  async function handleUpdatePricing(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingPricingRule) return;
+
+    try {
+      if (!pricingData.start_time || !pricingData.end_time) {
+        toast({ title: 'Error', description: 'Please select start and end time', variant: 'destructive' });
+        return;
+      }
+
+      if (pricingData.rule_type === 'special' && !pricingData.specific_date) {
+        toast({ title: 'Error', description: 'Please select a date for special pricing', variant: 'destructive' });
+        return;
+      }
+
+      if (pricingData.rule_type === 'peak_hours' && pricingData.days_of_week.length === 0) {
+        toast({ title: 'Error', description: 'Please select at least one day for peak hours', variant: 'destructive' });
+        return;
+      }
+
+      const { error } = await supabase.from('pricing_rules').update({
+        court_id: pricingData.court_id,
+        rule_type: pricingData.rule_type,
+        price_multiplier: parseFloat(pricingData.price_multiplier),
+        start_time: pricingData.start_time,
+        end_time: pricingData.end_time,
+        days_of_week: pricingData.rule_type === 'peak_hours' && pricingData.days_of_week.length > 0 ? pricingData.days_of_week : null,
+        specific_date: pricingData.rule_type === 'special' ? pricingData.specific_date : null,
+      }).eq('id', editingPricingRule.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Pricing rule updated successfully' });
+      setShowPricingForm(false);
+      setEditingPricingRule(null);
+      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [], specific_date: '' });
+      fetchOwnerData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  }
+
+  function handleClosePricingForm(open: boolean) {
+    if (!open) {
+      setEditingPricingRule(null);
+      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [], specific_date: '' });
+    }
+    setShowPricingForm(open);
   }
 
   async function handleEditCourt(court: any) {
@@ -778,7 +843,7 @@ export default function OwnerDashboard() {
 
           <TabsContent value="pricing" className="space-y-4">
             <div className="flex justify-end mb-4">
-              <Dialog open={showPricingForm} onOpenChange={setShowPricingForm}>
+              <Dialog open={showPricingForm} onOpenChange={handleClosePricingForm}>
                 <DialogTrigger asChild>
                   <Button>
                     <Clock className="mr-2 h-4 w-4" />
@@ -787,9 +852,9 @@ export default function OwnerDashboard() {
                 </DialogTrigger>
                 <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Create Pricing Rule</DialogTitle>
+                    <DialogTitle>{editingPricingRule ? 'Edit Pricing Rule' : 'Create Pricing Rule'}</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={handleCreatePricing} className="space-y-4">
+                  <form onSubmit={editingPricingRule ? handleUpdatePricing : handleCreatePricing} className="space-y-4">
                     <div>
                       <Label>Court</Label>
                       <Select value={pricingData.court_id} onValueChange={(value) => setPricingData({...pricingData, court_id: value})}>
@@ -932,7 +997,9 @@ export default function OwnerDashboard() {
                       </div>
                     )}
                     
-                    <Button type="submit" className="w-full">Create Pricing Rule</Button>
+                    <Button type="submit" className="w-full">
+                      {editingPricingRule ? 'Update Pricing Rule' : 'Create Pricing Rule'}
+                    </Button>
                   </form>
                 </DialogContent>
               </Dialog>
@@ -961,9 +1028,14 @@ export default function OwnerDashboard() {
                           {rule.rule_type.replace('_', ' ')}
                         </CardDescription>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => deletePricingRule(rule.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleEditPricingRule(rule)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => deletePricingRule(rule.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
