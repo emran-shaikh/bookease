@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, CheckCircle, XCircle, Users, Building2, Calendar, CreditCard, ArrowUpDown, Edit } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Users, Building2, Calendar, CreditCard, ArrowUpDown, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -155,6 +155,22 @@ export default function AdminDashboard() {
         description: error.message,
         variant: 'destructive',
       });
+    }
+  }
+
+  async function handleDeleteCourt(courtId: string) {
+    if (!confirm('Are you sure you want to delete this court? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('courts').delete().eq('id', courtId);
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Court deleted successfully' });
+      fetchAdminData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   }
 
@@ -565,17 +581,27 @@ export default function AdminDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setEditingCourt(court);
-                              setShowEditDialog(true);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingCourt(court);
+                                setShowEditDialog(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteCourt(court.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
