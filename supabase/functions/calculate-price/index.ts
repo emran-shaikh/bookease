@@ -55,13 +55,6 @@ const validatePriceRequest = (data: any) => {
   }
 };
 
-// Add hours to a time string
-const addHoursToTime = (time: string, hoursToAdd: number): string => {
-  const [h, m] = time.split(':').map(Number);
-  const newHours = (h + hoursToAdd) % 24;
-  return `${newHours.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
-};
-
 // Get the date for a specific hour slot (handles overnight bookings)
 const getDateForHourSlot = (baseDate: Date, startTime: string, hourIndex: number): { date: Date; dateStr: string; dayOfWeek: number } => {
   const startHour = parseInt(startTime.split(':')[0]);
@@ -78,6 +71,22 @@ const getDateForHourSlot = (baseDate: Date, startTime: string, hourIndex: number
     dateStr: date.toISOString().split('T')[0],
     dayOfWeek: date.getDay()
   };
+};
+
+// Check if a given hour falls within a time range (handles overnight ranges)
+const isHourInTimeRange = (hour: number, startTime: string | null, endTime: string | null): boolean => {
+  if (!startTime || !endTime) return true; // No time restriction
+  
+  const startHour = parseInt(startTime.split(':')[0]);
+  const endHour = parseInt(endTime.split(':')[0]);
+  
+  // Handle overnight time ranges (e.g., 22:00 to 06:00)
+  if (endHour <= startHour) {
+    return hour >= startHour || hour < endHour;
+  }
+  
+  // Normal time range
+  return hour >= startHour && hour < endHour;
 };
 
 // Calculate price for a single hour slot
@@ -112,49 +121,85 @@ const calculateHourPrice = (
   let priceMultiplier = 1.0;
   const appliedRules: string[] = [];
 
-  // Check peak hours rules
+  // Priority order: special_date > holiday > peak_hours > weekend > custom
+  let highestPriorityRule: { multiplier: number; priority: number; label: string } | null = null;
+
   for (const rule of pricingRules) {
-    if (rule.rule_type === 'peak_hours') {
-      const ruleStart = rule.start_time?.split(':')[0];
-      const ruleEnd = rule.end_time?.split(':')[0];
-      
-      if (ruleStart && ruleEnd) {
-        const ruleStartHour = parseInt(ruleStart);
-        const ruleEndHour = parseInt(ruleEnd);
-        const matchesDay = rule.days_of_week && rule.days_of_week.includes(dayOfWeek);
-        
-        // Check if this hour falls within peak hours
-        if (matchesDay && actualHour >= ruleStartHour && actualHour < ruleEndHour) {
-          if (Number(rule.price_multiplier) > priceMultiplier) {
-            priceMultiplier = Number(rule.price_multiplier);
-            appliedRules.length = 0; // Clear previous rules if higher multiplier found
-            appliedRules.push(`Peak Hour (${rule.price_multiplier}x)`);
-          }
+    let matchesRule = false;
+    let priority = 0;
+    let label = '';
+
+    if (rule.rule_type === 'special' && rule.specific_date) {
+      // Special date pricing - highest priority for court-specific special dates
+      if (rule.specific_date === dateStr) {
+        const matchesTime = isHourInTimeRange(actualHour, rule.start_time, rule.end_time);
+        if (matchesTime) {
+          matchesRule = true;
+          priority = 100; // Highest priority
+          label = `Special Date (${rule.price_multiplier}x)`;
         }
       }
+    } else if (rule.rule_type === 'peak_hours') {
+      // Peak hours - check time range AND day of week
+      const matchesDay = !rule.days_of_week || rule.days_of_week.length === 0 || rule.days_of_week.includes(dayOfWeek);
+      const matchesTime = isHourInTimeRange(actualHour, rule.start_time, rule.end_time);
+      
+      if (matchesDay && matchesTime) {
+        matchesRule = true;
+        priority = 30;
+        label = `Peak Hour (${rule.price_multiplier}x)`;
+      }
     } else if (rule.rule_type === 'weekend') {
+      // Weekend pricing - check if weekend AND optional time range
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      if (isWeekend && Number(rule.price_multiplier) > priceMultiplier) {
-        priceMultiplier = Number(rule.price_multiplier);
-        appliedRules.length = 0;
-        appliedRules.push(`Weekend (${rule.price_multiplier}x)`);
+      const matchesTime = isHourInTimeRange(actualHour, rule.start_time, rule.end_time);
+      
+      if (isWeekend && matchesTime) {
+        matchesRule = true;
+        priority = 20;
+        label = `Weekend (${rule.price_multiplier}x)`;
       }
     } else if (rule.rule_type === 'custom') {
+      // Custom rules - check day of week AND optional time range
       const matchesDay = rule.days_of_week && rule.days_of_week.includes(dayOfWeek);
-      if (matchesDay && Number(rule.price_multiplier) > priceMultiplier) {
-        priceMultiplier = Number(rule.price_multiplier);
-        appliedRules.length = 0;
-        appliedRules.push(`Custom (${rule.price_multiplier}x)`);
+      const matchesTime = isHourInTimeRange(actualHour, rule.start_time, rule.end_time);
+      
+      if (matchesDay && matchesTime) {
+        matchesRule = true;
+        priority = 10;
+        label = `Custom (${rule.price_multiplier}x)`;
+      }
+    }
+
+    if (matchesRule) {
+      const ruleMultiplier = Number(rule.price_multiplier);
+      // Use higher priority rule, or higher multiplier if same priority
+      if (!highestPriorityRule || 
+          priority > highestPriorityRule.priority || 
+          (priority === highestPriorityRule.priority && ruleMultiplier > highestPriorityRule.multiplier)) {
+        highestPriorityRule = { multiplier: ruleMultiplier, priority, label };
       }
     }
   }
 
-  // Check for holidays
+  // Apply the highest priority rule if found
+  if (highestPriorityRule) {
+    priceMultiplier = highestPriorityRule.multiplier;
+    appliedRules.push(highestPriorityRule.label);
+  }
+
+  // Check for global holidays (from holidays table) - priority 50, between special date and peak hours
   const holiday = holidays.get(dateStr);
-  if (holiday && Number(holiday.price_multiplier) > priceMultiplier) {
-    priceMultiplier = Number(holiday.price_multiplier);
-    appliedRules.length = 0;
-    appliedRules.push(`Holiday: ${holiday.name} (${holiday.price_multiplier}x)`);
+  if (holiday) {
+    const holidayMultiplier = Number(holiday.price_multiplier);
+    // Holiday from global table has priority 50
+    if (!highestPriorityRule || highestPriorityRule.priority < 50) {
+      if (holidayMultiplier > priceMultiplier) {
+        priceMultiplier = holidayMultiplier;
+        appliedRules.length = 0;
+        appliedRules.push(`Holiday: ${holiday.name} (${holiday.price_multiplier}x)`);
+      }
+    }
   }
 
   return {

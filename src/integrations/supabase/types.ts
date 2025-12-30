@@ -316,6 +316,7 @@ export type Database = {
           is_active: boolean
           price_multiplier: number
           rule_type: string
+          specific_date: string | null
           start_time: string | null
         }
         Insert: {
@@ -328,6 +329,7 @@ export type Database = {
           is_active?: boolean
           price_multiplier?: number
           rule_type: string
+          specific_date?: string | null
           start_time?: string | null
         }
         Update: {
@@ -340,6 +342,7 @@ export type Database = {
           is_active?: boolean
           price_multiplier?: number
           rule_type?: string
+          specific_date?: string | null
           start_time?: string | null
         }
         Relationships: [
