@@ -56,6 +56,15 @@ export default function OwnerDashboard() {
     start_time: '',
     end_time: '',
     days_of_week: [] as number[],
+    specific_date: '',
+  });
+
+  // Generate hour options for time selection (0-23 hours only)
+  const hourOptions = Array.from({ length: 24 }, (_, i) => {
+    const hour = i.toString().padStart(2, '0');
+    const period = i < 12 ? 'AM' : 'PM';
+    const displayHour = i === 0 ? 12 : i > 12 ? i - 12 : i;
+    return { value: `${hour}:00`, label: `${displayHour}:00 ${period}` };
   });
 
   useEffect(() => {
@@ -127,19 +136,38 @@ export default function OwnerDashboard() {
   async function handleCreatePricing(e: React.FormEvent) {
     e.preventDefault();
     try {
+      // Validate time selection for all rule types
+      if (!pricingData.start_time || !pricingData.end_time) {
+        toast({ title: 'Error', description: 'Please select start and end time', variant: 'destructive' });
+        return;
+      }
+
+      // Validate specific date for special rule type
+      if (pricingData.rule_type === 'special' && !pricingData.specific_date) {
+        toast({ title: 'Error', description: 'Please select a date for special pricing', variant: 'destructive' });
+        return;
+      }
+
+      // Validate days selection for peak_hours
+      if (pricingData.rule_type === 'peak_hours' && pricingData.days_of_week.length === 0) {
+        toast({ title: 'Error', description: 'Please select at least one day for peak hours', variant: 'destructive' });
+        return;
+      }
+
       const { error } = await supabase.from('pricing_rules').insert([{
         court_id: pricingData.court_id,
         rule_type: pricingData.rule_type,
         price_multiplier: parseFloat(pricingData.price_multiplier),
-        start_time: pricingData.start_time || null,
-        end_time: pricingData.end_time || null,
-        days_of_week: pricingData.days_of_week.length > 0 ? pricingData.days_of_week : null,
+        start_time: pricingData.start_time,
+        end_time: pricingData.end_time,
+        days_of_week: pricingData.rule_type === 'peak_hours' && pricingData.days_of_week.length > 0 ? pricingData.days_of_week : null,
+        specific_date: pricingData.rule_type === 'special' ? pricingData.specific_date : null,
       }]);
       if (error) throw error;
 
       toast({ title: 'Success', description: 'Pricing rule created successfully' });
       setShowPricingForm(false);
-      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [] });
+      setPricingData({ court_id: '', rule_type: 'peak_hours', price_multiplier: '1.5', start_time: '', end_time: '', days_of_week: [], specific_date: '' });
       fetchOwnerData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -663,11 +691,39 @@ export default function OwnerDashboard() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Start Time</Label>
-                        <Input type="time" value={blockSlotData.start_time} onChange={(e) => setBlockSlotData({...blockSlotData, start_time: e.target.value})} required />
+                        <Select 
+                          value={blockSlotData.start_time} 
+                          onValueChange={(value) => setBlockSlotData({...blockSlotData, start_time: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select start hour" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {hourOptions.map((hour) => (
+                              <SelectItem key={hour.value} value={hour.value}>
+                                {hour.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label>End Time</Label>
-                        <Input type="time" value={blockSlotData.end_time} onChange={(e) => setBlockSlotData({...blockSlotData, end_time: e.target.value})} required />
+                        <Select 
+                          value={blockSlotData.end_time} 
+                          onValueChange={(value) => setBlockSlotData({...blockSlotData, end_time: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select end hour" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {hourOptions.map((hour) => (
+                              <SelectItem key={hour.value} value={hour.value}>
+                                {hour.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div>
@@ -783,26 +839,63 @@ export default function OwnerDashboard() {
                       </p>
                     </div>
                     
+                    {pricingData.rule_type === 'special' && (
+                      <div>
+                        <Label>Date</Label>
+                        <Input 
+                          type="date" 
+                          value={pricingData.specific_date} 
+                          onChange={(e) => setPricingData({...pricingData, specific_date: e.target.value})} 
+                          min={new Date().toISOString().split('T')[0]}
+                          required
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Select the specific date for this special pricing
+                        </p>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label>Start Time</Label>
-                        <Input 
-                          type="time" 
+                        <Select 
                           value={pricingData.start_time} 
-                          onChange={(e) => setPricingData({...pricingData, start_time: e.target.value})} 
-                          required
-                        />
+                          onValueChange={(value) => setPricingData({...pricingData, start_time: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select start hour" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {hourOptions.map((hour) => (
+                              <SelectItem key={hour.value} value={hour.value}>
+                                {hour.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div>
                         <Label>End Time</Label>
-                        <Input 
-                          type="time" 
+                        <Select 
                           value={pricingData.end_time} 
-                          onChange={(e) => setPricingData({...pricingData, end_time: e.target.value})} 
-                          required
-                        />
+                          onValueChange={(value) => setPricingData({...pricingData, end_time: value})}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select end hour" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {hourOptions.map((hour) => (
+                              <SelectItem key={hour.value} value={hour.value}>
+                                {hour.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
+                    <p className="text-xs text-muted-foreground">
+                      Time selection is 1-hour based. Price applies to slots starting from Start Time until End Time.
+                    </p>
 
                     {pricingData.rule_type === 'peak_hours' && (
                       <div>
@@ -879,6 +972,12 @@ export default function OwnerDashboard() {
                         <span className="font-medium">Price Multiplier:</span> 
                         <span className="text-lg font-bold text-primary">{rule.price_multiplier}×</span>
                       </div>
+                      {rule.specific_date && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">Date:</span> {format(new Date(rule.specific_date), 'MMM d, yyyy')}
+                        </div>
+                      )}
                       {rule.start_time && rule.end_time && (
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
