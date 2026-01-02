@@ -122,12 +122,100 @@ export default function OwnerDashboard() {
     }
   }
 
+  // Helper function to check if two time ranges overlap
+  const doTimesOverlap = (start1: string, end1: string, start2: string, end2: string): boolean => {
+    const parseTime = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + (m || 0);
+    };
+    
+    const s1 = parseTime(start1);
+    const e1 = parseTime(end1);
+    const s2 = parseTime(start2);
+    const e2 = parseTime(end2);
+    
+    // Slots overlap if one starts before the other ends
+    return s1 < e2 && s2 < e1;
+  };
+
   async function handleBlockSlot(e: React.FormEvent) {
     e.preventDefault();
     try {
-      // Validate time selection
+      // Validate required fields
+      if (!blockSlotData.court_id) {
+        toast({ title: 'Error', description: 'Please select a court', variant: 'destructive' });
+        return;
+      }
+      if (!blockSlotData.date) {
+        toast({ title: 'Error', description: 'Please select a date', variant: 'destructive' });
+        return;
+      }
       if (!blockSlotData.start_time || !blockSlotData.end_time) {
         toast({ title: 'Error', description: 'Please select start and end time', variant: 'destructive' });
+        return;
+      }
+      
+      // Validate end time is after start time
+      const startHour = parseInt(blockSlotData.start_time.split(':')[0]);
+      const endHour = parseInt(blockSlotData.end_time.split(':')[0]);
+      if (endHour <= startHour) {
+        toast({ title: 'Error', description: 'End time must be after start time', variant: 'destructive' });
+        return;
+      }
+
+      // Check for existing bookings that overlap with the blocked time
+      const { data: existingBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('start_time, end_time, status')
+        .eq('court_id', blockSlotData.court_id)
+        .eq('booking_date', blockSlotData.date)
+        .in('status', ['confirmed', 'pending']);
+
+      if (bookingsError) throw bookingsError;
+
+      // Check for overlaps with existing bookings
+      const hasOverlap = existingBookings?.some(booking => 
+        doTimesOverlap(
+          blockSlotData.start_time, 
+          blockSlotData.end_time, 
+          booking.start_time.slice(0, 5), 
+          booking.end_time.slice(0, 5)
+        )
+      );
+
+      if (hasOverlap) {
+        toast({ 
+          title: 'Cannot Block Slot', 
+          description: 'There are existing bookings in this time range. Please cancel them first or choose a different time.', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+
+      // Check for existing blocked slots that overlap
+      const { data: existingBlocked, error: blockedError } = await supabase
+        .from('blocked_slots')
+        .select('start_time, end_time')
+        .eq('court_id', blockSlotData.court_id)
+        .eq('date', blockSlotData.date);
+
+      if (blockedError) throw blockedError;
+
+      const hasBlockedOverlap = existingBlocked?.some(blocked => 
+        doTimesOverlap(
+          blockSlotData.start_time, 
+          blockSlotData.end_time, 
+          blocked.start_time.slice(0, 5), 
+          blocked.end_time.slice(0, 5)
+        )
+      );
+
+      if (hasBlockedOverlap) {
+        toast({ 
+          title: 'Already Blocked', 
+          description: 'This time range is already blocked.', 
+          variant: 'destructive' 
+        });
         return;
       }
 

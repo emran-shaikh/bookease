@@ -193,7 +193,39 @@ export default function CourtDetail() {
   // Helper to normalize time to HH:MM format (strips seconds if present)
   const normalizeTime = (time: string): string => {
     const parts = time.split(':');
-    return `${parts[0]}:${parts[1]}`;
+    return `${parts[0].padStart(2, '0')}:${parts[1]}`;
+  };
+
+  // Expand a time range into individual 1-hour slots
+  const expandToHourlySlots = (startTime: string, endTime: string): string[] => {
+    const slots: string[] = [];
+    const startHour = parseInt(normalizeTime(startTime).split(':')[0]);
+    const endHour = parseInt(normalizeTime(endTime).split(':')[0]);
+    
+    // Handle overnight bookings (e.g., 22:00-02:00)
+    if (endHour <= startHour && endHour !== 0) {
+      // Overnight - from start to midnight
+      for (let h = startHour; h < 24; h++) {
+        const slotStart = `${h.toString().padStart(2, '0')}:00`;
+        const slotEnd = `${((h + 1) % 24).toString().padStart(2, '0')}:00`;
+        slots.push(`${slotStart}-${slotEnd}`);
+      }
+      // Then from midnight to end
+      for (let h = 0; h < endHour; h++) {
+        const slotStart = `${h.toString().padStart(2, '0')}:00`;
+        const slotEnd = `${(h + 1).toString().padStart(2, '0')}:00`;
+        slots.push(`${slotStart}-${slotEnd}`);
+      }
+    } else {
+      // Normal range
+      for (let h = startHour; h < endHour; h++) {
+        const slotStart = `${h.toString().padStart(2, '0')}:00`;
+        const slotEnd = `${(h + 1).toString().padStart(2, '0')}:00`;
+        slots.push(`${slotStart}-${slotEnd}`);
+      }
+    }
+    
+    return slots;
   };
 
   async function fetchBookedSlots() {
@@ -220,19 +252,28 @@ export default function CourtDetail() {
       if (bookingsResult.error) throw bookingsResult.error;
       if (blockedResult.error) throw blockedResult.error;
 
-      // Normalize time format to HH:MM (database stores HH:MM:SS)
-      const booked = bookingsResult.data?.map(b => 
-        `${normalizeTime(b.start_time)}-${normalizeTime(b.end_time)}`
-      ) || [];
-      const blockedTimes = blockedResult.data?.map(b => 
-        `${normalizeTime(b.start_time)}-${normalizeTime(b.end_time)}`
-      ) || [];
+      // Expand all bookings and blocked slots into individual 1-hour slots
+      const bookedHourlySlots: string[] = [];
+      bookingsResult.data?.forEach(b => {
+        const expanded = expandToHourlySlots(b.start_time, b.end_time);
+        bookedHourlySlots.push(...expanded);
+      });
+
+      const blockedHourlySlots: string[] = [];
+      blockedResult.data?.forEach(b => {
+        const expanded = expandToHourlySlots(b.start_time, b.end_time);
+        blockedHourlySlots.push(...expanded);
+      });
       
-      console.log('Booked slots:', booked);
-      console.log('Blocked slots:', blockedTimes);
+      // Remove duplicates
+      const uniqueBooked = [...new Set(bookedHourlySlots)];
+      const uniqueBlocked = [...new Set(blockedHourlySlots)];
       
-      setBookedSlots(booked);
-      setBlockedSlots(blockedTimes);
+      console.log('Booked slots (expanded):', uniqueBooked);
+      console.log('Blocked slots (expanded):', uniqueBlocked);
+      
+      setBookedSlots(uniqueBooked);
+      setBlockedSlots(uniqueBlocked);
     } catch (error: any) {
       console.error('Error fetching slots:', error);
     }
@@ -527,6 +568,21 @@ export default function CourtDetail() {
     return { level: 'premium', label: '⭐ Premium', color: 'bg-red-500/10 text-red-700 border-red-500' };
   };
 
+  // Helper to check time overlap
+  const doTimesOverlap = (start1: string, end1: string, start2: string, end2: string): boolean => {
+    const parseTime = (t: string) => {
+      const parts = t.split(':');
+      return parseInt(parts[0]) * 60 + parseInt(parts[1] || '0');
+    };
+    
+    const s1 = parseTime(start1);
+    const e1 = parseTime(end1);
+    const s2 = parseTime(start2);
+    const e2 = parseTime(end2);
+    
+    return s1 < e2 && s2 < e1;
+  };
+
   const handleBooking = async () => {
     if (!user) {
       toast({
@@ -553,31 +609,64 @@ export default function CourtDetail() {
       const endTime = addHoursToTime(selectedStartTime, selectedHours);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Check all slots in range
-      for (let i = 0; i < selectedHours; i++) {
-        const checkStart = addHoursToTime(selectedStartTime, i);
-        const checkEnd = addHoursToTime(selectedStartTime, i + 1);
-        
-        const { data: existingBookings, error: checkError } = await supabase
+      // Fetch both bookings and blocked slots to check for overlaps
+      const [bookingsResult, blockedResult] = await Promise.all([
+        supabase
           .from('bookings')
-          .select('id')
+          .select('start_time, end_time')
           .eq('court_id', courtId)
           .eq('booking_date', dateStr)
-          .eq('start_time', checkStart)
-          .eq('end_time', checkEnd)
-          .in('status', ['confirmed', 'pending']);
+          .in('status', ['confirmed', 'pending']),
+        supabase
+          .from('blocked_slots')
+          .select('start_time, end_time')
+          .eq('court_id', courtId)
+          .eq('date', dateStr)
+      ]);
 
-        if (checkError) throw checkError;
+      if (bookingsResult.error) throw bookingsResult.error;
+      if (blockedResult.error) throw blockedResult.error;
 
-        if (existingBookings && existingBookings.length > 0) {
-          toast({
-            title: 'Slot Unavailable',
-            description: 'One or more slots in your selection were just booked. Please choose different times.',
-            variant: 'destructive',
-          });
-          await fetchBookedSlots();
-          return;
-        }
+      // Check for overlapping bookings
+      const hasBookingOverlap = bookingsResult.data?.some(booking => 
+        doTimesOverlap(
+          selectedStartTime, 
+          endTime, 
+          booking.start_time.slice(0, 5), 
+          booking.end_time.slice(0, 5)
+        )
+      );
+
+      if (hasBookingOverlap) {
+        toast({
+          title: 'Slot Unavailable',
+          description: 'One or more slots in your selection were just booked. Please choose different times.',
+          variant: 'destructive',
+        });
+        await fetchBookedSlots();
+        setBookingLoading(false);
+        return;
+      }
+
+      // Check for overlapping blocked slots
+      const hasBlockedOverlap = blockedResult.data?.some(blocked => 
+        doTimesOverlap(
+          selectedStartTime, 
+          endTime, 
+          blocked.start_time.slice(0, 5), 
+          blocked.end_time.slice(0, 5)
+        )
+      );
+
+      if (hasBlockedOverlap) {
+        toast({
+          title: 'Slot Blocked',
+          description: 'This time slot is blocked by the court owner.',
+          variant: 'destructive',
+        });
+        await fetchBookedSlots();
+        setBookingLoading(false);
+        return;
       }
       
       const existingLock = getCurrentUserLock(selectedStartTime, endTime);
