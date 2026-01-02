@@ -47,6 +47,9 @@ export default function OwnerDashboard() {
     start_time: '',
     end_time: '',
     reason: '',
+    guest_name: '',
+    guest_email: '',
+    guest_phone: '',
   });
 
   // Pricing rule form state
@@ -122,12 +125,63 @@ export default function OwnerDashboard() {
   async function handleBlockSlot(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('blocked_slots').insert([blockSlotData]);
+      // Validate time selection
+      if (!blockSlotData.start_time || !blockSlotData.end_time) {
+        toast({ title: 'Error', description: 'Please select start and end time', variant: 'destructive' });
+        return;
+      }
+
+      const insertData: any = {
+        court_id: blockSlotData.court_id,
+        date: blockSlotData.date,
+        start_time: blockSlotData.start_time,
+        end_time: blockSlotData.end_time,
+        reason: blockSlotData.reason || null,
+        guest_name: blockSlotData.guest_name || null,
+        guest_email: blockSlotData.guest_email || null,
+        guest_phone: blockSlotData.guest_phone || null,
+      };
+
+      const { error } = await supabase.from('blocked_slots').insert([insertData]);
       if (error) throw error;
 
-      toast({ title: 'Success', description: 'Slot blocked successfully' });
+      // Send notification email if guest email is provided
+      if (blockSlotData.guest_email) {
+        try {
+          const court = courts.find(c => c.id === blockSlotData.court_id);
+          await supabase.functions.invoke('send-booking-confirmation', {
+            body: {
+              userEmail: blockSlotData.guest_email,
+              userName: blockSlotData.guest_name || 'Guest',
+              courtName: court?.name || 'Court',
+              bookingDate: format(new Date(blockSlotData.date), 'MMMM d, yyyy'),
+              startTime: blockSlotData.start_time,
+              endTime: blockSlotData.end_time,
+              totalPrice: 0,
+              isPendingPayment: false,
+              isManualBooking: true,
+            },
+          });
+          toast({ title: 'Success', description: 'Slot blocked and notification sent to guest' });
+        } catch (emailError) {
+          console.error('Failed to send guest notification:', emailError);
+          toast({ title: 'Success', description: 'Slot blocked (notification failed to send)' });
+        }
+      } else {
+        toast({ title: 'Success', description: 'Slot blocked successfully' });
+      }
+
       setShowBlockSlotForm(false);
-      setBlockSlotData({ court_id: '', date: '', start_time: '', end_time: '', reason: '' });
+      setBlockSlotData({ 
+        court_id: '', 
+        date: '', 
+        start_time: '', 
+        end_time: '', 
+        reason: '',
+        guest_name: '',
+        guest_email: '',
+        guest_phone: '',
+      });
       fetchOwnerData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -795,6 +849,39 @@ export default function OwnerDashboard() {
                       <Label>Reason (optional)</Label>
                       <Input value={blockSlotData.reason} onChange={(e) => setBlockSlotData({...blockSlotData, reason: e.target.value})} placeholder="Maintenance, private event, etc." />
                     </div>
+                    
+                    <div className="border-t pt-4 mt-4">
+                      <p className="text-sm text-muted-foreground mb-3">Block for a guest (optional) - they will be notified</p>
+                      <div className="space-y-3">
+                        <div>
+                          <Label>Guest Name</Label>
+                          <Input 
+                            value={blockSlotData.guest_name} 
+                            onChange={(e) => setBlockSlotData({...blockSlotData, guest_name: e.target.value})} 
+                            placeholder="Guest name" 
+                          />
+                        </div>
+                        <div>
+                          <Label>Guest Email</Label>
+                          <Input 
+                            type="email"
+                            value={blockSlotData.guest_email} 
+                            onChange={(e) => setBlockSlotData({...blockSlotData, guest_email: e.target.value})} 
+                            placeholder="guest@example.com" 
+                          />
+                        </div>
+                        <div>
+                          <Label>Guest Phone</Label>
+                          <Input 
+                            type="tel"
+                            value={blockSlotData.guest_phone} 
+                            onChange={(e) => setBlockSlotData({...blockSlotData, guest_phone: e.target.value})} 
+                            placeholder="+1 234 567 8900" 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
                     <Button type="submit" className="w-full">Block Slot</Button>
                   </form>
                 </DialogContent>
@@ -832,6 +919,14 @@ export default function OwnerDashboard() {
                       {slot.reason && (
                         <div>
                           <span className="font-medium">Reason:</span> {slot.reason}
+                        </div>
+                      )}
+                      {(slot.guest_name || slot.guest_email || slot.guest_phone) && (
+                        <div className="border-t pt-2 mt-2">
+                          <span className="font-medium text-primary">Reserved for:</span>
+                          {slot.guest_name && <div className="ml-2">{slot.guest_name}</div>}
+                          {slot.guest_email && <div className="ml-2 text-muted-foreground">{slot.guest_email}</div>}
+                          {slot.guest_phone && <div className="ml-2 text-muted-foreground">{slot.guest_phone}</div>}
                         </div>
                       )}
                     </div>

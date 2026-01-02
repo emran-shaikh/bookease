@@ -20,6 +20,9 @@ export type Database = {
           created_at: string
           date: string
           end_time: string
+          guest_email: string | null
+          guest_name: string | null
+          guest_phone: string | null
           id: string
           reason: string | null
           start_time: string
@@ -29,6 +32,9 @@ export type Database = {
           created_at?: string
           date: string
           end_time: string
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           reason?: string | null
           start_time: string
@@ -38,6 +44,9 @@ export type Database = {
           created_at?: string
           date?: string
           end_time?: string
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
           reason?: string | null
           start_time?: string
