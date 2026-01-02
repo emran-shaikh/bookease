@@ -10,7 +10,7 @@ const corsHeaders = {
 };
 
 interface BookingConfirmationRequest {
-  bookingId: string;
+  bookingId?: string;
   userEmail: string;
   userName: string;
   courtName: string;
@@ -22,6 +22,7 @@ interface BookingConfirmationRequest {
   ownerEmail?: string;
   ownerName?: string;
   isPendingPayment?: boolean;
+  isManualBooking?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -48,6 +49,7 @@ const handler = async (req: Request): Promise<Response> => {
       ownerEmail,
       ownerName,
       isPendingPayment,
+      isManualBooking,
     }: BookingConfirmationRequest = body;
 
     // Validate required fields
@@ -72,12 +74,111 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Determine email subject and content based on booking type
+    const isManual = isManualBooking === true;
+    const emailSubject = isManual 
+      ? "Court Slot Reserved for You! 🎾"
+      : "Booking Confirmed! 🎉";
+
     // Send email using Resend
     const emailResponse = await resend.emails.send({
       from: "BookedHours <support@bookedhours.com>",
       to: [userEmail],
-      subject: "Booking Confirmed! 🎉",
-      html: `
+      subject: emailSubject,
+      html: isManual ? `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                line-height: 1.6;
+                color: #333;
+                max-width: 600px;
+                margin: 0 auto;
+                padding: 20px;
+              }
+              .header {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                color: white;
+                padding: 30px;
+                border-radius: 10px 10px 0 0;
+                text-align: center;
+              }
+              .content {
+                background: #f9fafb;
+                padding: 30px;
+                border-radius: 0 0 10px 10px;
+              }
+              .booking-details {
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+                border-left: 4px solid #10b981;
+              }
+              .detail-row {
+                display: flex;
+                justify-content: space-between;
+                padding: 10px 0;
+                border-bottom: 1px solid #e5e7eb;
+              }
+              .detail-row:last-child {
+                border-bottom: none;
+              }
+              .detail-label {
+                font-weight: 600;
+                color: #6b7280;
+              }
+              .detail-value {
+                color: #111827;
+              }
+              .footer {
+                text-align: center;
+                margin-top: 30px;
+                color: #6b7280;
+                font-size: 0.875rem;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1 style="margin: 0;">🎾 Slot Reserved!</h1>
+              <p style="margin: 10px 0 0 0;">A court slot has been reserved for you</p>
+            </div>
+            <div class="content">
+              <p>Hi ${userName || 'Guest'},</p>
+              <p>A court slot has been reserved for you by the court owner. Here are the details:</p>
+              
+              <div class="booking-details">
+                <div class="detail-row">
+                  <span class="detail-label">Court:</span>
+                  <span class="detail-value">${courtName || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Date:</span>
+                  <span class="detail-value">${bookingDate || 'N/A'}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Time:</span>
+                  <span class="detail-value">${startTime || 'N/A'} - ${endTime || 'N/A'}</span>
+                </div>
+              </div>
+
+              <p><strong>Please Note:</strong></p>
+              <ul>
+                <li>Please arrive 10 minutes before your reserved time</li>
+                <li>Contact the court owner if you have any questions</li>
+              </ul>
+
+              <div class="footer">
+                <p>Thank you for choosing BookedHours!</p>
+                <p>This is an automated notification from the court owner.</p>
+              </div>
+            </div>
+          </body>
+        </html>
+      ` : `
         <!DOCTYPE html>
         <html>
           <head>
