@@ -142,16 +142,89 @@ export default function BookCourt() {
     }
   }
 
+  // Helper function to check if two time ranges overlap
+  const doTimesOverlap = (start1: string, end1: string, start2: string, end2: string): boolean => {
+    const parseTime = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + (m || 0);
+    };
+    
+    const s1 = parseTime(start1);
+    const e1 = parseTime(end1);
+    const s2 = parseTime(start2);
+    const e2 = parseTime(end2);
+    
+    return s1 < e2 && s2 < e1;
+  };
+
   async function handleBookingSubmit() {
     setLoading(true);
     
     try {
-      const [startTime, endTime] = timeSlot.split('-');
+      const [startTime, endTime] = timeSlot.split('-').map((t: string) => t.trim());
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      // Check for blocked slots that overlap with the booking time
+      const { data: blockedSlots, error: blockedError } = await supabase
+        .from('blocked_slots')
+        .select('start_time, end_time')
+        .eq('court_id', court.id)
+        .eq('date', dateStr);
+      
+      if (blockedError) throw blockedError;
+      
+      const hasBlockedOverlap = blockedSlots?.some(blocked => 
+        doTimesOverlap(
+          startTime, 
+          endTime, 
+          blocked.start_time.slice(0, 5), 
+          blocked.end_time.slice(0, 5)
+        )
+      );
+      
+      if (hasBlockedOverlap) {
+        toast({
+          title: 'Slot Unavailable',
+          description: 'This time slot is blocked by the court owner.',
+          variant: 'destructive',
+        });
+        navigate(`/courts/${court?.slug || slug}`);
+        return;
+      }
+      
+      // Check for existing bookings that overlap
+      const { data: existingBookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('start_time, end_time')
+        .eq('court_id', court.id)
+        .eq('booking_date', dateStr)
+        .in('status', ['confirmed', 'pending']);
+      
+      if (bookingsError) throw bookingsError;
+      
+      const hasBookingOverlap = existingBookings?.some(booking => 
+        doTimesOverlap(
+          startTime, 
+          endTime, 
+          booking.start_time.slice(0, 5), 
+          booking.end_time.slice(0, 5)
+        )
+      );
+      
+      if (hasBookingOverlap) {
+        toast({
+          title: 'Slot Already Booked',
+          description: 'Someone just booked this slot. Please choose another time.',
+          variant: 'destructive',
+        });
+        navigate(`/courts/${court?.slug || slug}`);
+        return;
+      }
       
       const { error } = await supabase.from('bookings').insert({
         court_id: court.id,
         user_id: user?.id,
-        booking_date: format(date, 'yyyy-MM-dd'),
+        booking_date: dateStr,
         start_time: startTime,
         end_time: endTime,
         total_price: priceCalculation ? parseFloat(priceCalculation.totalPrice) : court.base_price,
