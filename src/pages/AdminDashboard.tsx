@@ -18,6 +18,7 @@ import { format } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
 import { CourtEditForm } from '@/components/CourtEditForm';
 import { formatTimeSlot12h } from '@/lib/utils';
+import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
 
 type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'amount-desc' | 'amount-asc' | 'status';
 
@@ -36,6 +37,12 @@ export default function AdminDashboard() {
   const [userSort, setUserSort] = useState<SortOption>('name-asc');
   const [editingCourt, setEditingCourt] = useState<any>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  
+  // Filter states
+  const [bookingFilters, setBookingFilters] = useState<FilterState>({});
+  const [courtFilters, setCourtFilters] = useState<FilterState>({});
+  const [userFilters, setUserFilters] = useState<FilterState>({});
+  const [paymentFilters, setPaymentFilters] = useState<FilterState>({});
   const [analytics, setAnalytics] = useState({
     totalCourts: 0,
     totalBookings: 0,
@@ -174,9 +181,36 @@ export default function AdminDashboard() {
     }
   }
 
-  // Sorted data using useMemo
+  // Filtered and sorted data using useMemo
+  const filteredBookings = useMemo(() => {
+    return bookings.filter(booking => {
+      if (bookingFilters.status && bookingFilters.status !== 'all') {
+        if (booking.status !== bookingFilters.status) return false;
+      }
+      if (bookingFilters.paymentStatus && bookingFilters.paymentStatus !== 'all') {
+        if (booking.payment_status !== bookingFilters.paymentStatus) return false;
+      }
+      if (bookingFilters.dateFrom) {
+        if (new Date(booking.booking_date) < bookingFilters.dateFrom) return false;
+      }
+      if (bookingFilters.dateTo) {
+        if (new Date(booking.booking_date) > bookingFilters.dateTo) return false;
+      }
+      if (bookingFilters.search) {
+        const searchLower = bookingFilters.search.toLowerCase();
+        const customerName = booking.profiles?.full_name?.toLowerCase() || '';
+        const customerEmail = booking.profiles?.email?.toLowerCase() || '';
+        const courtName = booking.courts?.name?.toLowerCase() || '';
+        if (!customerName.includes(searchLower) && !customerEmail.includes(searchLower) && !courtName.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [bookings, bookingFilters]);
+
   const sortedBookings = useMemo(() => {
-    const sorted = [...bookings];
+    const sorted = [...filteredBookings];
     switch (bookingSort) {
       case 'date-desc':
         return sorted.sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime());
@@ -195,10 +229,29 @@ export default function AdminDashboard() {
       default:
         return sorted;
     }
-  }, [bookings, bookingSort]);
+  }, [filteredBookings, bookingSort]);
+
+  const filteredCourts = useMemo(() => {
+    return allCourts.filter(court => {
+      if (courtFilters.status && courtFilters.status !== 'all') {
+        if (court.status !== courtFilters.status) return false;
+      }
+      if (courtFilters.search) {
+        const searchLower = courtFilters.search.toLowerCase();
+        const courtName = court.name?.toLowerCase() || '';
+        const ownerName = court.profiles?.full_name?.toLowerCase() || '';
+        const ownerEmail = court.profiles?.email?.toLowerCase() || '';
+        const city = court.city?.toLowerCase() || '';
+        if (!courtName.includes(searchLower) && !ownerName.includes(searchLower) && !ownerEmail.includes(searchLower) && !city.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allCourts, courtFilters]);
 
   const sortedCourts = useMemo(() => {
-    const sorted = [...allCourts];
+    const sorted = [...filteredCourts];
     switch (courtSort) {
       case 'name-asc':
         return sorted.sort((a, b) => a.name.localeCompare(b.name));
@@ -213,10 +266,29 @@ export default function AdminDashboard() {
       default:
         return sorted;
     }
-  }, [allCourts, courtSort]);
+  }, [filteredCourts, courtSort]);
+
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      if (userFilters.role && userFilters.role !== 'all') {
+        const userRole = user.user_roles?.[0]?.role || 'customer';
+        if (userRole !== userFilters.role) return false;
+      }
+      if (userFilters.search) {
+        const searchLower = userFilters.search.toLowerCase();
+        const userName = user.full_name?.toLowerCase() || '';
+        const userEmail = user.email?.toLowerCase() || '';
+        const userPhone = user.phone?.toLowerCase() || '';
+        if (!userName.includes(searchLower) && !userEmail.includes(searchLower) && !userPhone.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [users, userFilters]);
 
   const sortedUsers = useMemo(() => {
-    const sorted = [...users];
+    const sorted = [...filteredUsers];
     switch (userSort) {
       case 'name-asc':
         return sorted.sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''));
@@ -225,7 +297,34 @@ export default function AdminDashboard() {
       default:
         return sorted;
     }
-  }, [users, userSort]);
+  }, [filteredUsers, userSort]);
+
+  const filteredPayments = useMemo(() => {
+    return bookings.filter(booking => {
+      // Only show non-pending payments by default, unless specifically filtered
+      if (!paymentFilters.paymentStatus || paymentFilters.paymentStatus === 'all') {
+        if (booking.payment_status === 'pending') return false;
+      } else {
+        if (booking.payment_status !== paymentFilters.paymentStatus) return false;
+      }
+      if (paymentFilters.dateFrom) {
+        if (new Date(booking.booking_date) < paymentFilters.dateFrom) return false;
+      }
+      if (paymentFilters.dateTo) {
+        if (new Date(booking.booking_date) > paymentFilters.dateTo) return false;
+      }
+      if (paymentFilters.search) {
+        const searchLower = paymentFilters.search.toLowerCase();
+        const customerName = booking.profiles?.full_name?.toLowerCase() || '';
+        const customerEmail = booking.profiles?.email?.toLowerCase() || '';
+        const courtName = booking.courts?.name?.toLowerCase() || '';
+        if (!customerName.includes(searchLower) && !customerEmail.includes(searchLower) && !courtName.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }, [bookings, paymentFilters]);
 
   if (loading || roleLoading) {
     return (
@@ -362,30 +461,45 @@ export default function AdminDashboard() {
 
           <TabsContent value="bookings">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <div>
                   <CardTitle>All Bookings</CardTitle>
                   <CardDescription>View and manage all court bookings</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={bookingSort} onValueChange={(v) => setBookingSort(v as SortOption)}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="date-desc">Date (Newest)</SelectItem>
-                      <SelectItem value="date-asc">Date (Oldest)</SelectItem>
-                      <SelectItem value="name-asc">Court (A-Z)</SelectItem>
-                      <SelectItem value="name-desc">Court (Z-A)</SelectItem>
-                      <SelectItem value="amount-desc">Amount (High-Low)</SelectItem>
-                      <SelectItem value="amount-asc">Amount (Low-High)</SelectItem>
-                      <SelectItem value="status">Status</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <DashboardFilters
+                  filters={bookingFilters}
+                  onFilterChange={setBookingFilters}
+                  showStatusFilter
+                  showPaymentFilter
+                  showDateFilter
+                  showSearchFilter
+                  placeholder="Search by customer, court..."
+                />
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {sortedBookings.length} of {bookings.length} bookings
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                    <Select value={bookingSort} onValueChange={(v) => setBookingSort(v as SortOption)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="date-desc">Date (Newest)</SelectItem>
+                        <SelectItem value="date-asc">Date (Oldest)</SelectItem>
+                        <SelectItem value="name-asc">Court (A-Z)</SelectItem>
+                        <SelectItem value="name-desc">Court (Z-A)</SelectItem>
+                        <SelectItem value="amount-desc">Amount (High-Low)</SelectItem>
+                        <SelectItem value="amount-asc">Amount (Low-High)</SelectItem>
+                        <SelectItem value="status">Status</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -528,28 +642,47 @@ export default function AdminDashboard() {
 
           <TabsContent value="all-courts">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <div>
                   <CardTitle>All Courts</CardTitle>
                   <CardDescription>View and manage all court listings</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={courtSort} onValueChange={(v) => setCourtSort(v as SortOption)}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                      <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-                      <SelectItem value="amount-desc">Price (High-Low)</SelectItem>
-                      <SelectItem value="amount-asc">Price (Low-High)</SelectItem>
-                      <SelectItem value="status">Status</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <DashboardFilters
+                  filters={courtFilters}
+                  onFilterChange={setCourtFilters}
+                  showStatusFilter
+                  showSearchFilter
+                  statusOptions={[
+                    { value: 'all', label: 'All Status' },
+                    { value: 'pending', label: 'Pending' },
+                    { value: 'approved', label: 'Approved' },
+                    { value: 'rejected', label: 'Rejected' },
+                  ]}
+                  placeholder="Search by court, owner, city..."
+                />
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {sortedCourts.length} of {allCourts.length} courts
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                    <Select value={courtSort} onValueChange={(v) => setCourtSort(v as SortOption)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                        <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                        <SelectItem value="amount-desc">Price (High-Low)</SelectItem>
+                        <SelectItem value="amount-asc">Price (Low-High)</SelectItem>
+                        <SelectItem value="status">Status</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -636,25 +769,38 @@ export default function AdminDashboard() {
 
           <TabsContent value="users">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <div>
                   <CardTitle>User Management</CardTitle>
                   <CardDescription>Manage user roles and permissions</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={userSort} onValueChange={(v) => setUserSort(v as SortOption)}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                      <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <DashboardFilters
+                  filters={userFilters}
+                  onFilterChange={setUserFilters}
+                  showRoleFilter
+                  showSearchFilter
+                  placeholder="Search by name, email, phone..."
+                />
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {sortedUsers.length} of {users.length} users
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                    <Select value={userSort} onValueChange={(v) => setUserSort(v as SortOption)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                        <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -715,7 +861,20 @@ export default function AdminDashboard() {
                 <CardTitle>Payment History</CardTitle>
                 <CardDescription>Monitor all platform transactions</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <DashboardFilters
+                  filters={paymentFilters}
+                  onFilterChange={setPaymentFilters}
+                  showPaymentFilter
+                  showDateFilter
+                  showSearchFilter
+                  placeholder="Search by customer, court..."
+                />
+                
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredPayments.length} payments
+                </div>
+                
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -727,23 +886,19 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {bookings
-                      .filter(b => b.payment_status !== 'pending')
-                      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                      .slice(0, 50)
-                      .map((booking) => (
-                        <TableRow key={booking.id}>
-                          <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
-                          <TableCell>{booking.profiles?.full_name || booking.profiles?.email}</TableCell>
-                          <TableCell>{booking.courts?.name}</TableCell>
-                          <TableCell>{formatPrice(booking.total_price)}</TableCell>
-                          <TableCell>
-                            <Badge variant={booking.payment_status === 'succeeded' ? 'default' : booking.payment_status === 'failed' ? 'destructive' : 'secondary'}>
-                              {booking.payment_status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                    {filteredPayments.slice(0, 100).map((booking) => (
+                      <TableRow key={booking.id}>
+                        <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>{booking.profiles?.full_name || booking.profiles?.email}</TableCell>
+                        <TableCell>{booking.courts?.name}</TableCell>
+                        <TableCell>{formatPrice(booking.total_price)}</TableCell>
+                        <TableCell>
+                          <Badge variant={booking.payment_status === 'succeeded' ? 'default' : booking.payment_status === 'failed' ? 'destructive' : 'secondary'}>
+                            {booking.payment_status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </Table>
               </CardContent>
