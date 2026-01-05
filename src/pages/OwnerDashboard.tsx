@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Header } from '@/components/Header';
@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { XCircle, Info } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
 import { formatTimeSlot12h } from '@/lib/utils';
+import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -39,6 +40,7 @@ export default function OwnerDashboard() {
   const [editingCourt, setEditingCourt] = useState<any>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingPricingRule, setEditingPricingRule] = useState<any>(null);
+  const [bookingFilters, setBookingFilters] = useState<FilterState>({});
 
   // Block slot form state
   const [blockSlotData, setBlockSlotData] = useState({
@@ -453,6 +455,49 @@ export default function OwnerDashboard() {
     new Date(b.booking_date) >= new Date() && b.status !== 'cancelled'
   );
 
+  // Filtered bookings based on filter state
+  const filteredBookings = useMemo(() => {
+    return bookings.filter(booking => {
+      // Status filter
+      if (bookingFilters.status && bookingFilters.status !== 'all') {
+        if (booking.status !== bookingFilters.status) return false;
+      }
+      
+      // Payment status filter
+      if (bookingFilters.paymentStatus && bookingFilters.paymentStatus !== 'all') {
+        if (booking.payment_status !== bookingFilters.paymentStatus) return false;
+      }
+      
+      // Court filter
+      if (bookingFilters.courtId && bookingFilters.courtId !== 'all') {
+        if (booking.court_id !== bookingFilters.courtId) return false;
+      }
+      
+      // Date range filter
+      if (bookingFilters.dateFrom) {
+        const bookingDate = new Date(booking.booking_date);
+        if (bookingDate < bookingFilters.dateFrom) return false;
+      }
+      if (bookingFilters.dateTo) {
+        const bookingDate = new Date(booking.booking_date);
+        if (bookingDate > bookingFilters.dateTo) return false;
+      }
+      
+      // Search filter
+      if (bookingFilters.search) {
+        const searchLower = bookingFilters.search.toLowerCase();
+        const customerName = booking.profiles?.full_name?.toLowerCase() || '';
+        const customerEmail = booking.profiles?.email?.toLowerCase() || '';
+        const courtName = booking.courts?.name?.toLowerCase() || '';
+        if (!customerName.includes(searchLower) && !customerEmail.includes(searchLower) && !courtName.includes(searchLower)) {
+          return false;
+        }
+      }
+      
+      return true;
+    }).sort((a, b) => new Date(b.booking_date).getTime() - new Date(a.booking_date).getTime());
+  }, [bookings, bookingFilters]);
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -638,15 +683,41 @@ export default function OwnerDashboard() {
           </TabsContent>
 
           <TabsContent value="bookings" className="space-y-4">
-            {bookings.length === 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Bookings</CardTitle>
+                <CardDescription>Manage and filter your court bookings</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <DashboardFilters
+                  filters={bookingFilters}
+                  onFilterChange={setBookingFilters}
+                  showStatusFilter
+                  showPaymentFilter
+                  showDateFilter
+                  showCourtFilter
+                  showSearchFilter
+                  courts={courts.map(c => ({ id: c.id, name: c.name }))}
+                  placeholder="Search by customer or court..."
+                />
+                
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredBookings.length} of {bookings.length} bookings
+                </div>
+              </CardContent>
+            </Card>
+
+            {filteredBookings.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
-                  <p className="text-muted-foreground">No bookings yet</p>
+                  <p className="text-muted-foreground">
+                    {bookings.length === 0 ? 'No bookings yet' : 'No bookings match your filters'}
+                  </p>
                 </CardContent>
               </Card>
             ) : (
-              bookings.map((booking) => (
+              filteredBookings.map((booking) => (
                 <Card key={booking.id}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
