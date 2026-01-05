@@ -7,8 +7,44 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { CalendarIcon, X, Filter, Search } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+type DatePreset = {
+  label: string;
+  getValue: () => { from: Date; to: Date };
+};
+
+const datePresets: DatePreset[] = [
+  {
+    label: 'Today',
+    getValue: () => ({
+      from: startOfDay(new Date()),
+      to: endOfDay(new Date()),
+    }),
+  },
+  {
+    label: 'This Week',
+    getValue: () => ({
+      from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+      to: endOfWeek(new Date(), { weekStartsOn: 1 }),
+    }),
+  },
+  {
+    label: 'This Month',
+    getValue: () => ({
+      from: startOfMonth(new Date()),
+      to: endOfMonth(new Date()),
+    }),
+  },
+  {
+    label: 'Last 30 Days',
+    getValue: () => ({
+      from: subDays(new Date(), 30),
+      to: endOfDay(new Date()),
+    }),
+  },
+];
 
 export interface FilterState {
   status?: string;
@@ -222,7 +258,26 @@ export function DashboardFilters({
           {showDateFilter && (
             <div className="space-y-2">
               <Label className="text-xs font-medium">Date Range</Label>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Quick date presets */}
+                <div className="flex flex-wrap gap-1">
+                  {datePresets.map((preset) => (
+                    <Button
+                      key={preset.label}
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        const { from, to } = preset.getValue();
+                        onFilterChange({ ...filters, dateFrom: from, dateTo: to });
+                      }}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="h-6 w-px bg-border hidden sm:block" />
+                {/* Custom date pickers */}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -243,6 +298,7 @@ export function DashboardFilters({
                       selected={filters.dateFrom}
                       onSelect={(date) => onFilterChange({ ...filters, dateFrom: date })}
                       initialFocus
+                      className="pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
@@ -267,6 +323,7 @@ export function DashboardFilters({
                       selected={filters.dateTo}
                       onSelect={(date) => onFilterChange({ ...filters, dateTo: date })}
                       initialFocus
+                      className="pointer-events-auto"
                     />
                   </PopoverContent>
                 </Popover>
