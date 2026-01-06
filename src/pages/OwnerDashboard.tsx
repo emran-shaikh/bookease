@@ -9,12 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard } from 'lucide-react';
+import { Loader2, Building2, Calendar, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard, Home } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
 import { CourtEditForm } from '@/components/CourtEditForm';
 import { OwnerBankSettings } from '@/components/OwnerBankSettings';
+import { VenueForm } from '@/components/VenueForm';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -23,18 +24,21 @@ import { XCircle, Info } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
 import { formatTimeSlot12h } from '@/lib/utils';
 import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
+import { formatCourtCount } from '@/lib/venue-utils';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const { notifications } = useNotifications();
   const [courts, setCourts] = useState<any[]>([]);
+  const [venues, setVenues] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
   const [pricingRules, setPricingRules] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [earnings, setEarnings] = useState(0);
   const [showCourtForm, setShowCourtForm] = useState(false);
+  const [showVenueForm, setShowVenueForm] = useState(false);
   const [showBlockSlotForm, setShowBlockSlotForm] = useState(false);
   const [showPricingForm, setShowPricingForm] = useState(false);
   const [editingCourt, setEditingCourt] = useState<any>(null);
@@ -81,8 +85,9 @@ export default function OwnerDashboard() {
 
   async function fetchOwnerData() {
     try {
-      const [courtsData, bookingsData, blockedData, pricingData] = await Promise.all([
+      const [courtsData, venuesData, bookingsData, blockedData, pricingData] = await Promise.all([
         supabase.from('courts').select('*').eq('owner_id', user?.id),
+        supabase.from('venues').select('*').eq('owner_id', user?.id),
         supabase.from('bookings').select(`
           *,
           courts!inner(owner_id, name),
@@ -99,11 +104,13 @@ export default function OwnerDashboard() {
       ]);
 
       if (courtsData.error) throw courtsData.error;
+      if (venuesData.error) throw venuesData.error;
       if (bookingsData.error) throw bookingsData.error;
       if (blockedData.error) throw blockedData.error;
       if (pricingData.error) throw pricingData.error;
 
       setCourts(courtsData.data || []);
+      setVenues(venuesData.data || []);
       setBookings(bookingsData.data || []);
       setBlockedSlots(blockedData.data || []);
       setPricingRules(pricingData.data || []);
@@ -553,6 +560,10 @@ export default function OwnerDashboard() {
 
         <Tabs defaultValue="courts" className="space-y-4">
           <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="venues" className="gap-1">
+              <Home className="h-3 w-3" />
+              Venues
+            </TabsTrigger>
             <TabsTrigger value="courts">My Courts</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="settings" className="gap-1">
@@ -570,6 +581,106 @@ export default function OwnerDashboard() {
             <TabsTrigger value="blocked">Blocked Slots</TabsTrigger>
             <TabsTrigger value="pricing">Pricing Rules</TabsTrigger>
           </TabsList>
+
+          {/* Venues Tab */}
+          <TabsContent value="venues" className="space-y-4">
+            <div className="flex justify-end mb-4">
+              <Dialog open={showVenueForm} onOpenChange={setShowVenueForm}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Venue
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <VenueForm 
+                    onSuccess={() => {
+                      setShowVenueForm(false);
+                      fetchOwnerData();
+                    }}
+                    onCancel={() => setShowVenueForm(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {venues.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Home className="mb-4 h-12 w-12 text-muted-foreground" />
+                  <p className="text-muted-foreground mb-2">No venues created yet</p>
+                  <p className="text-xs text-muted-foreground text-center max-w-md">
+                    Venues let you group multiple courts under one location. Great for indoor arenas with multiple sports.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {venues.map((venue) => {
+                  const venueCourts = courts.filter(c => c.venue_id === venue.id);
+                  return (
+                    <Card key={venue.id}>
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{venue.name}</CardTitle>
+                            <CardDescription>{venue.city}, {venue.state}</CardDescription>
+                          </div>
+                          <Badge
+                            variant={
+                              venue.status === 'approved'
+                                ? 'default'
+                                : venue.status === 'pending'
+                                ? 'secondary'
+                                : 'destructive'
+                            }
+                          >
+                            {venue.status}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-sm space-y-1 mb-4">
+                          <p><span className="font-medium">Courts:</span> {formatCourtCount(venueCourts.length)}</p>
+                          <p><span className="font-medium">Address:</span> {venue.address}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setShowCourtForm(true);
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add Court
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={async () => {
+                              if (!confirm('Delete this venue? Courts linked to it will become standalone.')) return;
+                              try {
+                                const { error } = await supabase.from('venues').delete().eq('id', venue.id);
+                                if (error) throw error;
+                                toast({ title: 'Venue deleted' });
+                                fetchOwnerData();
+                              } catch (err: any) {
+                                toast({ title: 'Error', description: err.message, variant: 'destructive' });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
 
           <TabsContent value="settings">
             <OwnerBankSettings />

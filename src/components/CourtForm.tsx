@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
+import { VenueSelector } from '@/components/VenueSelector';
 
 export function CourtForm() {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export function CourtForm() {
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
   const [is24Hours, setIs24Hours] = useState(false);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     sport_type: '',
@@ -107,25 +109,47 @@ export function CourtForm() {
       const filteredImages = images.filter(img => img.trim() !== '');
       const filteredAmenities = amenities.filter(am => am.trim() !== '');
 
-      const { data, error } = await supabase.from('courts').insert({
+      // Build insert data - if venue selected, skip location fields
+      const insertData: any = {
         owner_id: user.id,
         name: formData.name,
         sport_type: formData.sport_type,
         description: formData.description || null,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zip_code: formData.zip_code,
-        location: formData.location,
         base_price: parseFloat(formData.base_price),
-        latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-        longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-        images: filteredImages.length > 0 ? filteredImages : null,
-        amenities: filteredAmenities.length > 0 ? filteredAmenities : null,
         opening_time: is24Hours ? '00:00' : formData.opening_time,
         closing_time: is24Hours ? '23:59' : formData.closing_time,
         status: 'pending',
-      } as any).select();
+      };
+
+      // If linked to venue, use court_specific_images and court_specific_amenities
+      if (selectedVenueId) {
+        insertData.venue_id = selectedVenueId;
+        insertData.court_specific_images = filteredImages.length > 0 ? filteredImages : null;
+        insertData.court_specific_amenities = filteredAmenities.length > 0 ? filteredAmenities : null;
+        // Location fields will be null (inherited from venue)
+      } else {
+        // Standalone court - require location fields
+        if (!formData.address || !formData.city || !formData.state || !formData.zip_code || !formData.location) {
+          toast({
+            title: 'Error',
+            description: 'Location fields are required for standalone courts',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+        insertData.address = formData.address;
+        insertData.city = formData.city;
+        insertData.state = formData.state;
+        insertData.zip_code = formData.zip_code;
+        insertData.location = formData.location;
+        insertData.latitude = formData.latitude ? parseFloat(formData.latitude) : null;
+        insertData.longitude = formData.longitude ? parseFloat(formData.longitude) : null;
+        insertData.images = filteredImages.length > 0 ? filteredImages : null;
+        insertData.amenities = filteredAmenities.length > 0 ? filteredAmenities : null;
+      }
+
+      const { data, error } = await supabase.from('courts').insert(insertData).select();
 
       if (error) throw error;
 
@@ -179,6 +203,11 @@ export function CourtForm() {
             </div>
           </div>
 
+          <VenueSelector
+            value={selectedVenueId}
+            onChange={setSelectedVenueId}
+          />
+
           <div>
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -191,54 +220,115 @@ export function CourtForm() {
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="address">Address *</Label>
-              <Input
-                id="address"
-                name="address"
-                required
-                value={formData.address}
-                onChange={handleInputChange}
-                placeholder="Street address"
-              />
-            </div>
-            <div>
-              <Label htmlFor="city">City *</Label>
-              <Input
-                id="city"
-                name="city"
-                required
-                value={formData.city}
-                onChange={handleInputChange}
-                placeholder="City"
-              />
-            </div>
-          </div>
+          {/* Location fields - only shown for standalone courts */}
+          {!selectedVenueId && (
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="address">Address *</Label>
+                  <Input
+                    id="address"
+                    name="address"
+                    required
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    placeholder="Street address"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="city">City *</Label>
+                  <Input
+                    id="city"
+                    name="city"
+                    required
+                    value={formData.city}
+                    onChange={handleInputChange}
+                    placeholder="City"
+                  />
+                </div>
+              </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <Label htmlFor="state">State *</Label>
-              <Input
-                id="state"
-                name="state"
-                required
-                value={formData.state}
-                onChange={handleInputChange}
-                placeholder="State"
-              />
-            </div>
-            <div>
-              <Label htmlFor="zip_code">Zip Code *</Label>
-              <Input
-                id="zip_code"
-                name="zip_code"
-                required
-                value={formData.zip_code}
-                onChange={handleInputChange}
-                placeholder="12345"
-              />
-            </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label htmlFor="state">State *</Label>
+                  <Input
+                    id="state"
+                    name="state"
+                    required
+                    value={formData.state}
+                    onChange={handleInputChange}
+                    placeholder="State"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="zip_code">Zip Code *</Label>
+                  <Input
+                    id="zip_code"
+                    name="zip_code"
+                    required
+                    value={formData.zip_code}
+                    onChange={handleInputChange}
+                    placeholder="12345"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="base_price">Base Price ($/hour) *</Label>
+                  <Input
+                    id="base_price"
+                    name="base_price"
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formData.base_price}
+                    onChange={handleInputChange}
+                    placeholder="50.00"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="location">Location Display Name *</Label>
+                <Input
+                  id="location"
+                  name="location"
+                  required
+                  value={formData.location}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Downtown Sports Complex"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="latitude">Latitude (Optional)</Label>
+                  <Input
+                    id="latitude"
+                    name="latitude"
+                    type="number"
+                    step="any"
+                    value={formData.latitude}
+                    onChange={handleInputChange}
+                    placeholder="40.7128"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="longitude">Longitude (Optional)</Label>
+                  <Input
+                    id="longitude"
+                    name="longitude"
+                    type="number"
+                    step="any"
+                    value={formData.longitude}
+                    onChange={handleInputChange}
+                    placeholder="-74.0060"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Base price for venue-linked courts */}
+          {selectedVenueId && (
             <div>
               <Label htmlFor="base_price">Base Price ($/hour) *</Label>
               <Input
@@ -252,46 +342,7 @@ export function CourtForm() {
                 placeholder="50.00"
               />
             </div>
-          </div>
-
-          <div>
-            <Label htmlFor="location">Location Display Name *</Label>
-            <Input
-              id="location"
-              name="location"
-              required
-              value={formData.location}
-              onChange={handleInputChange}
-              placeholder="e.g., Downtown Sports Complex"
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="latitude">Latitude (Optional)</Label>
-              <Input
-                id="latitude"
-                name="latitude"
-                type="number"
-                step="any"
-                value={formData.latitude}
-                onChange={handleInputChange}
-                placeholder="40.7128"
-              />
-            </div>
-            <div>
-              <Label htmlFor="longitude">Longitude (Optional)</Label>
-              <Input
-                id="longitude"
-                name="longitude"
-                type="number"
-                step="any"
-                value={formData.longitude}
-                onChange={handleInputChange}
-                placeholder="-74.0060"
-              />
-            </div>
-          </div>
+          )}
 
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
@@ -334,7 +385,7 @@ export function CourtForm() {
           </div>
 
           <div>
-            <Label>Image URLs</Label>
+            <Label>{selectedVenueId ? 'Court-Specific Images' : 'Image URLs'}</Label>
             <div className="space-y-2 mt-2">
               {images.map((img, index) => (
                 <div key={index} className="flex gap-2">
@@ -363,7 +414,7 @@ export function CourtForm() {
           </div>
 
           <div>
-            <Label>Amenities</Label>
+            <Label>{selectedVenueId ? 'Court-Specific Amenities' : 'Amenities'}</Label>
             <div className="space-y-2 mt-2">
               {amenities.map((amenity, index) => (
                 <div key={index} className="flex gap-2">

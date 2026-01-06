@@ -129,76 +129,91 @@ export type Database = {
       }
       courts: {
         Row: {
-          address: string
+          address: string | null
           amenities: string[] | null
           base_price: number
-          city: string
+          city: string | null
           closing_time: string | null
+          closing_time_override: string | null
+          court_specific_amenities: string[] | null
+          court_specific_images: string[] | null
           created_at: string
           description: string | null
           id: string
           images: string[] | null
           is_active: boolean
           latitude: number | null
-          location: string
+          location: string | null
           longitude: number | null
           name: string
           opening_time: string | null
+          opening_time_override: string | null
           owner_id: string
           slug: string
           sport_type: string
-          state: string
+          state: string | null
           status: Database["public"]["Enums"]["court_status"]
           updated_at: string
-          zip_code: string
+          venue_id: string | null
+          zip_code: string | null
         }
         Insert: {
-          address: string
+          address?: string | null
           amenities?: string[] | null
           base_price: number
-          city: string
+          city?: string | null
           closing_time?: string | null
+          closing_time_override?: string | null
+          court_specific_amenities?: string[] | null
+          court_specific_images?: string[] | null
           created_at?: string
           description?: string | null
           id?: string
           images?: string[] | null
           is_active?: boolean
           latitude?: number | null
-          location: string
+          location?: string | null
           longitude?: number | null
           name: string
           opening_time?: string | null
+          opening_time_override?: string | null
           owner_id: string
           slug: string
           sport_type: string
-          state: string
+          state?: string | null
           status?: Database["public"]["Enums"]["court_status"]
           updated_at?: string
-          zip_code: string
+          venue_id?: string | null
+          zip_code?: string | null
         }
         Update: {
-          address?: string
+          address?: string | null
           amenities?: string[] | null
           base_price?: number
-          city?: string
+          city?: string | null
           closing_time?: string | null
+          closing_time_override?: string | null
+          court_specific_amenities?: string[] | null
+          court_specific_images?: string[] | null
           created_at?: string
           description?: string | null
           id?: string
           images?: string[] | null
           is_active?: boolean
           latitude?: number | null
-          location?: string
+          location?: string | null
           longitude?: number | null
           name?: string
           opening_time?: string | null
+          opening_time_override?: string | null
           owner_id?: string
           slug?: string
           sport_type?: string
-          state?: string
+          state?: string | null
           status?: Database["public"]["Enums"]["court_status"]
           updated_at?: string
-          zip_code?: string
+          venue_id?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {
@@ -206,6 +221,13 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "courts_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
             referencedColumns: ["id"]
           },
         ]
@@ -547,6 +569,81 @@ export type Database = {
           },
         ]
       }
+      venues: {
+        Row: {
+          address: string
+          amenities: string[] | null
+          city: string
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          default_closing_time: string | null
+          default_opening_time: string | null
+          description: string | null
+          id: string
+          images: string[] | null
+          is_active: boolean
+          latitude: number | null
+          location: string
+          longitude: number | null
+          name: string
+          owner_id: string
+          slug: string
+          state: string
+          status: Database["public"]["Enums"]["court_status"]
+          updated_at: string
+          zip_code: string
+        }
+        Insert: {
+          address: string
+          amenities?: string[] | null
+          city: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          default_closing_time?: string | null
+          default_opening_time?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean
+          latitude?: number | null
+          location: string
+          longitude?: number | null
+          name: string
+          owner_id: string
+          slug: string
+          state: string
+          status?: Database["public"]["Enums"]["court_status"]
+          updated_at?: string
+          zip_code: string
+        }
+        Update: {
+          address?: string
+          amenities?: string[] | null
+          city?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          default_closing_time?: string | null
+          default_opening_time?: string | null
+          description?: string | null
+          id?: string
+          images?: string[] | null
+          is_active?: boolean
+          latitude?: number | null
+          location?: string
+          longitude?: number | null
+          name?: string
+          owner_id?: string
+          slug?: string
+          state?: string
+          status?: Database["public"]["Enums"]["court_status"]
+          updated_at?: string
+          zip_code?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -555,6 +652,10 @@ export type Database = {
       cleanup_expired_slot_locks: { Args: never; Returns: undefined }
       generate_court_slug: {
         Args: { court_id: string; court_name: string }
+        Returns: string
+      }
+      generate_venue_slug: {
+        Args: { venue_id: string; venue_name: string }
         Returns: string
       }
       get_court_booking_count: { Args: { court_uuid: string }; Returns: number }
