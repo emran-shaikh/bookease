@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, X, Upload, Image as ImageIcon } from 'lucide-react';
+import { VenueSelector } from '@/components/VenueSelector';
 
 interface CourtEditFormProps {
   court: any;
@@ -22,6 +23,7 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
   const [is24Hours, setIs24Hours] = useState(false);
+  const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     sport_type: '',
@@ -46,6 +48,7 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
       const is24 = openingTime === '00:00' && (closingTime === '23:59' || closingTime === '00:00');
       
       setIs24Hours(is24);
+      setSelectedVenueId(court.venue_id || null);
       setFormData({
         name: court.name || '',
         sport_type: court.sport_type || '',
@@ -62,8 +65,15 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         opening_time: openingTime,
         closing_time: closingTime,
       });
-      setImages(court.images?.length > 0 ? court.images : ['']);
-      setAmenities(court.amenities?.length > 0 ? court.amenities : ['']);
+      
+      // Handle images based on venue linkage
+      if (court.venue_id) {
+        setImages(court.court_specific_images?.length > 0 ? court.court_specific_images : ['']);
+        setAmenities(court.court_specific_amenities?.length > 0 ? court.court_specific_amenities : ['']);
+      } else {
+        setImages(court.images?.length > 0 ? court.images : ['']);
+        setAmenities(court.amenities?.length > 0 ? court.amenities : ['']);
+      }
     }
   }, [court]);
 
@@ -183,26 +193,46 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
       const filteredImages = images.filter(img => img.trim() !== '');
       const filteredAmenities = amenities.filter(am => am.trim() !== '');
 
+      const updateData: any = {
+        name: formData.name,
+        sport_type: formData.sport_type,
+        description: formData.description || null,
+        base_price: parseFloat(formData.base_price),
+        is_active: formData.is_active,
+        opening_time: is24Hours ? '00:00' : formData.opening_time,
+        closing_time: is24Hours ? '23:59' : formData.closing_time,
+        venue_id: selectedVenueId || null,
+      };
+
+      if (selectedVenueId) {
+        // Venue-linked court
+        updateData.court_specific_images = filteredImages.length > 0 ? filteredImages : null;
+        updateData.court_specific_amenities = filteredAmenities.length > 0 ? filteredAmenities : null;
+        updateData.address = null;
+        updateData.city = null;
+        updateData.state = null;
+        updateData.zip_code = null;
+        updateData.location = null;
+        updateData.images = null;
+        updateData.amenities = null;
+      } else {
+        // Standalone court
+        updateData.address = formData.address;
+        updateData.city = formData.city;
+        updateData.state = formData.state;
+        updateData.zip_code = formData.zip_code;
+        updateData.location = formData.location;
+        updateData.latitude = formData.latitude ? parseFloat(formData.latitude) : null;
+        updateData.longitude = formData.longitude ? parseFloat(formData.longitude) : null;
+        updateData.images = filteredImages.length > 0 ? filteredImages : null;
+        updateData.amenities = filteredAmenities.length > 0 ? filteredAmenities : null;
+        updateData.court_specific_images = null;
+        updateData.court_specific_amenities = null;
+      }
+
       const { error } = await supabase
         .from('courts')
-        .update({
-          name: formData.name,
-          sport_type: formData.sport_type,
-          description: formData.description || null,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          zip_code: formData.zip_code,
-          location: formData.location,
-          base_price: parseFloat(formData.base_price),
-          latitude: formData.latitude ? parseFloat(formData.latitude) : null,
-          longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-          images: filteredImages.length > 0 ? filteredImages : null,
-          amenities: filteredAmenities.length > 0 ? filteredAmenities : null,
-          is_active: formData.is_active,
-          opening_time: is24Hours ? '00:00' : formData.opening_time,
-          closing_time: is24Hours ? '23:59' : formData.closing_time,
-        })
+        .update(updateData)
         .eq('id', court.id);
 
       if (error) throw error;
@@ -246,9 +276,14 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
             onChange={handleInputChange}
           />
         </div>
-      </div>
+        </div>
 
-      <div>
+        <VenueSelector
+          value={selectedVenueId}
+          onChange={setSelectedVenueId}
+        />
+
+        <div>
         <Label htmlFor="description">Description</Label>
         <Textarea
           id="description"
@@ -259,99 +294,120 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <Label htmlFor="address">Address *</Label>
-          <Input
-            id="address"
-            name="address"
-            required
-            value={formData.address}
-            onChange={handleInputChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="city">City *</Label>
-          <Input
-            id="city"
-            name="city"
-            required
-            value={formData.city}
-            onChange={handleInputChange}
-          />
-        </div>
-      </div>
+        {/* Location fields - only shown for standalone courts */}
+        {!selectedVenueId && (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="address">Address *</Label>
+                <Input
+                  id="address"
+                  name="address"
+                  required
+                  value={formData.address}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="city">City *</Label>
+                <Input
+                  id="city"
+                  name="city"
+                  required
+                  value={formData.city}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div>
-          <Label htmlFor="state">State *</Label>
-          <Input
-            id="state"
-            name="state"
-            required
-            value={formData.state}
-            onChange={handleInputChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="zip_code">Zip Code *</Label>
-          <Input
-            id="zip_code"
-            name="zip_code"
-            required
-            value={formData.zip_code}
-            onChange={handleInputChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="base_price">Base Price (Rs./hour) *</Label>
-          <Input
-            id="base_price"
-            name="base_price"
-            type="number"
-            step="0.01"
-            required
-            value={formData.base_price}
-            onChange={handleInputChange}
-          />
-        </div>
-      </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <Label htmlFor="state">State *</Label>
+                <Input
+                  id="state"
+                  name="state"
+                  required
+                  value={formData.state}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="zip_code">Zip Code *</Label>
+                <Input
+                  id="zip_code"
+                  name="zip_code"
+                  required
+                  value={formData.zip_code}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="base_price">Base Price (Rs./hour) *</Label>
+                <Input
+                  id="base_price"
+                  name="base_price"
+                  type="number"
+                  step="0.01"
+                  required
+                  value={formData.base_price}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
 
-      <div>
-        <Label htmlFor="location">Location Display Name *</Label>
-        <Input
-          id="location"
-          name="location"
-          required
-          value={formData.location}
-          onChange={handleInputChange}
-        />
-      </div>
+            <div>
+              <Label htmlFor="location">Location Display Name *</Label>
+              <Input
+                id="location"
+                name="location"
+                required
+                value={formData.location}
+                onChange={handleInputChange}
+              />
+            </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <Label htmlFor="latitude">Latitude (Optional)</Label>
-          <Input
-            id="latitude"
-            name="latitude"
-            type="number"
-            step="any"
-            value={formData.latitude}
-            onChange={handleInputChange}
-          />
-        </div>
-        <div>
-          <Label htmlFor="longitude">Longitude (Optional)</Label>
-          <Input
-            id="longitude"
-            name="longitude"
-            type="number"
-            step="any"
-            value={formData.longitude}
-            onChange={handleInputChange}
-          />
-        </div>
-      </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="latitude">Latitude (Optional)</Label>
+                <Input
+                  id="latitude"
+                  name="latitude"
+                  type="number"
+                  step="any"
+                  value={formData.latitude}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="longitude">Longitude (Optional)</Label>
+                <Input
+                  id="longitude"
+                  name="longitude"
+                  type="number"
+                  step="any"
+                  value={formData.longitude}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Base price for venue-linked courts */}
+        {selectedVenueId && (
+          <div>
+            <Label htmlFor="base_price">Base Price (Rs./hour) *</Label>
+            <Input
+              id="base_price"
+              name="base_price"
+              type="number"
+              step="0.01"
+              required
+              value={formData.base_price}
+              onChange={handleInputChange}
+            />
+          </div>
+        )}
 
       <div className="space-y-4">
         <div className="flex items-center space-x-2">
@@ -403,7 +459,7 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
       </div>
 
       <div>
-        <Label>Court Images</Label>
+        <Label>{selectedVenueId ? 'Court-Specific Images' : 'Court Images'}</Label>
         <div className="space-y-3 mt-2">
           {images.map((img, index) => (
             <div key={index} className="space-y-2">
@@ -461,7 +517,7 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
       </div>
 
       <div>
-        <Label>Amenities</Label>
+        <Label>{selectedVenueId ? 'Court-Specific Amenities' : 'Amenities'}</Label>
         <div className="space-y-2 mt-2">
           {amenities.map((amenity, index) => (
             <div key={index} className="flex gap-2">

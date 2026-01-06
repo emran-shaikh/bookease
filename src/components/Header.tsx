@@ -65,8 +65,11 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-4 lg:gap-6">
+          <Link to="/venues" className="text-sm font-medium hover:text-primary transition-colors">
+            Venues
+          </Link>
           <Link to="/courts" className="text-sm font-medium hover:text-primary transition-colors">
-            Browse Courts
+            Courts
           </Link>
           {user ? (
             <>
@@ -129,9 +132,16 @@ export function Header() {
                 <Button
                   variant="ghost"
                   className="justify-start h-12 text-base"
+                  onClick={() => handleNavigation('/venues')}
+                >
+                  Venues
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start h-12 text-base"
                   onClick={() => handleNavigation('/courts')}
                 >
-                  Browse Courts
+                  Courts
                 </Button>
                 {user ? (
                   <>
