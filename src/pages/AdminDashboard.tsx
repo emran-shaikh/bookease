@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
 import { CourtEditForm } from '@/components/CourtEditForm';
+import { VenueEditForm } from '@/components/VenueEditForm';
 import { formatTimeSlot12h } from '@/lib/utils';
 import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
 
@@ -40,6 +41,8 @@ export default function AdminDashboard() {
   const [userSort, setUserSort] = useState<SortOption>('name-asc');
   const [editingCourt, setEditingCourt] = useState<any>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingVenue, setEditingVenue] = useState<any>(null);
+  const [showVenueEditDialog, setShowVenueEditDialog] = useState(false);
   
   // Filter states
   const [bookingFilters, setBookingFilters] = useState<FilterState>({});
@@ -681,6 +684,16 @@ export default function AdminDashboard() {
                         <TableCell>{format(new Date(venue.created_at), 'MMM d, yyyy')}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingVenue(venue);
+                                setShowVenueEditDialog(true);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
                             {venue.status === 'pending' && (
                               <>
                                 <Button
@@ -714,6 +727,29 @@ export default function AdminDashboard() {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Edit Venue Dialog */}
+            <Dialog open={showVenueEditDialog} onOpenChange={setShowVenueEditDialog}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Venue</DialogTitle>
+                </DialogHeader>
+                {editingVenue && (
+                  <VenueEditForm
+                    venue={editingVenue}
+                    onSuccess={() => {
+                      setShowVenueEditDialog(false);
+                      setEditingVenue(null);
+                      fetchAdminData();
+                    }}
+                    onCancel={() => {
+                      setShowVenueEditDialog(false);
+                      setEditingVenue(null);
+                    }}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="bookings">
