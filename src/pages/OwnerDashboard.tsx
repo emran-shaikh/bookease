@@ -16,6 +16,7 @@ import { CourtForm } from '@/components/CourtForm';
 import { CourtEditForm } from '@/components/CourtEditForm';
 import { OwnerBankSettings } from '@/components/OwnerBankSettings';
 import { VenueForm } from '@/components/VenueForm';
+import { VenueEditForm } from '@/components/VenueEditForm';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -44,6 +45,8 @@ export default function OwnerDashboard() {
   const [editingCourt, setEditingCourt] = useState<any>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingPricingRule, setEditingPricingRule] = useState<any>(null);
+  const [editingVenue, setEditingVenue] = useState<any>(null);
+  const [showVenueEditDialog, setShowVenueEditDialog] = useState(false);
   const [bookingFilters, setBookingFilters] = useState<FilterState>({});
 
   // Block slot form state
@@ -648,6 +651,16 @@ export default function OwnerDashboard() {
                           <Button 
                             variant="outline" 
                             size="sm"
+                            onClick={() => {
+                              setEditingVenue(venue);
+                              setShowVenueEditDialog(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
                             className="flex-1"
                             onClick={() => {
                               setShowCourtForm(true);
@@ -680,6 +693,29 @@ export default function OwnerDashboard() {
                 })}
               </div>
             )}
+
+            {/* Edit Venue Dialog */}
+            <Dialog open={showVenueEditDialog} onOpenChange={setShowVenueEditDialog}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Venue</DialogTitle>
+                </DialogHeader>
+                {editingVenue && (
+                  <VenueEditForm
+                    venue={editingVenue}
+                    onSuccess={() => {
+                      setShowVenueEditDialog(false);
+                      setEditingVenue(null);
+                      fetchOwnerData();
+                    }}
+                    onCancel={() => {
+                      setShowVenueEditDialog(false);
+                      setEditingVenue(null);
+                    }}
+                  />
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="settings">
