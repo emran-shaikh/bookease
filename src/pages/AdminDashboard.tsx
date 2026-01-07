@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Loader2, CheckCircle, XCircle, Users, Building2, Calendar, CreditCard, ArrowUpDown, Edit, Trash2 } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Users, Building2, Calendar, CreditCard, ArrowUpDown, Edit, Trash2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -30,10 +30,13 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [pendingCourts, setPendingCourts] = useState<any[]>([]);
   const [allCourts, setAllCourts] = useState<any[]>([]);
+  const [pendingVenues, setPendingVenues] = useState<any[]>([]);
+  const [allVenues, setAllVenues] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
   const [bookingSort, setBookingSort] = useState<SortOption>('date-desc');
   const [courtSort, setCourtSort] = useState<SortOption>('name-asc');
+  const [venueSort, setVenueSort] = useState<SortOption>('name-asc');
   const [userSort, setUserSort] = useState<SortOption>('name-asc');
   const [editingCourt, setEditingCourt] = useState<any>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -41,10 +44,12 @@ export default function AdminDashboard() {
   // Filter states
   const [bookingFilters, setBookingFilters] = useState<FilterState>({});
   const [courtFilters, setCourtFilters] = useState<FilterState>({});
+  const [venueFilters, setVenueFilters] = useState<FilterState>({});
   const [userFilters, setUserFilters] = useState<FilterState>({});
   const [paymentFilters, setPaymentFilters] = useState<FilterState>({});
   const [analytics, setAnalytics] = useState({
     totalCourts: 0,
+    totalVenues: 0,
     totalBookings: 0,
     totalRevenue: 0,
     activeUsers: 0,
@@ -69,20 +74,26 @@ export default function AdminDashboard() {
 
   async function fetchAdminData() {
     try {
-      const [courtsData, allCourtsData, usersData, bookingsData] = await Promise.all([
+      const [courtsData, allCourtsData, venuesData, allVenuesData, usersData, bookingsData] = await Promise.all([
         supabase.from('courts').select('*, profiles(full_name, email)').eq('status', 'pending'),
         supabase.from('courts').select('*, profiles(full_name, email)'),
+        supabase.from('venues').select('*').eq('status', 'pending'),
+        supabase.from('venues').select('*'),
         supabase.from('profiles').select('*, user_roles(role)'),
         supabase.from('bookings').select('*, courts(name), profiles(full_name, email)'),
       ]);
 
       if (courtsData.error) throw courtsData.error;
       if (allCourtsData.error) throw allCourtsData.error;
+      if (venuesData.error) throw venuesData.error;
+      if (allVenuesData.error) throw allVenuesData.error;
       if (usersData.error) throw usersData.error;
       if (bookingsData.error) throw bookingsData.error;
 
       setPendingCourts(courtsData.data || []);
       setAllCourts(allCourtsData.data || []);
+      setPendingVenues(venuesData.data || []);
+      setAllVenues(allVenuesData.data || []);
       setUsers(usersData.data || []);
       setBookings(bookingsData.data || []);
 
@@ -92,6 +103,7 @@ export default function AdminDashboard() {
 
       setAnalytics({
         totalCourts: allCourtsData.data?.length || 0,
+        totalVenues: allVenuesData.data?.length || 0,
         totalBookings: bookingsData.data?.length || 0,
         totalRevenue,
         activeUsers: usersData.data?.length || 0,
@@ -175,6 +187,46 @@ export default function AdminDashboard() {
       if (error) throw error;
 
       toast({ title: 'Success', description: 'Court deleted successfully' });
+      fetchAdminData();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  }
+
+  async function updateVenueStatus(venueId: string, status: 'approved' | 'rejected') {
+    try {
+      const { error } = await supabase
+        .from('venues')
+        .update({ status })
+        .eq('id', venueId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: `Venue ${status} successfully`,
+      });
+
+      fetchAdminData();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  }
+
+  async function handleDeleteVenue(venueId: string) {
+    if (!confirm('Are you sure you want to delete this venue? This will also affect courts linked to it.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('venues').delete().eq('id', venueId);
+      if (error) throw error;
+
+      toast({ title: 'Success', description: 'Venue deleted successfully' });
       fetchAdminData();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
@@ -326,6 +378,42 @@ export default function AdminDashboard() {
     }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [bookings, paymentFilters]);
 
+  const filteredVenues = useMemo(() => {
+    return allVenues.filter(venue => {
+      if (venueFilters.status && venueFilters.status !== 'all') {
+        if (venue.status !== venueFilters.status) return false;
+      }
+      if (venueFilters.search) {
+        const searchLower = venueFilters.search.toLowerCase();
+        const venueName = venue.name?.toLowerCase() || '';
+        const city = venue.city?.toLowerCase() || '';
+        const address = venue.address?.toLowerCase() || '';
+        if (!venueName.includes(searchLower) && !city.includes(searchLower) && !address.includes(searchLower)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allVenues, venueFilters]);
+
+  const sortedVenues = useMemo(() => {
+    const sorted = [...filteredVenues];
+    switch (venueSort) {
+      case 'name-asc':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'name-desc':
+        return sorted.sort((a, b) => b.name.localeCompare(a.name));
+      case 'date-desc':
+        return sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      case 'date-asc':
+        return sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      case 'status':
+        return sorted.sort((a, b) => a.status.localeCompare(b.status));
+      default:
+        return sorted;
+    }
+  }, [filteredVenues, venueSort]);
+
   if (loading || roleLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -353,7 +441,17 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">Manage courts, users, and monitor platform activity</p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-4 mb-8">
+        <div className="grid gap-6 md:grid-cols-5 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Venues</CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{analytics.totalVenues}</div>
+              <p className="text-xs text-muted-foreground">{pendingVenues.length} pending approval</p>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Courts</CardTitle>
@@ -393,14 +491,73 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <Tabs defaultValue="courts" className="space-y-4">
-          <TabsList>
+        <Tabs defaultValue="venues" className="space-y-4">
+          <TabsList className="flex-wrap">
+            <TabsTrigger value="venues">Pending Venues</TabsTrigger>
             <TabsTrigger value="courts">Pending Courts</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="all-venues">All Venues</TabsTrigger>
             <TabsTrigger value="all-courts">All Courts</TabsTrigger>
+            <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="venues">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pending Venue Approvals</CardTitle>
+                <CardDescription>Review and approve new venue listings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pendingVenues.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No pending venues</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Venue Name</TableHead>
+                        <TableHead>Address</TableHead>
+                        <TableHead>City</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Submitted</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingVenues.map((venue) => (
+                        <TableRow key={venue.id}>
+                          <TableCell className="font-medium">{venue.name}</TableCell>
+                          <TableCell>{venue.address}</TableCell>
+                          <TableCell>{venue.city}, {venue.state}</TableCell>
+                          <TableCell>{venue.contact_email || venue.contact_phone || '-'}</TableCell>
+                          <TableCell>{format(new Date(venue.created_at), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => updateVenueStatus(venue.id, 'approved')}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => updateVenueStatus(venue.id, 'rejected')}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="courts">
             <Card>
@@ -455,6 +612,106 @@ export default function AdminDashboard() {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="all-venues">
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>All Venues</CardTitle>
+                  <CardDescription>View and manage all venue listings</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <DashboardFilters
+                  filters={venueFilters}
+                  onFilterChange={setVenueFilters}
+                  showStatusFilter
+                  showSearchFilter
+                  placeholder="Search by venue name, city..."
+                />
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {sortedVenues.length} of {allVenues.length} venues
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                    <Select value={venueSort} onValueChange={(v) => setVenueSort(v as SortOption)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                        <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                        <SelectItem value="date-desc">Date (Newest)</SelectItem>
+                        <SelectItem value="date-asc">Date (Oldest)</SelectItem>
+                        <SelectItem value="status">Status</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Venue Name</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>City</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedVenues.map((venue) => (
+                      <TableRow key={venue.id}>
+                        <TableCell className="font-medium">{venue.name}</TableCell>
+                        <TableCell>{venue.address}</TableCell>
+                        <TableCell>{venue.city}, {venue.state}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            venue.status === 'approved' ? 'default' :
+                            venue.status === 'rejected' ? 'destructive' : 'secondary'
+                          }>
+                            {venue.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{format(new Date(venue.created_at), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {venue.status === 'pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateVenueStatus(venue.id, 'approved')}
+                                >
+                                  <CheckCircle className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateVenueStatus(venue.id, 'rejected')}
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteVenue(venue.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
