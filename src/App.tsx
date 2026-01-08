@@ -14,6 +14,8 @@ import Courts from "./pages/Courts";
 import CourtDetail from "./pages/CourtDetail";
 import Venues from "./pages/Venues";
 import VenueDetail from "./pages/VenueDetail";
+import Sports from "./pages/Sports";
+import SportDetail from "./pages/SportDetail";
 import BookCourt from "./pages/BookCourt";
 import Dashboard from "./pages/Dashboard";
 import OwnerDashboard from "./pages/OwnerDashboard";
@@ -46,6 +48,8 @@ const App = () => (
               <Route path="/courts/:slug" element={<CourtDetail />} />
               <Route path="/venues" element={<Venues />} />
               <Route path="/venues/:venueSlug" element={<VenueDetail />} />
+              <Route path="/sports" element={<Sports />} />
+              <Route path="/sports/:sportType" element={<SportDetail />} />
               <Route
                 path="/book/:slug"
                 element={
