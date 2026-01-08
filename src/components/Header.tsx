@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu } from 'lucide-react';
+import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu, Trophy } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 
 export function Header() {
@@ -65,6 +65,9 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-4 lg:gap-6">
+          <Link to="/sports" className="text-sm font-medium hover:text-primary transition-colors">
+            Sports
+          </Link>
           <Link to="/venues" className="text-sm font-medium hover:text-primary transition-colors">
             Venues
           </Link>
@@ -129,6 +132,14 @@ export function Header() {
                     {userName}
                   </div>
                 )}
+                <Button
+                  variant="ghost"
+                  className="justify-start h-12 text-base"
+                  onClick={() => handleNavigation('/sports')}
+                >
+                  <Trophy className="mr-2 h-5 w-5" />
+                  Sports
+                </Button>
                 <Button
                   variant="ghost"
                   className="justify-start h-12 text-base"
