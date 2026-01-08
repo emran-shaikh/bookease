@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
 import { SEO } from '@/components/SEO';
@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, MapPin, Clock, Star, Phone, Mail, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/currency';
-import { resolveCourtData } from '@/lib/venue-utils';
+import { resolveCourtData, getUniqueSportTypes } from '@/lib/venue-utils';
+import { getSportIcon, getAmenityIcon, formatSportWithIcon } from '@/lib/sport-icons';
 
 interface VenueData {
   id: string;
@@ -217,14 +218,37 @@ export default function VenueDetail() {
               )}
             </div>
 
-            {/* Amenities */}
+            {/* Amenities - Janbaz style with icons */}
             {venue.amenities && venue.amenities.length > 0 && (
               <div>
-                <h3 className="text-lg font-semibold mb-2">Venue Amenities</h3>
-                <div className="flex flex-wrap gap-2">
+                <h3 className="text-lg font-semibold mb-3">Amenities</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {venue.amenities.map((amenity, index) => (
-                    <Badge key={index} variant="secondary">
-                      {amenity}
+                    <div key={index} className="flex items-center gap-2 text-sm">
+                      <span className="text-lg">{getAmenityIcon(amenity)}</span>
+                      <span>{amenity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Also Available Here - Cross-sport linking like Janbaz */}
+            {courts.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Available Sports</h3>
+                <div className="flex flex-wrap gap-2">
+                  {getUniqueSportTypes(courts).map((sport) => (
+                    <Badge 
+                      key={sport} 
+                      variant="outline" 
+                      className="text-sm px-3 py-1.5 cursor-pointer hover:bg-accent transition-colors"
+                      onClick={() => {
+                        const courtSection = document.getElementById('courts-section');
+                        courtSection?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      {formatSportWithIcon(sport)}
                     </Badge>
                   ))}
                 </div>
@@ -273,7 +297,7 @@ export default function VenueDetail() {
         </div>
 
         {/* Courts Section */}
-        <div>
+        <div id="courts-section">
           <h2 className="text-xl sm:text-2xl font-bold mb-4">Available Courts</h2>
           
           {courts.length === 0 ? (
@@ -326,7 +350,9 @@ export default function VenueDetail() {
                     
                     <CardContent className="p-3 sm:p-4 pt-0">
                       <div className="space-y-1.5 sm:space-y-2">
-                        <Badge variant="secondary" className="text-xs">{court.sport_type}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {formatSportWithIcon(court.sport_type)}
+                        </Badge>
                         
                         {court.rating > 0 && (
                           <div className="flex items-center text-xs sm:text-sm">

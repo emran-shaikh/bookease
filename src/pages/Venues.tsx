@@ -12,6 +12,7 @@ import { Loader2, MapPin, Search, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCourtCount, getUniqueSportTypes, getLowestPrice } from '@/lib/venue-utils';
 import { formatPrice } from '@/lib/currency';
+import { getSportIcon, formatSportWithIcon } from '@/lib/sport-icons';
 
 interface Venue {
   id: string;
@@ -77,7 +78,8 @@ export default function Venues() {
     }
   }
 
-  // Get unique cities and sport types for filters
+  // Get unique cities/areas and sport types for filters (Janbaz-style area filtering)
+  const areas = ['all', ...new Set(venues.map(v => v.location).filter(Boolean))];
   const cities = ['all', ...new Set(venues.map(v => v.city))];
   const allSportTypes = new Set<string>();
   venues.forEach(v => {
@@ -86,19 +88,21 @@ export default function Venues() {
     });
   });
   const sportTypes = ['all', ...allSportTypes];
+  const [areaFilter, setAreaFilter] = useState('all');
 
   const filteredVenues = venues.filter(venue => {
     const matchesSearch = 
       venue.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       venue.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      venue.location.toLowerCase().includes(searchTerm.toLowerCase());
+      (venue.location || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesCity = cityFilter === 'all' || venue.city === cityFilter;
+    const matchesArea = areaFilter === 'all' || venue.location === areaFilter;
     
     const matchesSport = sportFilter === 'all' || 
       venue.courts?.some(c => c.sport_type === sportFilter);
     
-    return matchesSearch && matchesCity && matchesSport;
+    return matchesSearch && matchesCity && matchesArea && matchesSport;
   });
 
   if (loading) {
@@ -127,8 +131,31 @@ export default function Venues() {
           </p>
         </div>
 
-        {/* Filters */}
+        {/* Filters - Janbaz style with Sport & Area emphasis */}
         <div className="mb-4 sm:mb-6 space-y-3 sm:space-y-4">
+          {/* Sport filter chips - Primary filter like Janbaz */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={sportFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setSportFilter('all')}
+              className="h-9"
+            >
+              All Sports
+            </Button>
+            {[...allSportTypes].map(sport => (
+              <Button
+                key={sport}
+                variant={sportFilter === sport ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSportFilter(sport)}
+                className="h-9"
+              >
+                {formatSportWithIcon(sport)}
+              </Button>
+            ))}
+          </div>
+
           <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -141,6 +168,20 @@ export default function Venues() {
             </div>
             
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:flex">
+              {/* Area filter - Janbaz emphasizes neighborhoods */}
+              <Select value={areaFilter} onValueChange={setAreaFilter}>
+                <SelectTrigger className="w-full lg:w-[160px] h-10 sm:h-11 text-sm">
+                  <SelectValue placeholder="All Areas" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas.map(area => (
+                    <SelectItem key={area} value={area}>
+                      {area === 'all' ? 'All Areas' : area}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
               <Select value={cityFilter} onValueChange={setCityFilter}>
                 <SelectTrigger className="w-full lg:w-[160px] h-10 sm:h-11 text-sm">
                   <SelectValue placeholder="All Cities" />
@@ -149,19 +190,6 @@ export default function Venues() {
                   {cities.map(city => (
                     <SelectItem key={city} value={city}>
                       {city === 'all' ? 'All Cities' : city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <Select value={sportFilter} onValueChange={setSportFilter}>
-                <SelectTrigger className="w-full lg:w-[160px] h-10 sm:h-11 text-sm">
-                  <SelectValue placeholder="All Sports" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sportTypes.map(sport => (
-                    <SelectItem key={sport} value={sport}>
-                      {sport === 'all' ? 'All Sports' : sport}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -213,11 +241,11 @@ export default function Venues() {
                 
                 <CardContent className="p-3 sm:p-4 pt-0">
                   <div className="space-y-1.5 sm:space-y-2">
-                    {/* Sport types */}
+                    {/* Sport types with icons - Janbaz style */}
                     <div className="flex flex-wrap gap-1">
                       {sportTypesInVenue.slice(0, 3).map((sport) => (
                         <Badge key={sport} variant="outline" className="text-xs">
-                          {sport}
+                          {formatSportWithIcon(sport)}
                         </Badge>
                       ))}
                       {sportTypesInVenue.length > 3 && (
