@@ -114,7 +114,7 @@ export function VenueSelector({ value, onChange, label = "Link to Venue (Optiona
       
       {value && (
         <p className="text-xs text-muted-foreground">
-          Court will inherit address and location from the selected venue.
+          Court will inherit <strong>address, location, and operating hours</strong> from the selected venue. You can override hours per court if needed.
         </p>
       )}
     </div>
