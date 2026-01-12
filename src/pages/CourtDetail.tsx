@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useSlotLock } from '@/hooks/useSlotLock';
@@ -13,11 +13,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '@/components/ui/carousel';
-import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, Filter, CalendarIcon, List } from 'lucide-react';
+import { Loader2, MapPin, Star, Clock, Lock, Heart, ChevronLeft, ChevronRight, Filter, CalendarIcon, List, Building2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, addDays, startOfDay, isBefore, isToday } from 'date-fns';
 import { useFavorites } from '@/hooks/useFavorites';
 import { formatPrice } from '@/lib/currency';
+import { resolveCourtData, Venue, ResolvedCourtData } from '@/lib/venue-utils';
+import { getAmenityIcon } from '@/lib/sport-icons';
 
 export default function CourtDetail() {
   const { slug } = useParams();
@@ -25,6 +27,8 @@ export default function CourtDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [court, setCourt] = useState<any>(null);
+  const [venue, setVenue] = useState<Venue | null>(null);
+  const [resolvedData, setResolvedData] = useState<ResolvedCourtData | null>(null);
   const [courtId, setCourtId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -171,7 +175,7 @@ export default function CourtDetail() {
         .from('courts')
         .select(`
           *,
-          reviews (rating, comment, created_at, profiles (full_name))
+          reviews (rating, comment, created_at, images, profiles (full_name))
         `)
         .eq('slug', slug)
         .single();
@@ -179,6 +183,24 @@ export default function CourtDetail() {
       if (error) throw error;
       setCourt(data);
       setCourtId(data.id);
+      
+      // Fetch venue data if court is linked to a venue
+      if (data.venue_id) {
+        const { data: venueData, error: venueError } = await supabase
+          .from('venues')
+          .select('*')
+          .eq('id', data.venue_id)
+          .single();
+        
+        if (!venueError && venueData) {
+          setVenue(venueData as Venue);
+          setResolvedData(resolveCourtData(data, venueData as Venue));
+        } else {
+          setResolvedData(resolveCourtData(data, null));
+        }
+      } else {
+        setResolvedData(resolveCourtData(data, null));
+      }
     } catch (error: any) {
       toast({
         title: 'Error loading court details',
@@ -480,16 +502,22 @@ export default function CourtDetail() {
 
   // Check if court operates 24 hours (opening at 00:00 and closing at 23:00/23:59 or later)
   const is24HourCourt = (): boolean => {
-    const opening = parseTimeHour(court?.opening_time, 0);
-    const closing = parseTimeHour(court?.closing_time, 23);
+    // Use resolved data if available, otherwise fall back to court data
+    const openingTime = resolvedData?.opening_time || court?.opening_time;
+    const closingTime = resolvedData?.closing_time || court?.closing_time;
+    const opening = parseTimeHour(openingTime, 0);
+    const closing = parseTimeHour(closingTime, 23);
     return opening === 0 && closing >= 23;
   };
 
-  // Generate time slots based on court's opening/closing hours
+  // Generate time slots based on resolved opening/closing hours
   // Last bookable slot is the closing hour (e.g., 23:00 slot if closing at 23:00)
   const generateTimeSlots = () => {
-    const openingHour = parseTimeHour(court?.opening_time, 0);
-    const closingHour = parseTimeHour(court?.closing_time, 23);
+    // Use resolved data for operating hours
+    const openingTime = resolvedData?.opening_time || court?.opening_time;
+    const closingTime = resolvedData?.closing_time || court?.closing_time;
+    const openingHour = parseTimeHour(openingTime, 0);
+    const closingHour = parseTimeHour(closingTime, 23);
     const slots: string[] = [];
     
     // Generate slots from opening to closing (inclusive)
@@ -693,6 +721,8 @@ export default function CourtDetail() {
       navigate(`/book/${slug}`, {
         state: {
           court,
+          venue,
+          resolvedData,
           date: selectedDate,
           timeSlot: `${selectedStartTime}-${endTime}`,
           lockId: existingLock?.id,
@@ -784,8 +814,8 @@ export default function CourtDetail() {
     <div className="min-h-screen bg-background overflow-x-hidden">
       <SEO 
         title={court ? `${court.name} - Book Now` : 'Court Details'}
-        description={court ? `Book ${court.name} in ${court.city}. ${court.sport_type} court with real-time availability. ${court.description?.slice(0, 100) || ''}` : 'View court details and book your slot.'}
-        keywords={court ? `${court.name}, ${court.sport_type}, ${court.city}, book court, sports venue` : 'court details, sports booking'}
+        description={court ? `Book ${court.name} in ${resolvedData?.city || court.city}. ${court.sport_type} court with real-time availability. ${court.description?.slice(0, 100) || ''}` : 'View court details and book your slot.'}
+        keywords={court ? `${court.name}, ${court.sport_type}, ${resolvedData?.city || court.city}, book court, sports venue${venue ? `, ${venue.name}` : ''}` : 'court details, sports booking'}
       />
       <Header />
       
@@ -793,10 +823,11 @@ export default function CourtDetail() {
         <div className="grid gap-4 sm:gap-6 md:gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="mb-4 sm:mb-6 relative">
-              {court.images && court.images.length > 1 ? (
+              {/* Use resolved images (venue + court-specific) */}
+              {resolvedData?.images && resolvedData.images.length > 1 ? (
                 <Carousel className="w-full">
                   <CarouselContent>
-                    {court.images.map((image: string, index: number) => (
+                    {resolvedData.images.map((image: string, index: number) => (
                       <CarouselItem key={index}>
                         <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
                           <img
@@ -822,10 +853,10 @@ export default function CourtDetail() {
                   <CarouselPrevious className="left-2 h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border-0" />
                   <CarouselNext className="right-2 h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border-0" />
                 </Carousel>
-              ) : court.images && court.images.length === 1 ? (
+              ) : resolvedData?.images && resolvedData.images.length === 1 ? (
                 <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
                   <img
-                    src={court.images[0]}
+                    src={resolvedData.images[0]}
                     alt={court.name}
                     className="h-full w-full object-cover"
                     onError={(e) => {
@@ -864,17 +895,30 @@ export default function CourtDetail() {
 
             <h1 className="mb-2 text-xl sm:text-2xl md:text-3xl font-bold">{court.name}</h1>
             
+            {/* Venue Badge - Show if linked to a venue */}
+            {venue && resolvedData?.venue && (
+              <Link 
+                to={`/venues/${resolvedData.venue.slug}`}
+                className="inline-flex items-center gap-1.5 mb-3 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs sm:text-sm font-medium hover:bg-primary/20 transition-colors"
+              >
+                <Building2 className="h-3.5 w-3.5" />
+                Part of {resolvedData.venue.name}
+              </Link>
+            )}
+            
             <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-2 sm:gap-4">
               <Badge variant="secondary" className="text-xs sm:text-sm">{court.sport_type}</Badge>
               <Badge variant="outline" className="text-xs sm:text-sm flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 {is24HourCourt() 
                   ? 'Open 24 Hours' 
-                  : `${convertTo12Hour(court.opening_time || '00:00')} - ${convertTo12Hour(court.closing_time || '23:00')}`}
+                  : `${convertTo12Hour(resolvedData?.opening_time || court.opening_time || '00:00')} - ${convertTo12Hour(resolvedData?.closing_time || court.closing_time || '23:00')}`}
               </Badge>
               <div className="flex items-center text-xs sm:text-sm text-muted-foreground">
                 <MapPin className="mr-1 h-3 w-3 sm:h-4 sm:w-4" />
-                <span className="line-clamp-1">{court.address}, {court.city}, {court.state}</span>
+                <span className="line-clamp-1">
+                  {resolvedData?.address || court.address}, {resolvedData?.city || court.city}, {resolvedData?.state || court.state}
+                </span>
               </div>
               {avgRating > 0 && (
                 <div className="flex items-center">
@@ -889,12 +933,16 @@ export default function CourtDetail() {
 
             <p className="mb-4 sm:mb-6 text-sm sm:text-base text-muted-foreground">{court.description}</p>
 
-            {court.amenities && court.amenities.length > 0 && (
+            {/* Amenities - Use resolved amenities (venue + court-specific) */}
+            {resolvedData?.amenities && resolvedData.amenities.length > 0 && (
               <div className="mb-4 sm:mb-6">
                 <h2 className="mb-2 text-base sm:text-lg md:text-xl font-semibold">Amenities</h2>
                 <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {court.amenities.map((amenity: string, index: number) => (
-                    <Badge key={index} variant="outline" className="text-xs">{amenity}</Badge>
+                  {resolvedData.amenities.map((amenity: string, index: number) => (
+                    <Badge key={index} variant="outline" className="text-xs flex items-center gap-1">
+                      <span>{getAmenityIcon(amenity)}</span>
+                      {amenity}
+                    </Badge>
                   ))}
                 </div>
               </div>
