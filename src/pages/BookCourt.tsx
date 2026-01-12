@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import { useParams, useLocation, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useSlotLock } from '@/hooks/useSlotLock';
@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Clock, Banknote, Building, MessageCircle, ExternalLink, CheckCircle } from 'lucide-react';
+import { Loader2, Clock, Banknote, Building, MessageCircle, ExternalLink, CheckCircle, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
@@ -49,7 +49,7 @@ export default function BookCourt() {
   const [ownerPaymentInfo, setOwnerPaymentInfo] = useState<OwnerPaymentInfo | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
-  const { court, date, timeSlot, lockId } = location.state || {};
+  const { court, venue, resolvedData, date, timeSlot, lockId } = location.state || {};
   const { unlockSlot, getCurrentUserLock } = useSlotLock(court?.id || '', date || null);
 
   // Timer countdown
@@ -353,6 +353,21 @@ export default function BookCourt() {
                 <div>
                   <p className="text-xs sm:text-sm font-medium">Court</p>
                   <p className="text-sm sm:text-base md:text-lg">{court.name}</p>
+                  {venue && resolvedData?.venue && (
+                    <Link 
+                      to={`/venues/${resolvedData.venue.slug}`}
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                    >
+                      <Building2 className="h-3 w-3" />
+                      at {resolvedData.venue.name}
+                    </Link>
+                  )}
+                  {resolvedData && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {resolvedData.city}, {resolvedData.state}
+                    </p>
+                  )}
                 </div>
                 <Separator />
                 <div>
