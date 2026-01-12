@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, X } from 'lucide-react';
+import { Loader2, Plus, X, Clock, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { VenueSelector } from '@/components/VenueSelector';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface Venue {
+  id: string;
+  name: string;
+  default_opening_time: string | null;
+  default_closing_time: string | null;
+}
 
 export function CourtForm() {
   const { user } = useAuth();
@@ -21,6 +29,8 @@ export function CourtForm() {
   const [amenities, setAmenities] = useState<string[]>(['']);
   const [is24Hours, setIs24Hours] = useState(false);
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [useCustomHours, setUseCustomHours] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sport_type: '',
@@ -36,6 +46,31 @@ export function CourtForm() {
     opening_time: '06:00',
     closing_time: '22:00',
   });
+
+  // Fetch venue details when venue is selected
+  useEffect(() => {
+    if (selectedVenueId) {
+      fetchVenueDetails(selectedVenueId);
+    } else {
+      setSelectedVenue(null);
+      setUseCustomHours(false);
+    }
+  }, [selectedVenueId]);
+
+  async function fetchVenueDetails(venueId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('venues')
+        .select('id, name, default_opening_time, default_closing_time')
+        .eq('id', venueId)
+        .single();
+      
+      if (error) throw error;
+      setSelectedVenue(data);
+    } catch (error) {
+      console.error('Error fetching venue:', error);
+    }
+  }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setFormData({
@@ -101,7 +136,7 @@ export function CourtForm() {
       return;
     }
 
-    if (!validateTimes()) return;
+    if ((useCustomHours || !selectedVenueId) && !validateTimes()) return;
 
     setLoading(true);
 
@@ -116,8 +151,6 @@ export function CourtForm() {
         sport_type: formData.sport_type,
         description: formData.description || null,
         base_price: parseFloat(formData.base_price),
-        opening_time: is24Hours ? '00:00' : formData.opening_time,
-        closing_time: is24Hours ? '23:59' : formData.closing_time,
         status: 'pending',
       };
 
@@ -127,6 +160,13 @@ export function CourtForm() {
         insertData.court_specific_images = filteredImages.length > 0 ? filteredImages : null;
         insertData.court_specific_amenities = filteredAmenities.length > 0 ? filteredAmenities : null;
         // Location fields will be null (inherited from venue)
+        
+        // Handle operating hours override
+        if (useCustomHours) {
+          insertData.opening_time_override = is24Hours ? '00:00' : formData.opening_time;
+          insertData.closing_time_override = is24Hours ? '23:59' : formData.closing_time;
+        }
+        // opening_time and closing_time remain null for venue courts
       } else {
         // Standalone court - require location fields
         if (!formData.address || !formData.city || !formData.state || !formData.zip_code || !formData.location) {
@@ -147,6 +187,8 @@ export function CourtForm() {
         insertData.longitude = formData.longitude ? parseFloat(formData.longitude) : null;
         insertData.images = filteredImages.length > 0 ? filteredImages : null;
         insertData.amenities = filteredAmenities.length > 0 ? filteredAmenities : null;
+        insertData.opening_time = is24Hours ? '00:00' : formData.opening_time;
+        insertData.closing_time = is24Hours ? '23:59' : formData.closing_time;
       }
 
       const { data, error } = await supabase.from('courts').insert(insertData).select();
@@ -344,43 +386,79 @@ export function CourtForm() {
             </div>
           )}
 
+          {/* Operating Hours Section */}
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="is_24_hours"
-                checked={is24Hours}
-                onCheckedChange={(checked) => setIs24Hours(checked === true)}
-              />
-              <Label htmlFor="is_24_hours" className="text-sm font-medium cursor-pointer">
-                Open 24 Hours
-              </Label>
-            </div>
+            <Label className="flex items-center gap-2 text-base font-medium">
+              <Clock className="h-4 w-4" />
+              Operating Hours
+            </Label>
             
-            {!is24Hours && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="opening_time">Opening Time *</Label>
-                  <Input
-                    id="opening_time"
-                    name="opening_time"
-                    type="time"
-                    required
-                    value={formData.opening_time}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="closing_time">Closing Time *</Label>
-                  <Input
-                    id="closing_time"
-                    name="closing_time"
-                    type="time"
-                    required
-                    value={formData.closing_time}
-                    onChange={handleInputChange}
-                  />
-                </div>
+            {selectedVenueId && selectedVenue && (
+              <Alert>
+                <Building2 className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Venue Hours:</strong> {selectedVenue.default_opening_time?.substring(0, 5) || '06:00'} - {selectedVenue.default_closing_time?.substring(0, 5) || '22:00'}
+                  <br />
+                  <span className="text-muted-foreground text-sm">
+                    This court will inherit these hours unless you set custom hours below.
+                  </span>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {selectedVenueId && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="use_custom_hours"
+                  checked={useCustomHours}
+                  onCheckedChange={(checked) => setUseCustomHours(checked === true)}
+                />
+                <Label htmlFor="use_custom_hours" className="text-sm font-medium cursor-pointer">
+                  Use custom operating hours for this court
+                </Label>
               </div>
+            )}
+
+            {(useCustomHours || !selectedVenueId) && (
+              <>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="is_24_hours"
+                    checked={is24Hours}
+                    onCheckedChange={(checked) => setIs24Hours(checked === true)}
+                  />
+                  <Label htmlFor="is_24_hours" className="text-sm font-medium cursor-pointer">
+                    Open 24 Hours
+                  </Label>
+                </div>
+                
+                {!is24Hours && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="opening_time">Opening Time *</Label>
+                      <Input
+                        id="opening_time"
+                        name="opening_time"
+                        type="time"
+                        required
+                        value={formData.opening_time}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="closing_time">Closing Time *</Label>
+                      <Input
+                        id="closing_time"
+                        name="closing_time"
+                        type="time"
+                        required
+                        value={formData.closing_time}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 

@@ -7,8 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, X, Upload, Image as ImageIcon } from 'lucide-react';
+import { Loader2, Plus, X, Upload, Clock, Building2 } from 'lucide-react';
 import { VenueSelector } from '@/components/VenueSelector';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface Venue {
+  id: string;
+  name: string;
+  default_opening_time: string | null;
+  default_closing_time: string | null;
+}
 
 interface CourtEditFormProps {
   court: any;
@@ -24,6 +32,8 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
   const [amenities, setAmenities] = useState<string[]>(['']);
   const [is24Hours, setIs24Hours] = useState(false);
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
+  const [selectedVenue, setSelectedVenue] = useState<Venue | null>(null);
+  const [useCustomHours, setUseCustomHours] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     sport_type: '',
@@ -41,14 +51,40 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
     closing_time: '22:00',
   });
 
+  // Fetch venue details when venue is selected
+  useEffect(() => {
+    if (selectedVenueId) {
+      fetchVenueDetails(selectedVenueId);
+    } else {
+      setSelectedVenue(null);
+    }
+  }, [selectedVenueId]);
+
+  async function fetchVenueDetails(venueId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('venues')
+        .select('id, name, default_opening_time, default_closing_time')
+        .eq('id', venueId)
+        .single();
+      
+      if (error) throw error;
+      setSelectedVenue(data);
+    } catch (error) {
+      console.error('Error fetching venue:', error);
+    }
+  }
+
   useEffect(() => {
     if (court) {
-      const openingTime = court.opening_time?.substring(0, 5) || '06:00';
-      const closingTime = court.closing_time?.substring(0, 5) || '22:00';
+      const hasTimeOverride = court.opening_time_override || court.closing_time_override;
+      const openingTime = (hasTimeOverride ? court.opening_time_override : court.opening_time)?.substring(0, 5) || '06:00';
+      const closingTime = (hasTimeOverride ? court.closing_time_override : court.closing_time)?.substring(0, 5) || '22:00';
       const is24 = openingTime === '00:00' && (closingTime === '23:59' || closingTime === '00:00');
       
       setIs24Hours(is24);
       setSelectedVenueId(court.venue_id || null);
+      setUseCustomHours(hasTimeOverride || !court.venue_id);
       setFormData({
         name: court.name || '',
         sport_type: court.sport_type || '',
@@ -185,7 +221,8 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     
-    if (!validateTimes()) return;
+    // Only validate times if using custom hours
+    if ((useCustomHours || !selectedVenueId) && !validateTimes()) return;
     
     setLoading(true);
 
@@ -199,8 +236,6 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         description: formData.description || null,
         base_price: parseFloat(formData.base_price),
         is_active: formData.is_active,
-        opening_time: is24Hours ? '00:00' : formData.opening_time,
-        closing_time: is24Hours ? '23:59' : formData.closing_time,
         venue_id: selectedVenueId || null,
       };
 
@@ -215,6 +250,18 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         updateData.location = null;
         updateData.images = null;
         updateData.amenities = null;
+        
+        // Handle operating hours override
+        if (useCustomHours) {
+          updateData.opening_time_override = is24Hours ? '00:00' : formData.opening_time;
+          updateData.closing_time_override = is24Hours ? '23:59' : formData.closing_time;
+        } else {
+          updateData.opening_time_override = null;
+          updateData.closing_time_override = null;
+        }
+        // Keep base times null for venue courts
+        updateData.opening_time = null;
+        updateData.closing_time = null;
       } else {
         // Standalone court
         updateData.address = formData.address;
@@ -228,6 +275,10 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
         updateData.amenities = filteredAmenities.length > 0 ? filteredAmenities : null;
         updateData.court_specific_images = null;
         updateData.court_specific_amenities = null;
+        updateData.opening_time = is24Hours ? '00:00' : formData.opening_time;
+        updateData.closing_time = is24Hours ? '23:59' : formData.closing_time;
+        updateData.opening_time_override = null;
+        updateData.closing_time_override = null;
       }
 
       const { error } = await supabase
@@ -409,43 +460,79 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
           </div>
         )}
 
+      {/* Operating Hours Section */}
       <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="is_24_hours"
-            checked={is24Hours}
-            onCheckedChange={(checked) => setIs24Hours(checked === true)}
-          />
-          <Label htmlFor="is_24_hours" className="text-sm font-medium cursor-pointer">
-            Open 24 Hours
-          </Label>
-        </div>
+        <Label className="flex items-center gap-2 text-base font-medium">
+          <Clock className="h-4 w-4" />
+          Operating Hours
+        </Label>
         
-        {!is24Hours && (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="opening_time">Opening Time *</Label>
-              <Input
-                id="opening_time"
-                name="opening_time"
-                type="time"
-                required
-                value={formData.opening_time}
-                onChange={handleInputChange}
-              />
-            </div>
-            <div>
-              <Label htmlFor="closing_time">Closing Time *</Label>
-              <Input
-                id="closing_time"
-                name="closing_time"
-                type="time"
-                required
-                value={formData.closing_time}
-                onChange={handleInputChange}
-              />
-            </div>
+        {selectedVenueId && selectedVenue && (
+          <Alert>
+            <Building2 className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Venue Hours:</strong> {selectedVenue.default_opening_time?.substring(0, 5) || '06:00'} - {selectedVenue.default_closing_time?.substring(0, 5) || '22:00'}
+              <br />
+              <span className="text-muted-foreground text-sm">
+                This court will inherit these hours unless you set custom hours below.
+              </span>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {selectedVenueId && (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="use_custom_hours"
+              checked={useCustomHours}
+              onCheckedChange={(checked) => setUseCustomHours(checked === true)}
+            />
+            <Label htmlFor="use_custom_hours" className="text-sm font-medium cursor-pointer">
+              Use custom operating hours for this court
+            </Label>
           </div>
+        )}
+
+        {(useCustomHours || !selectedVenueId) && (
+          <>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="is_24_hours"
+                checked={is24Hours}
+                onCheckedChange={(checked) => setIs24Hours(checked === true)}
+              />
+              <Label htmlFor="is_24_hours" className="text-sm font-medium cursor-pointer">
+                Open 24 Hours
+              </Label>
+            </div>
+            
+            {!is24Hours && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="opening_time">Opening Time *</Label>
+                  <Input
+                    id="opening_time"
+                    name="opening_time"
+                    type="time"
+                    required
+                    value={formData.opening_time}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="closing_time">Closing Time *</Label>
+                  <Input
+                    id="closing_time"
+                    name="closing_time"
+                    type="time"
+                    required
+                    value={formData.closing_time}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
