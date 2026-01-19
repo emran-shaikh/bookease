@@ -150,3 +150,45 @@ All colors MUST be HSL.
     overflow-x: hidden;
   }
 }
+
+/* Leaflet Map Custom Styles */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 0;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply bg-card text-card-foreground rounded-lg shadow-xl border;
+}
+
+.leaflet-popup-content {
+  margin: 12px;
+}
+
+.leaflet-popup-tip {
+  @apply bg-card;
+}
+
+.custom-venue-marker,
+.custom-court-marker,
+.custom-user-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.custom-venue-marker > div,
+.custom-court-marker > div,
+.custom-user-marker > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ensure marker icons use theme colors */
+.custom-venue-marker > div {
+  @apply bg-primary text-primary-foreground;
+}
+
+.custom-court-marker > div {
+  @apply bg-secondary text-secondary-foreground;
+}
