@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,8 @@ import { Slider } from '@/components/ui/slider';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
-import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp, Building2 } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp, Building2, LayoutGrid, Map } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/currency';
@@ -20,6 +21,9 @@ import heroImage from '@/assets/hero-sports.jpg';
 import tennisImage from '@/assets/tennis-court.jpg';
 import basketballImage from '@/assets/basketball-court.jpg';
 import badmintonImage from '@/assets/badminton-court.jpg';
+
+// Lazy load map component for better performance
+const MapView = lazy(() => import('@/components/MapView'));
 
 interface Court {
   id: string;
@@ -78,6 +82,7 @@ export default function Index() {
   const [priceRange, setPriceRange] = useState([0, 0]);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
 
   // Get user location on mount
   useEffect(() => {
@@ -398,8 +403,22 @@ export default function Index() {
       <main className="container -mt-8 sm:-mt-12 md:-mt-16 relative z-20 px-4">
         <Card className="mb-8 sm:mb-10 md:mb-12 shadow-2xl border-2">
           <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-lg sm:text-xl md:text-2xl">Find Your Perfect Venue</CardTitle>
-            <CardDescription className="text-xs sm:text-sm">Search sports venues and courts near you</CardDescription>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg sm:text-xl md:text-2xl">Find Your Perfect Venue</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">Search sports venues and courts near you</CardDescription>
+              </div>
+              <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'grid' | 'map')} className="bg-muted p-1 rounded-lg">
+                <ToggleGroupItem value="grid" aria-label="Grid view" className="data-[state=on]:bg-background data-[state=on]:shadow-sm px-3">
+                  <LayoutGrid className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Grid</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="map" aria-label="Map view" className="data-[state=on]:bg-background data-[state=on]:shadow-sm px-3">
+                  <Map className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Map</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
             <div className="relative">
@@ -462,8 +481,32 @@ export default function Index() {
           </CardContent>
         </Card>
 
-        {/* Venues Section */}
-        {filteredVenues.length > 0 && (
+        {/* Map View */}
+        {viewMode === 'map' && (
+          <section className="pb-8 sm:pb-12">
+            <Suspense fallback={
+              <Card className="h-[500px] flex items-center justify-center">
+                <div className="text-center">
+                  <Map className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-pulse" />
+                  <p className="text-muted-foreground">Loading map...</p>
+                </div>
+              </Card>
+            }>
+              <MapView
+                venues={filteredVenues}
+                courts={filteredStandaloneCourts}
+                userLocation={userLocation}
+                className="h-[500px] sm:h-[600px]"
+              />
+            </Suspense>
+            <p className="text-xs text-muted-foreground text-center mt-3">
+              Showing {filteredVenues.length} venues and {filteredStandaloneCourts.length} courts on map
+            </p>
+          </section>
+        )}
+
+        {/* Venues Section - Grid View */}
+        {viewMode === 'grid' && filteredVenues.length > 0 && (
           <section className="pb-8 sm:pb-12">
             <div className="mb-4 sm:mb-6 md:mb-8 flex items-center gap-2 sm:gap-3">
               <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5">
@@ -576,8 +619,8 @@ export default function Index() {
           </section>
         )}
 
-        {/* Standalone Courts Section */}
-        {filteredStandaloneCourts.length > 0 && (
+        {/* Standalone Courts Section - Grid View */}
+        {viewMode === 'grid' && filteredStandaloneCourts.length > 0 && (
           <section className="pb-8 sm:pb-12 md:pb-16">
             <div className="mb-4 sm:mb-6 md:mb-8">
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-1 sm:mb-2">Individual Courts</h2>
@@ -639,26 +682,28 @@ export default function Index() {
           </section>
         )}
 
-        {/* No Results */}
-        {loading ? (
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 pb-8">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <Card key={i} className="animate-pulse">
-                <div className="h-40 sm:h-48 bg-muted" />
-                <CardHeader className="p-3 sm:p-4">
-                  <div className="h-5 sm:h-6 bg-muted rounded w-3/4" />
-                  <div className="h-3 sm:h-4 bg-muted rounded w-1/2 mt-2" />
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
-        ) : totalResults === 0 ? (
-          <Card className="p-8 sm:p-12 text-center mb-8">
-            <MapPin className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-muted-foreground mb-3 sm:mb-4" />
-            <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-2">No venues or courts found</h3>
-            <p className="text-xs sm:text-sm text-muted-foreground">Try adjusting your filters to see more results</p>
-          </Card>
-        ) : null}
+        {/* No Results - Grid View */}
+        {viewMode === 'grid' && (
+          loading ? (
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 pb-8">
+              {[1, 2, 3, 4, 5, 6].map(i => (
+                <Card key={i} className="animate-pulse">
+                  <div className="h-40 sm:h-48 bg-muted" />
+                  <CardHeader className="p-3 sm:p-4">
+                    <div className="h-5 sm:h-6 bg-muted rounded w-3/4" />
+                    <div className="h-3 sm:h-4 bg-muted rounded w-1/2 mt-2" />
+                  </CardHeader>
+                </Card>
+              ))}
+            </div>
+          ) : totalResults === 0 ? (
+            <Card className="p-8 sm:p-12 text-center mb-8">
+              <MapPin className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-muted-foreground mb-3 sm:mb-4" />
+              <h3 className="text-lg sm:text-xl font-semibold mb-1 sm:mb-2">No venues or courts found</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">Try adjusting your filters to see more results</p>
+            </Card>
+          ) : null
+        )}
 
         {/* Popular Section */}
         {popularItems.length > 0 && (
