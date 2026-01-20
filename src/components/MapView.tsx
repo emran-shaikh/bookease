@@ -1,68 +1,10 @@
-import { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Building2, MapPin } from 'lucide-react';
+import { Building2, MapPin, Loader2 } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
 import { formatCourtCount, getUniqueSportTypes, getLowestPrice } from '@/lib/venue-utils';
-import 'leaflet/dist/leaflet.css';
-
-// Fix for default marker icons in React-Leaflet
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
-
-// Custom venue marker icon
-const venueIcon = new L.DivIcon({
-  className: 'custom-venue-marker',
-  html: `<div class="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg border-2 border-background">
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect width="16" height="20" x="4" y="2" rx="2" ry="2"/>
-      <path d="M9 22v-4h6v4"/>
-      <path d="M8 6h.01"/>
-      <path d="M16 6h.01"/>
-      <path d="M12 6h.01"/>
-      <path d="M12 10h.01"/>
-      <path d="M12 14h.01"/>
-      <path d="M16 10h.01"/>
-      <path d="M16 14h.01"/>
-      <path d="M8 10h.01"/>
-      <path d="M8 14h.01"/>
-    </svg>
-  </div>`,
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
-  popupAnchor: [0, -40],
-});
-
-// Custom court marker icon
-const courtIcon = new L.DivIcon({
-  className: 'custom-court-marker',
-  html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground shadow-lg border-2 border-background">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-      <circle cx="12" cy="10" r="3"/>
-    </svg>
-  </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32],
-});
-
-// User location marker icon
-const userLocationIcon = new L.DivIcon({
-  className: 'custom-user-marker',
-  html: `<div class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white shadow-lg border-2 border-white animate-pulse">
-    <div class="w-2 h-2 rounded-full bg-white"></div>
-  </div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-});
 
 interface Court {
   id: string;
@@ -98,59 +40,121 @@ interface MapViewProps {
   className?: string;
 }
 
-// Component to recenter map
-function RecenterMap({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
-  return null;
-}
-
-// Component to fit bounds
-function FitBounds({ venues, courts, userLocation }: { venues: Venue[]; courts: Court[]; userLocation: { lat: number; lng: number } | null }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    const points: [number, number][] = [];
-    
-    venues.forEach(v => {
-      if (v.latitude && v.longitude) {
-        points.push([v.latitude, v.longitude]);
-      }
-    });
-    
-    courts.forEach(c => {
-      if (c.latitude && c.longitude) {
-        points.push([c.latitude, c.longitude]);
-      }
-    });
-    
-    if (userLocation) {
-      points.push([userLocation.lat, userLocation.lng]);
-    }
-    
-    if (points.length > 0) {
-      const bounds = L.latLngBounds(points);
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
-    }
-  }, [venues, courts, userLocation, map]);
-  
-  return null;
-}
-
-export default function MapView({ venues, courts, userLocation, className = '' }: MapViewProps) {
+// Lazy-loaded inner component that uses Leaflet
+function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewProps) {
   const navigate = useNavigate();
-  
+  const [mapReady, setMapReady] = useState(false);
+  const [L, setL] = useState<typeof import('leaflet') | null>(null);
+  const [ReactLeaflet, setReactLeaflet] = useState<typeof import('react-leaflet') | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadLeaflet = async () => {
+      try {
+        // Dynamically import Leaflet and React-Leaflet
+        const [leafletModule, reactLeafletModule] = await Promise.all([
+          import('leaflet'),
+          import('react-leaflet'),
+        ]);
+
+        // Import CSS
+        await import('leaflet/dist/leaflet.css');
+
+        if (!mounted) return;
+
+        // Fix default marker icons
+        delete (leafletModule.default.Icon.Default.prototype as any)._getIconUrl;
+        leafletModule.default.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        });
+
+        setL(leafletModule.default as any);
+        setReactLeaflet(reactLeafletModule);
+        setMapReady(true);
+      } catch (error) {
+        console.error('Failed to load map libraries:', error);
+      }
+    };
+
+    loadLeaflet();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!mapReady || !L || !ReactLeaflet) {
+    return (
+      <div className={`flex items-center justify-center bg-muted rounded-xl ${className}`}>
+        <div className="text-center p-8">
+          <Loader2 className="h-12 w-12 mx-auto text-primary mb-4 animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { MapContainer, TileLayer, Marker, Popup, useMap } = ReactLeaflet;
+
+  // Custom venue marker icon
+  const venueIcon = new L.DivIcon({
+    className: 'custom-venue-marker',
+    html: `<div class="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg border-2 border-background">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect width="16" height="20" x="4" y="2" rx="2" ry="2"/>
+        <path d="M9 22v-4h6v4"/>
+        <path d="M8 6h.01"/>
+        <path d="M16 6h.01"/>
+        <path d="M12 6h.01"/>
+        <path d="M12 10h.01"/>
+        <path d="M12 14h.01"/>
+        <path d="M16 10h.01"/>
+        <path d="M16 14h.01"/>
+        <path d="M8 10h.01"/>
+        <path d="M8 14h.01"/>
+      </svg>
+    </div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40],
+  });
+
+  // Custom court marker icon
+  const courtIcon = new L.DivIcon({
+    className: 'custom-court-marker',
+    html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground shadow-lg border-2 border-background">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+    </div>`,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
+  });
+
+  // User location marker icon
+  const userLocationIcon = new L.DivIcon({
+    className: 'custom-user-marker',
+    html: `<div class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white shadow-lg border-2 border-white animate-pulse">
+      <div class="w-2 h-2 rounded-full bg-white"></div>
+    </div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+
   // Default center to Karachi if no user location
   const defaultCenter: [number, number] = userLocation 
     ? [userLocation.lat, userLocation.lng] 
     : [24.8607, 67.0011];
-  
+
   // Filter items with valid coordinates
   const venuesWithCoords = venues.filter(v => v.latitude && v.longitude);
   const courtsWithCoords = courts.filter(c => c.latitude && c.longitude);
-  
+
   const hasAnyMarkers = venuesWithCoords.length > 0 || courtsWithCoords.length > 0;
 
   if (!hasAnyMarkers && !userLocation) {
@@ -167,6 +171,38 @@ export default function MapView({ venues, courts, userLocation, className = '' }
     );
   }
 
+  // Component to fit bounds
+  const FitBounds = () => {
+    const map = useMap();
+    
+    useEffect(() => {
+      const points: [number, number][] = [];
+      
+      venuesWithCoords.forEach(v => {
+        if (v.latitude && v.longitude) {
+          points.push([v.latitude, v.longitude]);
+        }
+      });
+      
+      courtsWithCoords.forEach(c => {
+        if (c.latitude && c.longitude) {
+          points.push([c.latitude, c.longitude]);
+        }
+      });
+      
+      if (userLocation) {
+        points.push([userLocation.lat, userLocation.lng]);
+      }
+      
+      if (points.length > 0) {
+        const bounds = L.latLngBounds(points);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+      }
+    }, [map]);
+    
+    return null;
+  };
+
   return (
     <div className={`rounded-xl overflow-hidden border shadow-lg ${className}`}>
       <MapContainer
@@ -180,7 +216,7 @@ export default function MapView({ venues, courts, userLocation, className = '' }
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <FitBounds venues={venuesWithCoords} courts={courtsWithCoords} userLocation={userLocation} />
+        <FitBounds />
         
         {/* User location marker */}
         {userLocation && (
@@ -295,4 +331,9 @@ export default function MapView({ venues, courts, userLocation, className = '' }
       </MapContainer>
     </div>
   );
+}
+
+// Export the component directly (no lazy wrapper needed now since imports are internal)
+export default function MapView(props: MapViewProps) {
+  return <MapViewInner {...props} />;
 }

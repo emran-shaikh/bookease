@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -17,13 +17,11 @@ import { formatCourtCount, getUniqueSportTypes, getLowestPrice } from '@/lib/ven
 import { formatSportWithIcon } from '@/lib/sport-icons';
 import { SEO } from '@/components/SEO';
 import Footer from '@/components/Footer';
+import MapView from '@/components/MapView';
 import heroImage from '@/assets/hero-sports.jpg';
 import tennisImage from '@/assets/tennis-court.jpg';
 import basketballImage from '@/assets/basketball-court.jpg';
 import badmintonImage from '@/assets/badminton-court.jpg';
-
-// Lazy load map component for better performance
-const MapView = lazy(() => import('@/components/MapView'));
 
 interface Court {
   id: string;
@@ -484,21 +482,12 @@ export default function Index() {
         {/* Map View */}
         {viewMode === 'map' && (
           <section className="pb-8 sm:pb-12">
-            <Suspense fallback={
-              <Card className="h-[500px] flex items-center justify-center">
-                <div className="text-center">
-                  <Map className="h-12 w-12 mx-auto text-muted-foreground mb-4 animate-pulse" />
-                  <p className="text-muted-foreground">Loading map...</p>
-                </div>
-              </Card>
-            }>
-              <MapView
-                venues={filteredVenues}
-                courts={filteredStandaloneCourts}
-                userLocation={userLocation}
-                className="h-[500px] sm:h-[600px]"
-              />
-            </Suspense>
+            <MapView
+              venues={filteredVenues}
+              courts={filteredStandaloneCourts}
+              userLocation={userLocation}
+              className="h-[500px] sm:h-[600px]"
+            />
             <p className="text-xs text-muted-foreground text-center mt-3">
               Showing {filteredVenues.length} venues and {filteredStandaloneCourts.length} courts on map
             </p>
