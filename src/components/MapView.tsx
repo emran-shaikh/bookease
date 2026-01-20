@@ -1,10 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Building2, MapPin, Loader2 } from 'lucide-react';
-import { formatPrice } from '@/lib/currency';
-import { formatCourtCount, getUniqueSportTypes, getLowestPrice } from '@/lib/venue-utils';
+import { useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Building2, MapPin } from "lucide-react";
+import { formatPrice } from "@/lib/currency";
+import { formatCourtCount, getUniqueSportTypes, getLowestPrice } from "@/lib/venue-utils";
+
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 
 interface Court {
   id: string;
@@ -40,120 +48,112 @@ interface MapViewProps {
   className?: string;
 }
 
-// Lazy-loaded inner component that uses Leaflet
-function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewProps) {
-  const navigate = useNavigate();
-  const [mapReady, setMapReady] = useState(false);
-  const [L, setL] = useState<typeof import('leaflet') | null>(null);
-  const [ReactLeaflet, setReactLeaflet] = useState<typeof import('react-leaflet') | null>(null);
+// Fix default marker icons for bundlers (Vite)
+// This must run once on the client.
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
+function FitBounds({
+  points,
+  maxZoom = 14,
+}: {
+  points: [number, number][];
+  maxZoom?: number;
+}) {
+  const map = useMap();
 
   useEffect(() => {
-    let mounted = true;
+    if (points.length === 0) return;
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom });
+  }, [map, points, maxZoom]);
 
-    const loadLeaflet = async () => {
-      try {
-        // Dynamically import Leaflet and React-Leaflet
-        const [leafletModule, reactLeafletModule] = await Promise.all([
-          import('leaflet'),
-          import('react-leaflet'),
-        ]);
+  return null;
+}
 
-        // Import CSS
-        await import('leaflet/dist/leaflet.css');
+export default function MapView({ venues, courts, userLocation, className = "" }: MapViewProps) {
+  const navigate = useNavigate();
 
-        if (!mounted) return;
+  const venuesWithCoords = useMemo(
+    () => venues.filter((v) => v.latitude != null && v.longitude != null),
+    [venues]
+  );
+  const courtsWithCoords = useMemo(
+    () => courts.filter((c) => c.latitude != null && c.longitude != null),
+    [courts]
+  );
 
-        // Fix default marker icons
-        delete (leafletModule.default.Icon.Default.prototype as any)._getIconUrl;
-        leafletModule.default.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        });
+  const points = useMemo(() => {
+    const pts: [number, number][] = [];
+    venuesWithCoords.forEach((v) => pts.push([v.latitude!, v.longitude!]));
+    courtsWithCoords.forEach((c) => pts.push([c.latitude!, c.longitude!]));
+    if (userLocation) pts.push([userLocation.lat, userLocation.lng]);
+    return pts;
+  }, [venuesWithCoords, courtsWithCoords, userLocation]);
 
-        setL(leafletModule.default as any);
-        setReactLeaflet(reactLeafletModule);
-        setMapReady(true);
-      } catch (error) {
-        console.error('Failed to load map libraries:', error);
-      }
-    };
-
-    loadLeaflet();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (!mapReady || !L || !ReactLeaflet) {
-    return (
-      <div className={`flex items-center justify-center bg-muted rounded-xl ${className}`}>
-        <div className="text-center p-8">
-          <Loader2 className="h-12 w-12 mx-auto text-primary mb-4 animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading map...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { MapContainer, TileLayer, Marker, Popup, useMap } = ReactLeaflet;
-
-  // Custom venue marker icon
-  const venueIcon = new L.DivIcon({
-    className: 'custom-venue-marker',
-    html: `<div class="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg border-2 border-background">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect width="16" height="20" x="4" y="2" rx="2" ry="2"/>
-        <path d="M9 22v-4h6v4"/>
-        <path d="M8 6h.01"/>
-        <path d="M16 6h.01"/>
-        <path d="M12 6h.01"/>
-        <path d="M12 10h.01"/>
-        <path d="M12 14h.01"/>
-        <path d="M16 10h.01"/>
-        <path d="M16 14h.01"/>
-        <path d="M8 10h.01"/>
-        <path d="M8 14h.01"/>
-      </svg>
-    </div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-    popupAnchor: [0, -40],
-  });
-
-  // Custom court marker icon
-  const courtIcon = new L.DivIcon({
-    className: 'custom-court-marker',
-    html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground shadow-lg border-2 border-background">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-        <circle cx="12" cy="10" r="3"/>
-      </svg>
-    </div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
-  });
-
-  // User location marker icon
-  const userLocationIcon = new L.DivIcon({
-    className: 'custom-user-marker',
-    html: `<div class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white shadow-lg border-2 border-white animate-pulse">
-      <div class="w-2 h-2 rounded-full bg-white"></div>
-    </div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  });
-
-  // Default center to Karachi if no user location
-  const defaultCenter: [number, number] = userLocation 
-    ? [userLocation.lat, userLocation.lng] 
+  const defaultCenter: [number, number] = userLocation
+    ? [userLocation.lat, userLocation.lng]
     : [24.8607, 67.0011];
 
-  // Filter items with valid coordinates
-  const venuesWithCoords = venues.filter(v => v.latitude && v.longitude);
-  const courtsWithCoords = courts.filter(c => c.latitude && c.longitude);
+  const venueIcon = useMemo(
+    () =>
+      new L.DivIcon({
+        className: "custom-venue-marker",
+        html: `<div class="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg border-2 border-background">
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect width="16" height="20" x="4" y="2" rx="2" ry="2"/>
+    <path d="M9 22v-4h6v4"/>
+    <path d="M8 6h.01"/>
+    <path d="M16 6h.01"/>
+    <path d="M12 6h.01"/>
+    <path d="M12 10h.01"/>
+    <path d="M12 14h.01"/>
+    <path d="M16 10h.01"/>
+    <path d="M16 14h.01"/>
+    <path d="M8 10h.01"/>
+    <path d="M8 14h.01"/>
+  </svg>
+</div>`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 40],
+        popupAnchor: [0, -40],
+      }),
+    []
+  );
+
+  const courtIcon = useMemo(
+    () =>
+      new L.DivIcon({
+        className: "custom-court-marker",
+        html: `<div class="flex items-center justify-center w-8 h-8 rounded-full bg-secondary text-secondary-foreground shadow-lg border-2 border-background">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+    <circle cx="12" cy="10" r="3"/>
+  </svg>
+</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -32],
+      }),
+    []
+  );
+
+  const userLocationIcon = useMemo(
+    () =>
+      new L.DivIcon({
+        className: "custom-user-marker",
+        html: `<div class="flex items-center justify-center w-6 h-6 rounded-full bg-accent text-accent-foreground shadow-lg border-2 border-background animate-pulse">
+  <div class="w-2 h-2 rounded-full bg-background"></div>
+</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      }),
+    []
+  );
 
   const hasAnyMarkers = venuesWithCoords.length > 0 || courtsWithCoords.length > 0;
 
@@ -164,44 +164,12 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
           <MapPin className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">No locations available</h3>
           <p className="text-sm text-muted-foreground">
-            Venues and courts without coordinates won't appear on the map.
+            Venues and courts without coordinates won&apos;t appear on the map.
           </p>
         </div>
       </div>
     );
   }
-
-  // Component to fit bounds
-  const FitBounds = () => {
-    const map = useMap();
-    
-    useEffect(() => {
-      const points: [number, number][] = [];
-      
-      venuesWithCoords.forEach(v => {
-        if (v.latitude && v.longitude) {
-          points.push([v.latitude, v.longitude]);
-        }
-      });
-      
-      courtsWithCoords.forEach(c => {
-        if (c.latitude && c.longitude) {
-          points.push([c.latitude, c.longitude]);
-        }
-      });
-      
-      if (userLocation) {
-        points.push([userLocation.lat, userLocation.lng]);
-      }
-      
-      if (points.length > 0) {
-        const bounds = L.latLngBounds(points);
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
-      }
-    }, [map]);
-    
-    return null;
-  };
 
   return (
     <div className={`rounded-xl overflow-hidden border shadow-lg ${className}`}>
@@ -209,21 +177,17 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
         center={defaultCenter}
         zoom={12}
         className="h-full w-full min-h-[400px]"
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
-        <FitBounds />
-        
-        {/* User location marker */}
+
+        <FitBounds points={points} />
+
         {userLocation && (
-          <Marker 
-            position={[userLocation.lat, userLocation.lng]} 
-            icon={userLocationIcon}
-          >
+          <Marker position={[userLocation.lat, userLocation.lng]} icon={userLocationIcon}>
             <Popup>
               <div className="text-center">
                 <strong>Your Location</strong>
@@ -231,9 +195,8 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
             </Popup>
           </Marker>
         )}
-        
-        {/* Venue markers */}
-        {venuesWithCoords.map(venue => (
+
+        {venuesWithCoords.map((venue) => (
           <Marker
             key={`venue-${venue.id}`}
             position={[venue.latitude!, venue.longitude!]}
@@ -242,11 +205,12 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
             <Popup>
               <div className="min-w-[200px] max-w-[280px]">
                 {venue.images?.[0] && (
-                  <img 
-                    src={venue.images[0]} 
+                  <img
+                    src={venue.images[0]}
                     alt={venue.name}
                     className="w-full h-24 object-cover rounded-t-md -mt-3 -mx-3 mb-2"
-                    style={{ width: 'calc(100% + 24px)' }}
+                    style={{ width: "calc(100% + 24px)" }}
+                    loading="lazy"
                   />
                 )}
                 <div className="flex items-center gap-2 mb-1">
@@ -264,18 +228,20 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
                   {venue.city}
                 </p>
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {getUniqueSportTypes(venue.courts).slice(0, 2).map(sport => (
-                    <Badge key={sport} variant="secondary" className="text-xs">
-                      {sport}
-                    </Badge>
-                  ))}
+                  {getUniqueSportTypes(venue.courts)
+                    .slice(0, 2)
+                    .map((sport) => (
+                      <Badge key={sport} variant="secondary" className="text-xs">
+                        {sport}
+                      </Badge>
+                    ))}
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-primary">
                     From {formatPrice(getLowestPrice(venue.courts))}/hr
                   </span>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     className="text-xs h-7"
                     onClick={() => navigate(`/venues/${venue.slug}`)}
@@ -287,9 +253,8 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
             </Popup>
           </Marker>
         ))}
-        
-        {/* Court markers */}
-        {courtsWithCoords.map(court => (
+
+        {courtsWithCoords.map((court) => (
           <Marker
             key={`court-${court.id}`}
             position={[court.latitude!, court.longitude!]}
@@ -298,11 +263,12 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
             <Popup>
               <div className="min-w-[180px] max-w-[250px]">
                 {court.images?.[0] && (
-                  <img 
-                    src={court.images[0]} 
+                  <img
+                    src={court.images[0]}
                     alt={court.name}
                     className="w-full h-20 object-cover rounded-t-md -mt-3 -mx-3 mb-2"
-                    style={{ width: 'calc(100% + 24px)' }}
+                    style={{ width: "calc(100% + 24px)" }}
+                    loading="lazy"
                   />
                 )}
                 <Badge className="mb-1 text-xs">{court.sport_type}</Badge>
@@ -315,8 +281,8 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
                   <span className="text-sm font-semibold text-primary">
                     {formatPrice(court.base_price)}/hr
                   </span>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
                     className="text-xs h-7"
                     onClick={() => navigate(`/courts/${court.slug}`)}
@@ -331,9 +297,4 @@ function MapViewInner({ venues, courts, userLocation, className = '' }: MapViewP
       </MapContainer>
     </div>
   );
-}
-
-// Export the component directly (no lazy wrapper needed now since imports are internal)
-export default function MapView(props: MapViewProps) {
-  return <MapViewInner {...props} />;
 }
