@@ -192,3 +192,44 @@ All colors MUST be HSL.
 .custom-court-marker > div {
   @apply bg-secondary text-secondary-foreground;
 }
+
+/* Marker cluster styles */
+.custom-cluster-icon {
+  background: transparent !important;
+}
+
+.cluster-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 3px solid hsl(var(--background));
+}
+
+.cluster-marker span {
+  line-height: 1;
+}
+
+.cluster-small {
+  width: 40px;
+  height: 40px;
+  font-size: 13px;
+  background: hsl(var(--primary) / 0.85);
+}
+
+.cluster-medium {
+  width: 48px;
+  height: 48px;
+  font-size: 15px;
+  background: hsl(var(--primary) / 0.92);
+}
+
+.cluster-large {
+  width: 56px;
+  height: 56px;
+  font-size: 17px;
+  background: hsl(var(--primary));
+}
