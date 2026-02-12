@@ -24,6 +24,7 @@ interface Court {
   base_price: number;
   sport_type: string;
   images: string[] | null;
+  court_specific_images?: string[] | null;
   latitude: number | null;
   longitude: number | null;
   venue_id: string | null;
@@ -120,8 +121,9 @@ function buildVenuePopup(venue: Venue): string {
 }
 
 function buildCourtPopup(court: Court): string {
-  const imgHtml = court.images?.[0]
-    ? `<img src="${court.images[0]}" alt="${court.name}" style="width:calc(100% + 24px);height:80px;object-fit:cover;border-radius:6px 6px 0 0;margin:-12px -12px 8px" loading="lazy"/>`
+  const courtImage = court.court_specific_images?.[0] || court.images?.[0];
+  const imgHtml = courtImage
+    ? `<img src="${courtImage}" alt="${court.name}" style="width:calc(100% + 24px);height:80px;object-fit:cover;border-radius:6px 6px 0 0;margin:-12px -12px 8px" loading="lazy"/>`
     : "";
   return `<div style="min-width:180px;max-width:250px">
     ${imgHtml}
