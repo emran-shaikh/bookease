@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.court-assistant]
 verify_jwt = false
+
+[functions.whatsapp-booking]
+verify_jwt = false
+
+[functions.booking-webhook]
+verify_jwt = false

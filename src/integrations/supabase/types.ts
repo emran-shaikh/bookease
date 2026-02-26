@@ -397,6 +397,7 @@ export type Database = {
           email: string
           full_name: string | null
           id: string
+          n8n_webhook_url: string | null
           phone: string | null
           updated_at: string
           whatsapp_number: string | null
@@ -411,6 +412,7 @@ export type Database = {
           email: string
           full_name?: string | null
           id: string
+          n8n_webhook_url?: string | null
           phone?: string | null
           updated_at?: string
           whatsapp_number?: string | null
@@ -425,6 +427,7 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          n8n_webhook_url?: string | null
           phone?: string | null
           updated_at?: string
           whatsapp_number?: string | null
@@ -643,6 +646,41 @@ export type Database = {
           zip_code?: string
         }
         Relationships: []
+      }
+      whatsapp_sessions: {
+        Row: {
+          conversation_state: Json
+          created_at: string
+          id: string
+          last_message_at: string
+          phone_number: string
+          user_id: string | null
+        }
+        Insert: {
+          conversation_state?: Json
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          phone_number: string
+          user_id?: string | null
+        }
+        Update: {
+          conversation_state?: Json
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          phone_number?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
