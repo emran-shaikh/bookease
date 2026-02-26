@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Building, CreditCard, MessageCircle, Save } from 'lucide-react';
+import { Loader2, Building, CreditCard, MessageCircle, Save, Webhook } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface BankSettings {
@@ -13,6 +13,7 @@ interface BankSettings {
   account_title: string;
   account_number: string;
   whatsapp_number: string;
+  n8n_webhook_url: string;
 }
 
 export function OwnerBankSettings() {
@@ -25,6 +26,7 @@ export function OwnerBankSettings() {
     account_title: '',
     account_number: '',
     whatsapp_number: '',
+    n8n_webhook_url: '',
   });
 
   useEffect(() => {
@@ -37,7 +39,7 @@ export function OwnerBankSettings() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('bank_name, account_title, account_number, whatsapp_number')
+        .select('bank_name, account_title, account_number, whatsapp_number, n8n_webhook_url')
         .eq('id', user?.id)
         .maybeSingle();
 
@@ -49,6 +51,7 @@ export function OwnerBankSettings() {
           account_title: data.account_title || '',
           account_number: data.account_number || '',
           whatsapp_number: data.whatsapp_number || '',
+          n8n_webhook_url: (data as any).n8n_webhook_url || '',
         });
       }
     } catch (error: any) {
@@ -70,7 +73,8 @@ export function OwnerBankSettings() {
           account_title: settings.account_title || null,
           account_number: settings.account_number || null,
           whatsapp_number: settings.whatsapp_number || null,
-        })
+          n8n_webhook_url: settings.n8n_webhook_url || null,
+        } as any)
         .eq('id', user?.id);
 
       if (error) throw error;
@@ -159,6 +163,22 @@ export function OwnerBankSettings() {
                 onChange={(e) => setSettings({ ...settings, whatsapp_number: e.target.value })}
               />
             </div>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t">
+            <Label htmlFor="n8n_webhook_url" className="flex items-center gap-2">
+              <Webhook className="h-4 w-4" />
+              n8n Webhook URL (Optional)
+            </Label>
+            <Input
+              id="n8n_webhook_url"
+              placeholder="e.g., https://your-n8n.app/webhook/..."
+              value={settings.n8n_webhook_url}
+              onChange={(e) => setSettings({ ...settings, n8n_webhook_url: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Paste your n8n webhook URL to receive booking notifications via WhatsApp and sync with Google Sheets.
+            </p>
           </div>
 
           <Button type="submit" disabled={saving} className="w-full sm:w-auto">
