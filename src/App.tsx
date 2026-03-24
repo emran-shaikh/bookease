@@ -29,6 +29,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsConditions from "./pages/TermsConditions";
 import RefundPolicy from "./pages/RefundPolicy";
 import ServicePolicy from "./pages/ServicePolicy";
+import WhatsAppSimulator from "./pages/WhatsAppSimulator";
 
 const queryClient = new QueryClient();
 
