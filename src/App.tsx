@@ -29,6 +29,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsConditions from "./pages/TermsConditions";
 import RefundPolicy from "./pages/RefundPolicy";
 import ServicePolicy from "./pages/ServicePolicy";
+import WhatsAppSimulator from "./pages/WhatsAppSimulator";
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,7 @@ const App = () => (
               <Route path="/terms-conditions" element={<TermsConditions />} />
               <Route path="/refund-policy" element={<RefundPolicy />} />
               <Route path="/service-policy" element={<ServicePolicy />} />
+              <Route path="/whatsapp-test" element={<WhatsAppSimulator />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
