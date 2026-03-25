@@ -227,9 +227,8 @@ serve(async (req) => {
     ).join("\n");
 
     const userContext = userProfile
-      ? `KNOWN USER: ${userProfile.full_name} (${userProfile.email}), Phone: ${phone}, City: ${userProfile.city || "N/A"}`
       ? `KNOWN USER: ${userProfile.full_name} (${userProfile.email}), Phone: ${normalizedPhone}, City: ${userProfile.city || "N/A"}`
-      : `UNKNOWN USER: Phone ${phone} — not registered. If they want to book, collect their full name and email.`;
+      : `UNKNOWN USER: Phone ${normalizedPhone} — not registered. If they want to book, collect their full name and email.`;
 
     const sessionContext = state.step !== "initial"
       ? `\nCURRENT SESSION STATE: ${JSON.stringify({ step: state.step, selected_court: state.selected_court, selected_date: state.selected_date, selected_time: state.selected_time })}`
