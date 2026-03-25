@@ -8,6 +8,14 @@ const corsHeaders = {
 
 const SESSION_EXPIRY_MINUTES = 30;
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function formatBookingReference(bookingId: string) {
+  return `BK-${bookingId.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -207,6 +215,7 @@ CONVERSATION RULES:
 - When listing courts, number them (1️⃣, 2️⃣, 3️⃣) so users can reply with a number
 - When a user wants to book, check availability first
 - For unregistered users: ask for full name and email before booking
+- Always include Booking ID reference (format: BK-XXXXXXXX) in booking confirmations and booking lists
 - After booking: show payment details (bank info from owner profile)
 - Prices are in Pakistani Rupees (Rs.)
 - Time format: use 12-hour (e.g., 10:00 PM)
@@ -265,11 +274,11 @@ When you need to perform an action, call the appropriate tool.`;
         type: "function",
         function: {
           name: "cancel_booking",
-          description: "Cancel a booking by ID",
+          description: "Cancel a booking by full booking UUID or booking reference like BK-XXXXXXXX",
           parameters: {
             type: "object",
             properties: {
-              booking_id: { type: "string", description: "Booking UUID to cancel" },
+              booking_id: { type: "string", description: "Booking UUID or booking reference (BK-XXXXXXXX) to cancel" },
             },
             required: ["booking_id"],
           },
@@ -306,6 +315,7 @@ When you need to perform an action, call the appropriate tool.`;
 
     const aiData = await aiResponse.json();
     let assistantMessage = aiData.choices?.[0]?.message;
+    let latestBookingReference: string | null = null;
 
     // 10. Handle tool calls
     if (assistantMessage?.tool_calls) {
@@ -322,6 +332,9 @@ When you need to perform an action, call the appropriate tool.`;
           }
           case "create_booking": {
             result = await handleCreateBooking(supabase, args, phone, userProfile, courts || []);
+            if (result?.success && result?.booking_reference) {
+              latestBookingReference = result.booking_reference;
+            }
             break;
           }
           case "get_my_bookings": {
@@ -367,7 +380,11 @@ When you need to perform an action, call the appropriate tool.`;
       }
     }
 
-    const reply = assistantMessage?.content || "Sorry, I couldn't understand that. Try asking about court availability or type 'help' for options.";
+    let reply = assistantMessage?.content || "Sorry, I couldn't understand that. Try asking about court availability or type 'help' for options.";
+
+    if (latestBookingReference && !reply.includes(latestBookingReference)) {
+      reply = `${reply}\n\nBooking ID: ${latestBookingReference}`;
+    }
 
     // 11. Update session
     history.push({ role: "assistant", content: reply });
@@ -579,6 +596,7 @@ async function handleCreateBooking(
   return {
     success: true,
     booking_id: booking.id,
+    booking_reference: formatBookingReference(booking.id),
     court_name: court.name,
     date: args.date,
     start_time: args.start_time,
@@ -621,6 +639,7 @@ async function handleGetBookings(supabase: any, phone: string, userProfile: any)
   return {
     bookings: bookings.map((b: any) => ({
       ...b,
+      booking_reference: formatBookingReference(b.id),
       court_name: courts?.find((c: any) => c.id === b.court_id)?.name || "Unknown",
     })),
   };
@@ -631,12 +650,28 @@ async function handleCancelBooking(supabase: any, bookingId: string, userProfile
     return { error: "Please sign up at bookease.lovable.app to manage bookings." };
   }
 
-  const { data: booking } = await supabase
-    .from("bookings")
-    .select("id, status, user_id")
-    .eq("id", bookingId)
-    .eq("user_id", userProfile.id)
-    .maybeSingle();
+  const normalized = bookingId.trim();
+  let booking: any = null;
+
+  if (isUuid(normalized)) {
+    const { data } = await supabase
+      .from("bookings")
+      .select("id, status, user_id")
+      .eq("id", normalized)
+      .eq("user_id", userProfile.id)
+      .maybeSingle();
+    booking = data;
+  } else {
+    const cleanedRef = normalized.toUpperCase().replace(/^BK-/, "").replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    const { data: userBookings } = await supabase
+      .from("bookings")
+      .select("id, status, user_id")
+      .eq("user_id", userProfile.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    booking = (userBookings || []).find((b: any) => formatBookingReference(b.id).slice(3) === cleanedRef) || null;
+  }
 
   if (!booking) return { error: "Booking not found." };
   if (booking.status === "cancelled") return { error: "This booking is already cancelled." };
@@ -645,8 +680,13 @@ async function handleCancelBooking(supabase: any, bookingId: string, userProfile
   const { error } = await supabase
     .from("bookings")
     .update({ status: "cancelled" })
-    .eq("id", bookingId);
+    .eq("id", booking.id);
 
   if (error) return { error: "Failed to cancel booking." };
-  return { success: true, message: "Booking cancelled successfully." };
+  return {
+    success: true,
+    booking_id: booking.id,
+    booking_reference: formatBookingReference(booking.id),
+    message: "Booking cancelled successfully.",
+  };
 }
