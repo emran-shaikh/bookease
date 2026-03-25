@@ -30,6 +30,16 @@ const isValidPhone = (phone: string) => {
   return /^\+\d{10,15}$/.test(cleaned);
 };
 
+const extractBookingReference = (text: string) => {
+  const refMatch = text.match(/BK-[A-Z0-9]{8}/i);
+  if (refMatch) return refMatch[0].toUpperCase();
+
+  const uuidMatch = text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i);
+  if (!uuidMatch) return null;
+
+  return `BK-${uuidMatch[0].replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+};
+
 const WhatsAppSimulator = () => {
   const { user } = useAuth();
   const [phone, setPhone] = useState("");
@@ -37,6 +47,7 @@ const WhatsAppSimulator = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [phoneError, setPhoneError] = useState("");
+  const [latestBookingReference, setLatestBookingReference] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-fetch phone from logged-in user's profile
@@ -101,6 +112,10 @@ const WhatsAppSimulator = () => {
         content: data?.reply || "No response received",
         timestamp: new Date(),
       };
+
+      const foundRef = extractBookingReference(botMsg.content);
+      if (foundRef) setLatestBookingReference(foundRef);
+
       setMessages((prev) => [...prev, botMsg]);
     } catch (err: any) {
       setMessages((prev) => [
@@ -112,7 +127,18 @@ const WhatsAppSimulator = () => {
     }
   };
 
-  const clearChat = () => setMessages([]);
+  const clearChat = () => {
+    setMessages([]);
+    setLatestBookingReference(null);
+  };
+
+  const openWhatsAppForPayment = () => {
+    const text = latestBookingReference
+      ? `Hi, I want to upload payment screenshot for booking ${latestBookingReference}.`
+      : "Hi, I want to upload payment screenshot for my booking.";
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
@@ -220,6 +246,14 @@ const WhatsAppSimulator = () => {
                 <Send className="h-4 w-4" />
               </Button>
             </div>
+
+            {latestBookingReference && (
+              <div className="px-3 pb-3">
+                <Button variant="secondary" className="w-full" onClick={openWhatsAppForPayment}>
+                  Open WhatsApp to Upload Payment Screenshot ({latestBookingReference})
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>
