@@ -8,6 +8,27 @@ const corsHeaders = {
 
 const SESSION_EXPIRY_MINUTES = 30;
 
+function normalizePhone(input: string) {
+  const digits = input.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 15) return null;
+  return `+${digits}`;
+}
+
+function buildPhoneCandidates(normalizedPhone: string) {
+  const digits = normalizedPhone.replace(/\D/g, "");
+  const values = new Set<string>([normalizedPhone, digits, `+${digits}`]);
+
+  if (digits.startsWith("0") && digits.length > 1) {
+    const withoutLeadingZero = digits.slice(1);
+    values.add(withoutLeadingZero);
+    values.add(`+${withoutLeadingZero}`);
+  } else {
+    values.add(`0${digits}`);
+  }
+
+  return [...values];
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -24,11 +45,25 @@ serve(async (req) => {
   try {
     const { phone, message, media_url } = await req.json();
 
-    if (!phone || !message) {
+    const incomingPhone = typeof phone === "string" ? phone.trim() : "";
+    const incomingMessage = typeof message === "string" ? message.trim() : "";
+
+    if (!incomingPhone || !incomingMessage) {
       return new Response(JSON.stringify({ error: "phone and message are required" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const normalizedPhone = normalizePhone(incomingPhone);
+    if (!normalizedPhone) {
+      return new Response(
+        JSON.stringify({ error: "Please use a valid WhatsApp number in international format (e.g., +923001234567)" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -48,10 +83,12 @@ serve(async (req) => {
       .lt("last_message_at", expiryThreshold);
 
     // Get active session
+    const phoneCandidates = buildPhoneCandidates(normalizedPhone);
+
     let { data: session } = await supabase
       .from("whatsapp_sessions")
       .select("*")
-      .eq("phone_number", phone)
+      .in("phone_number", phoneCandidates)
       .gte("last_message_at", expiryThreshold)
       .order("last_message_at", { ascending: false })
       .limit(1)
@@ -60,20 +97,31 @@ serve(async (req) => {
     if (!session) {
       const { data: newSession } = await supabase
         .from("whatsapp_sessions")
-        .insert({ phone_number: phone, conversation_state: { step: "initial", history: [] } })
+        .insert({ phone_number: normalizedPhone, conversation_state: { step: "initial", history: [] } })
         .select()
         .single();
       session = newSession;
+    } else if (session.phone_number !== normalizedPhone) {
+      await supabase
+        .from("whatsapp_sessions")
+        .update({ phone_number: normalizedPhone })
+        .eq("id", session.id);
+      session.phone_number = normalizedPhone;
     }
 
     // 2. Look up user by phone
-    const { data: userProfile } = await supabase
-      .from("profiles")
-      .select("id, full_name, email, phone, city")
-      .eq("phone", phone)
-      .maybeSingle();
+    let userProfile = await findProfileByPhone(supabase, normalizedPhone);
 
-    if (userProfile && !session.user_id) {
+    if (!userProfile && session.user_id) {
+      const { data: profileBySessionUser } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, phone, whatsapp_number, city")
+        .eq("id", session.user_id)
+        .maybeSingle();
+      userProfile = profileBySessionUser;
+    }
+
+    if (userProfile && session.user_id !== userProfile.id) {
       await supabase
         .from("whatsapp_sessions")
         .update({ user_id: userProfile.id })
@@ -88,7 +136,7 @@ serve(async (req) => {
         try {
           const mediaResponse = await fetch(media_url);
           const mediaBlob = await mediaResponse.blob();
-          const fileName = `whatsapp/${phone}/${Date.now()}.jpg`;
+          const fileName = `whatsapp/${normalizedPhone.replace(/\D/g, "")}/${Date.now()}.jpg`;
 
           await supabase.storage
             .from("payment-screenshots")
@@ -143,7 +191,7 @@ serve(async (req) => {
     const history = state.history || [];
 
     // Add current message to history
-    history.push({ role: "user", content: message });
+    history.push({ role: "user", content: incomingMessage });
 
     // 7. Fetch real-time availability
     const today = new Date().toISOString().split("T")[0];
@@ -180,6 +228,7 @@ serve(async (req) => {
 
     const userContext = userProfile
       ? `KNOWN USER: ${userProfile.full_name} (${userProfile.email}), Phone: ${phone}, City: ${userProfile.city || "N/A"}`
+      ? `KNOWN USER: ${userProfile.full_name} (${userProfile.email}), Phone: ${normalizedPhone}, City: ${userProfile.city || "N/A"}`
       : `UNKNOWN USER: Phone ${phone} — not registered. If they want to book, collect their full name and email.`;
 
     const sessionContext = state.step !== "initial"
@@ -331,14 +380,14 @@ When you need to perform an action, call the appropriate tool.`;
             break;
           }
           case "create_booking": {
-            result = await handleCreateBooking(supabase, args, phone, userProfile, courts || []);
+            result = await handleCreateBooking(supabase, args, normalizedPhone, userProfile, courts || []);
             if (result?.success && result?.booking_reference) {
               latestBookingReference = result.booking_reference;
             }
             break;
           }
           case "get_my_bookings": {
-            result = await handleGetBookings(supabase, phone, userProfile);
+            result = await handleGetBookings(supabase, normalizedPhone, userProfile);
             break;
           }
           case "cancel_booking": {
@@ -421,6 +470,46 @@ async function updateSession(supabase: any, sessionId: string, state: any) {
     .eq("id", sessionId);
 }
 
+async function findProfileByPhone(supabase: any, normalizedPhone: string) {
+  const candidates = buildPhoneCandidates(normalizedPhone);
+
+  const [phoneMatches, whatsappMatches] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, phone, whatsapp_number, city")
+      .in("phone", candidates)
+      .limit(5),
+    supabase
+      .from("profiles")
+      .select("id, full_name, email, phone, whatsapp_number, city")
+      .in("whatsapp_number", candidates)
+      .limit(5),
+  ]);
+
+  const directMatches = [...(phoneMatches.data || []), ...(whatsappMatches.data || [])];
+  if (directMatches.length > 0) {
+    return directMatches[0];
+  }
+
+  const { data: fallbackProfiles } = await supabase
+    .from("profiles")
+    .select("id, full_name, email, phone, whatsapp_number, city")
+    .or("phone.not.is.null,whatsapp_number.not.is.null")
+    .limit(1000);
+
+  const targetDigits = normalizedPhone.replace(/\D/g, "");
+  return (fallbackProfiles || []).find((profile: any) => {
+    const phoneDigits = profile.phone ? String(profile.phone).replace(/\D/g, "") : "";
+    const whatsappDigits = profile.whatsapp_number ? String(profile.whatsapp_number).replace(/\D/g, "") : "";
+    return (
+      phoneDigits === targetDigits ||
+      whatsappDigits === targetDigits ||
+      (phoneDigits.length >= 10 && targetDigits.endsWith(phoneDigits.slice(-10))) ||
+      (whatsappDigits.length >= 10 && targetDigits.endsWith(whatsappDigits.slice(-10)))
+    );
+  }) || null;
+}
+
 async function handleSearchCourts(
   supabase: any,
   args: any,
@@ -491,6 +580,13 @@ async function handleCreateBooking(
   courts: any[]
 ) {
   let userId = userProfile?.id;
+
+  if (!userId) {
+    const linkedProfile = await findProfileByPhone(supabase, phone);
+    if (linkedProfile) {
+      userId = linkedProfile.id;
+    }
+  }
 
   // Create profile for guest users
   if (!userId && args.guest_name && args.guest_email) {
