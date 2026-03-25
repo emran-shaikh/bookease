@@ -147,8 +147,8 @@ const WhatsAppSimulator = () => {
         <Card className="h-[calc(100vh-220px)] flex flex-col">
           <CardHeader className="pb-3 border-b flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-600 flex items-center justify-center">
-                <Phone className="h-5 w-5 text-white" />
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+                <Phone className="h-5 w-5 text-primary-foreground" />
               </div>
               <div>
                 <CardTitle className="text-lg">WhatsApp Simulator</CardTitle>
@@ -242,7 +242,7 @@ const WhatsAppSimulator = () => {
                 disabled={loading}
                 className="flex-1"
               />
-              <Button onClick={() => sendMessage()} disabled={loading || !message.trim()} size="icon" className="bg-green-600 hover:bg-green-700">
+              <Button onClick={() => sendMessage()} disabled={loading || !message.trim()} size="icon">
                 <Send className="h-4 w-4" />
               </Button>
             </div>
