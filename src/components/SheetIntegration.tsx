@@ -125,7 +125,7 @@ export function SheetIntegrationPanel() {
 
   const getSyncStatusIcon = (status: string) => {
     switch (status) {
-      case 'success': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'success': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
       case 'error': return <XCircle className="h-4 w-4 text-destructive" />;
       case 'syncing': return <Loader2 className="h-4 w-4 animate-spin text-primary" />;
       default: return <Clock className="h-4 w-4 text-muted-foreground" />;
@@ -134,7 +134,7 @@ export function SheetIntegrationPanel() {
 
   const getSyncStatusBadge = (status: string) => {
     switch (status) {
-      case 'success': return <Badge variant="default" className="bg-green-500">Synced</Badge>;
+      case 'success': return <Badge variant="default">Synced</Badge>;
       case 'error': return <Badge variant="destructive">Error</Badge>;
       case 'syncing': return <Badge variant="secondary">Syncing...</Badge>;
       default: return <Badge variant="outline">Pending</Badge>;
