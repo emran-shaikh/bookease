@@ -584,6 +584,10 @@ export default function OwnerDashboard() {
             </TabsTrigger>
             <TabsTrigger value="blocked">Blocked Slots</TabsTrigger>
             <TabsTrigger value="pricing">Pricing Rules</TabsTrigger>
+            <TabsTrigger value="sheets" className="gap-1">
+              <FileSpreadsheet className="h-3 w-3" />
+              Sheets
+            </TabsTrigger>
           </TabsList>
 
           {/* Venues Tab */}
