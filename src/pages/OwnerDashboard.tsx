@@ -9,13 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard, Home } from 'lucide-react';
+import { Loader2, Building2, Calendar, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard, Home, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
 import { CourtEditForm } from '@/components/CourtEditForm';
 import { OwnerBankSettings } from '@/components/OwnerBankSettings';
 import { VenueForm } from '@/components/VenueForm';
+import { SheetIntegrationPanel } from '@/components/SheetIntegration';
 import { VenueEditForm } from '@/components/VenueEditForm';
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -583,6 +584,10 @@ export default function OwnerDashboard() {
             </TabsTrigger>
             <TabsTrigger value="blocked">Blocked Slots</TabsTrigger>
             <TabsTrigger value="pricing">Pricing Rules</TabsTrigger>
+            <TabsTrigger value="sheets" className="gap-1">
+              <FileSpreadsheet className="h-3 w-3" />
+              Sheets
+            </TabsTrigger>
           </TabsList>
 
           {/* Venues Tab */}
@@ -1480,6 +1485,11 @@ export default function OwnerDashboard() {
                 </Card>
               ))
             )}
+          </TabsContent>
+
+          {/* Sheets Integration Tab */}
+          <TabsContent value="sheets" className="space-y-4">
+            <SheetIntegrationPanel />
           </TabsContent>
         </Tabs>
       </main>
