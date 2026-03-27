@@ -492,6 +492,92 @@ export type Database = {
           },
         ]
       }
+      sheet_integrations: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          owner_id: string
+          platform: string
+          sheet_id: string | null
+          sheet_name: string | null
+          sheet_url: string
+          sync_error: string | null
+          sync_status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          owner_id: string
+          platform?: string
+          sheet_id?: string | null
+          sheet_name?: string | null
+          sheet_url: string
+          sync_error?: string | null
+          sync_status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          owner_id?: string
+          platform?: string
+          sheet_id?: string | null
+          sheet_name?: string | null
+          sheet_url?: string
+          sync_error?: string | null
+          sync_status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sheet_sync_logs: {
+        Row: {
+          completed_at: string | null
+          direction: string
+          error_details: string | null
+          id: string
+          integration_id: string
+          records_failed: number | null
+          records_synced: number | null
+          started_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          direction: string
+          error_details?: string | null
+          id?: string
+          integration_id: string
+          records_failed?: number | null
+          records_synced?: number | null
+          started_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          direction?: string
+          error_details?: string | null
+          id?: string
+          integration_id?: string
+          records_failed?: number | null
+          records_synced?: number | null
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sheet_sync_logs_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "sheet_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       slot_locks: {
         Row: {
           booking_date: string
