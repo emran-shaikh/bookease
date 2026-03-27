@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.booking-webhook]
 verify_jwt = false
+
+[functions.sync-sheet]
+verify_jwt = false

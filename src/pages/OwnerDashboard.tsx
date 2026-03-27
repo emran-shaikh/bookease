@@ -1486,6 +1486,11 @@ export default function OwnerDashboard() {
               ))
             )}
           </TabsContent>
+
+          {/* Sheets Integration Tab */}
+          <TabsContent value="sheets" className="space-y-4">
+            <SheetIntegrationPanel />
+          </TabsContent>
         </Tabs>
       </main>
     </div>
