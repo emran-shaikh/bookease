@@ -47,7 +47,14 @@ async function googleSheetsRequest(
 ) {
   const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
   if (!GOOGLE_SERVICE_ACCOUNT_KEY) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_KEY not configured. Please add your Google service account credentials.");
+    // Simple mode: allow reading from publicly shared sheets without credentials
+    if (method === "GET") {
+      return await googleSheetsPublicRead(sheetId, range);
+    }
+
+    throw new Error(
+      "This action needs authenticated Google Sheets write access. For simple mode, share the sheet and use 'From Sheet' sync."
+    );
   }
 
   let serviceAccount;
@@ -83,6 +90,53 @@ async function googleSheetsRequest(
     throw new Error(`Google Sheets API error (${response.status}): ${errText}`);
   }
   return response.json();
+}
+
+// Read shared/public Google Sheets without service account (simple mode)
+async function googleSheetsPublicRead(sheetId: string, range: string) {
+  const sheetName = range.includes("!") ? range.split("!")[0] : "Bookings";
+
+  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?sheet=${encodeURIComponent(sheetName)}&tqx=out:json`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Unable to read shared Google Sheet (${response.status}): ${errText}`);
+  }
+
+  const rawText = await response.text();
+  const start = rawText.indexOf("{");
+  const end = rawText.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("Invalid shared Google Sheet response. Ensure sheet is shared with link access.");
+  }
+
+  const payload = JSON.parse(rawText.slice(start, end + 1));
+  const cols = payload?.table?.cols || [];
+  const rows = payload?.table?.rows || [];
+
+  const values: string[][] = [];
+
+  // Header row from sheet columns
+  const headerRow = cols.map((col: any) => String(col?.label || "").trim());
+  if (headerRow.some((h: string) => h.length > 0)) {
+    values.push(headerRow);
+  }
+
+  for (const row of rows) {
+    const cells = row?.c || [];
+    values.push(
+      cells.map((cell: any) => {
+        if (!cell) return "";
+        if (cell.f !== undefined && cell.f !== null) return String(cell.f);
+        if (cell.v !== undefined && cell.v !== null) return String(cell.v);
+        return "";
+      })
+    );
+  }
+
+  return { values };
 }
 
 // Generate Google OAuth2 access token from service account
