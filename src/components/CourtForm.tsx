@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ export function CourtForm() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const submitLockRef = useRef(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
@@ -179,6 +180,8 @@ export function CourtForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (loading || submitLockRef.current) return;
     
     if (!user) {
       toast({
@@ -190,6 +193,8 @@ export function CourtForm() {
     }
 
     if ((useCustomHours || !selectedVenueId) && !validateTimes()) return;
+
+    submitLockRef.current = true;
 
     setLoading(true);
 
@@ -262,6 +267,7 @@ export function CourtForm() {
       });
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   }
 
