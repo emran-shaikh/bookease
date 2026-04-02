@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,7 @@ interface CourtEditFormProps {
 export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const submitLockRef = useRef(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
@@ -220,9 +221,13 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (loading || submitLockRef.current) return;
     
     // Only validate times if using custom hours
     if ((useCustomHours || !selectedVenueId) && !validateTimes()) return;
+
+    submitLockRef.current = true;
     
     setLoading(true);
 
@@ -301,6 +306,7 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
       });
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   }
 

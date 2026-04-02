@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ interface VenueEditFormProps {
 export function VenueEditForm({ venue, onSuccess, onCancel }: VenueEditFormProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const submitLockRef = useRef(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
@@ -163,8 +164,12 @@ export function VenueEditForm({ venue, onSuccess, onCancel }: VenueEditFormProps
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (loading || submitLockRef.current) return;
     
     if (!validateTimes()) return;
+
+    submitLockRef.current = true;
     
     setLoading(true);
 
@@ -211,6 +216,7 @@ export function VenueEditForm({ venue, onSuccess, onCancel }: VenueEditFormProps
       });
     } finally {
       setLoading(false);
+      submitLockRef.current = false;
     }
   }
 
