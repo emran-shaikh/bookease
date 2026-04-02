@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Plus, X, Clock, Building2 } from 'lucide-react';
+import { Loader2, Plus, X, Clock, Building2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { VenueSelector } from '@/components/VenueSelector';
@@ -25,6 +25,7 @@ export function CourtForm() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [images, setImages] = useState<string[]>(['']);
   const [amenities, setAmenities] = useState<string[]>(['']);
   const [is24Hours, setIs24Hours] = useState(false);
@@ -91,6 +92,58 @@ export function CourtForm() {
 
   function removeImageField(index: number) {
     setImages(images.filter((_, i) => i !== index));
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>, index: number) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please upload an image file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please upload an image smaller than 5MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `court-${user?.id}-${Date.now()}.${fileExt}`;
+      const filePath = `court-images/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('review-images')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('review-images')
+        .getPublicUrl(filePath);
+
+      handleImageChange(index, publicUrl);
+      toast({ title: 'Success', description: 'Image uploaded successfully' });
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
   }
 
   function handleAmenityChange(index: number, value: string) {
@@ -464,23 +517,51 @@ export function CourtForm() {
 
           <div>
             <Label>{selectedVenueId ? 'Court-Specific Images' : 'Image URLs'}</Label>
-            <div className="space-y-2 mt-2">
+            <div className="space-y-3 mt-2">
               {images.map((img, index) => (
-                <div key={index} className="flex gap-2">
-                  <Input
-                    value={img}
-                    onChange={(e) => handleImageChange(index, e.target.value)}
-                    placeholder="https://example.com/image.jpg"
-                  />
-                  {images.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => removeImageField(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                <div key={index} className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={img}
+                      onChange={(e) => handleImageChange(index, e.target.value)}
+                      placeholder="Image URL or upload below"
+                    />
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(e, index)}
+                        disabled={uploadingImage}
+                      />
+                      <Button type="button" variant="outline" size="icon" disabled={uploadingImage} asChild>
+                        <span>
+                          {uploadingImage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                        </span>
+                      </Button>
+                    </label>
+                    {images.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeImageField(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  {img && (
+                    <div className="relative h-24 w-24 overflow-hidden rounded-lg border">
+                      <img
+                        src={img}
+                        alt={`Court image ${index + 1}`}
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               ))}
