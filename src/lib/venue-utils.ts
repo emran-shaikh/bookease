@@ -67,11 +67,10 @@ export function resolveCourtData(court: any, venue?: Venue | null): ResolvedCour
       ...(court.court_specific_images || court.images || [])
     ].filter(Boolean),
     
-    // Amenities: combine venue amenities with court-specific amenities
-    amenities: [
-      ...(hasVenue ? (venue.amenities || []) : []),
-      ...(court.court_specific_amenities || court.amenities || [])
-    ].filter(Boolean),
+    // Amenities: venue-linked courts use venue amenities only; standalone courts use their own
+    amenities: hasVenue
+      ? (venue.amenities || []).filter(Boolean)
+      : (court.court_specific_amenities || court.amenities || []).filter(Boolean),
     
     // Operating hours: use court override if set, otherwise inherit from venue or use court default
     opening_time: court.opening_time_override || 
