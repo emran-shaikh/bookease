@@ -322,6 +322,12 @@ export default function BookCourt() {
   }
 
   const hasPaymentInfo = ownerPaymentInfo?.bank_name && ownerPaymentInfo?.account_number;
+  const bookingImage = [
+    ...(court.court_specific_images || []),
+    ...(court.images || []),
+    ...(venue?.images || []),
+    ...(resolvedData?.images || []),
+  ].find(Boolean) || '/placeholder.svg';
 
   return (
     <div className="min-h-screen bg-background">
@@ -350,6 +356,17 @@ export default function BookCourt() {
                 <CardTitle className="text-base sm:text-lg">Booking Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6 pt-0">
+                <div className="overflow-hidden rounded-lg border bg-muted/30">
+                  <img
+                    src={bookingImage}
+                    alt={court.name}
+                    className="h-44 w-full object-cover"
+                    loading="lazy"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/placeholder.svg';
+                    }}
+                  />
+                </div>
                 <div>
                   <p className="text-xs sm:text-sm font-medium">Court</p>
                   <p className="text-sm sm:text-base md:text-lg">{court.name}</p>
