@@ -12,7 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { Loader2, MapPin, Star, Search, Navigation, Heart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFavorites } from '@/hooks/useFavorites';
-import { formatPrice, getCurrencySymbol } from '@/lib/currency';
+import { formatPrice } from '@/lib/currency';
 
 interface Court {
   id: string;
