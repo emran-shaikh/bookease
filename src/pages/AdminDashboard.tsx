@@ -83,7 +83,7 @@ export default function AdminDashboard() {
         supabase.from('venues').select('*').eq('status', 'pending'),
         supabase.from('venues').select('*'),
         supabase.from('profiles').select('*, user_roles(role)'),
-        supabase.from('bookings').select('*, courts(name), profiles(full_name, email)'),
+        supabase.from('bookings').select('*, courts(name, owner_id), profiles(full_name, email)'),
       ]);
 
       if (courtsData.error) throw courtsData.error;
@@ -857,6 +857,14 @@ export default function AdminDashboard() {
                                       ]);
 
                                       // Send email notification
+                                      const { data: ownerProfile } = booking.courts?.owner_id
+                                        ? await supabase
+                                            .from('profiles')
+                                            .select('email, full_name')
+                                            .eq('id', booking.courts.owner_id)
+                                            .maybeSingle()
+                                        : { data: null };
+
                                       await supabase.functions.invoke('send-booking-confirmation', {
                                         body: {
                                           bookingId: booking.id,
@@ -867,6 +875,9 @@ export default function AdminDashboard() {
                                           startTime: booking.start_time,
                                           endTime: booking.end_time,
                                           totalPrice: booking.total_price,
+                                          ownerEmail: ownerProfile?.email,
+                                          ownerName: ownerProfile?.full_name,
+                                          isPendingPayment: false,
                                         }
                                       });
 
