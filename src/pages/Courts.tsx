@@ -102,7 +102,8 @@ export default function Courts() {
         .from('courts')
         .select(`
           *,
-          reviews (rating)
+          reviews (rating),
+          venues (images)
         `)
         .eq('status', 'approved')
         .eq('is_active', true);
@@ -110,6 +111,12 @@ export default function Courts() {
       if (error) throw error;
 
       const courtsWithRatings = data.map((court: any) => {
+        const courtImages = [
+          ...(court.court_specific_images || []),
+          ...(court.images || []),
+        ].filter(Boolean);
+        const venueImages = (court.venues?.images || []).filter(Boolean);
+
         const ratings = court.reviews?.map((r: any) => r.rating) || [];
         const avgRating = ratings.length > 0
           ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length
@@ -127,6 +134,7 @@ export default function Courts() {
         
         return {
           ...court,
+          images: courtImages.length > 0 ? courtImages : venueImages,
           rating: avgRating,
           reviews_count: ratings.length,
           distance,
