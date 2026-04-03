@@ -953,8 +953,16 @@ export default function OwnerDashboard() {
                                 }
                               ]);
 
-                              // Send email notification to customer
+                              // Send email notification to customer and owner
                               try {
+                                const { data: ownerProfile } = booking.courts?.owner_id
+                                  ? await supabase
+                                      .from('profiles')
+                                      .select('email, full_name')
+                                      .eq('id', booking.courts.owner_id)
+                                      .maybeSingle()
+                                  : { data: null };
+
                                 await supabase.functions.invoke('send-booking-confirmation', {
                                   body: {
                                     userEmail: booking.profiles?.email,
@@ -964,6 +972,8 @@ export default function OwnerDashboard() {
                                     startTime: booking.start_time,
                                     endTime: booking.end_time,
                                     totalPrice: parseFloat(booking.total_price),
+                                    ownerEmail: ownerProfile?.email,
+                                    ownerName: ownerProfile?.full_name,
                                     isPendingPayment: false, // Payment is now confirmed
                                   },
                                 });

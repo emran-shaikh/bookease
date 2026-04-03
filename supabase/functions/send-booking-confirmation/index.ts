@@ -302,15 +302,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email sent successfully! ID:", emailResponse.data?.id);
 
-    // Send notification email to court owner for pending payments
+    // Send notification email to court owner for pending or confirmed payments
     let ownerEmailId = null;
-    if (ownerEmail && isPendingPayment) {
+    if (ownerEmail && typeof isPendingPayment === "boolean") {
       console.log("Sending notification to court owner:", ownerEmail);
       
       const ownerEmailResponse = await resend.emails.send({
         from: "BookedHours <support@bookedhours.com>",
         to: [ownerEmail],
-        subject: "🔔 New Booking - Payment Pending",
+        subject: isPendingPayment ? "🔔 New Booking - Payment Pending" : "✅ Booking Payment Confirmed",
         html: `
           <!DOCTYPE html>
           <html>
@@ -392,12 +392,15 @@ const handler = async (req: Request): Promise<Response> => {
             </head>
             <body>
               <div class="header">
-                <h1 style="margin: 0;">🔔 New Booking Received</h1>
-                <p style="margin: 10px 0 0 0;">Payment pending confirmation</p>
+                <h1 style="margin: 0;">${isPendingPayment ? "🔔 New Booking Received" : "✅ Payment Confirmed"}</h1>
+                <p style="margin: 10px 0 0 0;">${isPendingPayment ? "Payment pending confirmation" : "Booking is now confirmed"}</p>
               </div>
               <div class="content">
                 <p>Hi ${ownerName || 'Court Owner'},</p>
-                <p>You have a new booking request for <strong>${courtName || 'your court'}</strong>. The customer has submitted their booking and payment is pending.</p>
+                <p>${isPendingPayment
+                  ? `You have a new booking request for <strong>${courtName || 'your court'}</strong>. The customer has submitted their booking and payment is pending.`
+                  : `Payment has been confirmed for booking at <strong>${courtName || 'your court'}</strong>.`}
+                </p>
                 
                 <div class="booking-details">
                   <div class="detail-row">
@@ -422,23 +425,28 @@ const handler = async (req: Request): Promise<Response> => {
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Status:</span>
-                    <span class="pending-badge">⏳ Payment Pending</span>
+                    <span class="pending-badge">${isPendingPayment ? "⏳ Payment Pending" : "✅ Payment Confirmed"}</span>
                   </div>
                 </div>
 
                 <p><strong>What to do next:</strong></p>
-                <ul>
-                  <li>Wait for the customer to send payment or screenshot via WhatsApp</li>
-                  <li>Verify the payment in your bank account</li>
-                  <li>Confirm the booking from your Owner Dashboard</li>
-                </ul>
+                ${isPendingPayment
+                  ? `<ul>
+                      <li>Wait for the customer to send payment or screenshot via WhatsApp</li>
+                      <li>Verify the payment in your bank account</li>
+                      <li>Confirm the booking from your Owner Dashboard</li>
+                    </ul>`
+                  : `<ul>
+                      <li>No further action needed for payment confirmation</li>
+                      <li>Prepare the court for the booked slot</li>
+                    </ul>`}
 
                 <center>
                   <a href="https://bookedhours.com/owner" class="action-btn">Go to Owner Dashboard</a>
                 </center>
 
                 <div class="footer">
-                  <p>This booking will be held for 30 minutes. If payment is not received, it will expire automatically.</p>
+                  <p>${isPendingPayment ? "This booking will be held for 30 minutes. If payment is not received, it will expire automatically." : "This is an automated payment confirmation update."}</p>
                   <p>Thank you for using BookedHours!</p>
                 </div>
               </div>
