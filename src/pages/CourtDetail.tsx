@@ -810,6 +810,13 @@ export default function CourtDetail() {
     return { available: true, reason: '', hide: false };
   };
 
+  const courtImages = [
+    ...(court?.court_specific_images || []),
+    ...(court?.images || []),
+  ].filter(Boolean);
+  const venueImages = (venue?.images || []).filter(Boolean);
+  const displayImages = [...new Set(courtImages.length > 0 ? courtImages : venueImages)];
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
       <SEO 
@@ -823,11 +830,11 @@ export default function CourtDetail() {
         <div className="grid gap-4 sm:gap-6 md:gap-8 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <div className="mb-4 sm:mb-6 relative">
-              {/* Use resolved images (venue + court-specific) */}
-              {resolvedData?.images && resolvedData.images.length > 1 ? (
+              {/* Show court images first; fallback to venue images only when court has none */}
+              {displayImages.length > 1 ? (
                 <Carousel className="w-full">
                   <CarouselContent>
-                    {resolvedData.images.map((image: string, index: number) => (
+                    {displayImages.map((image: string, index: number) => (
                       <CarouselItem key={index}>
                         <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
                           <img
@@ -853,10 +860,10 @@ export default function CourtDetail() {
                   <CarouselPrevious className="left-2 h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border-0" />
                   <CarouselNext className="right-2 h-8 w-8 sm:h-10 sm:w-10 bg-background/80 hover:bg-background border-0" />
                 </Carousel>
-              ) : resolvedData?.images && resolvedData.images.length === 1 ? (
+              ) : displayImages.length === 1 ? (
                 <div className="aspect-video w-full overflow-hidden rounded-lg bg-muted">
                   <img
-                    src={resolvedData.images[0]}
+                    src={displayImages[0]}
                     alt={court.name}
                     className="h-full w-full object-cover"
                     onError={(e) => {
