@@ -327,6 +327,37 @@ async function initializeSheet(supabaseAdmin: any, integrationId: string, ownerI
   }).eq("id", integrationId);
 
   try {
+    // Google Sheets simple mode (no service account): validate read access only
+    if (integration.platform === "google_sheets" && !Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY")) {
+      const sheetId = extractGoogleSheetId(integration.sheet_url);
+      if (!sheetId) throw new Error("Invalid Google Sheet URL");
+
+      const sheetName = integration.sheet_name || "Bookings";
+      await googleSheetsPublicRead(sheetId, `${sheetName}!A:N`);
+
+      await supabaseAdmin.from("sheet_integrations").update({
+        sync_status: "success",
+        last_synced_at: new Date().toISOString(),
+        sync_error: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", integrationId);
+
+      await supabaseAdmin.from("sheet_sync_logs").insert({
+        integration_id: integrationId,
+        direction: "from_sheet",
+        records_synced: 0,
+        completed_at: new Date().toISOString(),
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Sheet linked in simple mode. Use 'From Sheet' to import updates. 'To Sheet' and 'Full Sync' need authenticated Google write access.",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Get all bookings for owner's courts
     const { data: courts } = await supabaseAdmin
       .from("courts")
