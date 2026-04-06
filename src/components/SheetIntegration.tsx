@@ -77,7 +77,12 @@ export function SheetIntegrationPanel() {
 
       if (error) throw error;
 
-      toast({ title: 'Success', description: 'Sheet linked! Click "Initialize" to set up the sheet with your booking data.' });
+      toast({
+        title: 'Success',
+        description: formData.platform === 'google_sheets'
+          ? 'Sheet linked! If using simple mode, use "From Sheet" to import changes.'
+          : 'Sheet linked! Click "Initialize" to set up the sheet with your booking data.',
+      });
       setShowAddForm(false);
       setFormData({ sheet_url: '', platform: 'google_sheets', sheet_name: 'Bookings' });
       fetchIntegrations();
