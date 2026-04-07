@@ -105,6 +105,11 @@ async function googleSheetsPublicRead(sheetId: string, range: string) {
   }
 
   const rawText = await response.text();
+
+  if (rawText.includes("Sign in to your Google Account") || rawText.includes("Allow Google Sheets access to your necessary cookies")) {
+    throw new Error("Sheet is not publicly accessible. Set sharing to 'Anyone with the link' (Viewer), then retry 'From Sheet'.");
+  }
+
   const start = rawText.indexOf("{");
   const end = rawText.lastIndexOf("}");
 
@@ -274,6 +279,23 @@ Deno.serve(async (req) => {
   try {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { action, integration_id, owner_id } = await req.json();
+
+    const integration = await getIntegration(supabaseAdmin, integration_id, owner_id);
+    const isGoogleSimpleMode = integration.platform === "google_sheets" && !Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
+
+    if (isGoogleSimpleMode && action === "sync_to_sheet") {
+      return new Response(JSON.stringify({
+        success: false,
+        error: "'To Sheet' needs authenticated Google Sheets write access. In simple mode, use 'From Sheet' sync.",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (isGoogleSimpleMode && action === "full_sync") {
+      return await syncFromSheet(supabaseAdmin, integration_id, owner_id);
+    }
 
     if (action === "sync_to_sheet") {
       // Push bookings from DB to sheet
