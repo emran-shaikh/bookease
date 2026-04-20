@@ -333,8 +333,11 @@ Deno.serve(async (req) => {
     }
   } catch (error: any) {
     console.error("Sync error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    return new Response(JSON.stringify({
+      success: false,
+      error: error?.message || "Sync failed",
+    }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
