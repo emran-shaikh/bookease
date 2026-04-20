@@ -278,7 +278,21 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { action, integration_id, owner_id } = await req.json();
+    const requestBody = await req.json().catch(() => ({}));
+    const { action, integration_id, owner_id } = requestBody;
+
+    if (action === "get_capabilities") {
+      const hasGoogleServiceAccount = !!Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
+      return new Response(JSON.stringify({
+        google_sheets: {
+          authenticated: hasGoogleServiceAccount,
+          write_enabled: hasGoogleServiceAccount,
+        },
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const integration = await getIntegration(supabaseAdmin, integration_id, owner_id);
     const isGoogleSimpleMode = integration.platform === "google_sheets" && !Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
