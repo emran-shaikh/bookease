@@ -26,11 +26,20 @@ interface SheetIntegration {
   created_at: string;
 }
 
+interface SyncCapabilities {
+  google_sheets?: {
+    authenticated: boolean;
+    write_enabled: boolean;
+  };
+}
+
 export function SheetIntegrationPanel() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [integrations, setIntegrations] = useState<SheetIntegration[]>([]);
   const [loading, setLoading] = useState(true);
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
+  const [syncCapabilities, setSyncCapabilities] = useState<SyncCapabilities | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,8 +49,27 @@ export function SheetIntegrationPanel() {
   });
 
   useEffect(() => {
-    if (user) fetchIntegrations();
+    if (user) {
+      fetchIntegrations();
+      fetchSyncCapabilities();
+    }
   }, [user]);
+
+  async function fetchSyncCapabilities() {
+    setCapabilitiesLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('sync-sheet', {
+        body: { action: 'get_capabilities' },
+      });
+
+      if (error) throw error;
+      setSyncCapabilities((data as SyncCapabilities) || null);
+    } catch {
+      setSyncCapabilities(null);
+    } finally {
+      setCapabilitiesLoading(false);
+    }
+  }
 
   async function fetchIntegrations() {
     const { data, error } = await supabase
@@ -146,6 +174,8 @@ export function SheetIntegrationPanel() {
     }
   };
 
+  const isGoogleWriteEnabled = !!syncCapabilities?.google_sheets?.write_enabled;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -165,6 +195,22 @@ export function SheetIntegrationPanel() {
           <p className="text-sm text-muted-foreground">
             Link your Google Sheets or Excel Online to sync bookings bidirectionally
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Badge variant={capabilitiesLoading ? 'outline' : isGoogleWriteEnabled ? 'default' : 'secondary'}>
+              {capabilitiesLoading
+                ? 'Checking Google auth...'
+                : isGoogleWriteEnabled
+                  ? 'Authenticated mode'
+                  : 'Simple mode (read-only)'}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {capabilitiesLoading
+                ? 'Checking if private-sheet write sync is available.'
+                : isGoogleWriteEnabled
+                  ? 'Write sync is enabled for private Google Sheets.'
+                  : 'Write sync is disabled until a Google service account key is configured.'}
+            </span>
+          </div>
         </div>
         <Button onClick={() => setShowAddForm(!showAddForm)} variant={showAddForm ? 'outline' : 'default'}>
           {showAddForm ? 'Cancel' : '+ Link Sheet'}
