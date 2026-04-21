@@ -1,181 +1,106 @@
 
+1) Define the sync contract (owner-facing + system rules)
+- Make Google Sheets a first-class “operations console” for owners, with true two-way behavior:
+  - Website changes push to sheet automatically.
+  - Sheet edits pull to website automatically in background.
+- Apply your chosen conflict policy:
+  - **Most recent wins**
+  - **Automatic + instant** (implemented as immediate push from site + frequent background pull from sheet)
+  - **Allow new rows from sheet**
+  - **Deleted row in sheet => cancel booking on website**
+- Standardize the sheet schema so sync is deterministic (no ambiguous columns).
 
-## How WhatsApp Booking Works — End-to-End Flow
+2) Database upgrades for reliable bidirectional sync
+- Create a migration to add sync metadata and mapping state:
+  - `bookings`:
+    - `source_updated_at timestamptz` (last authoritative change time for conflict resolution)
+    - `source_updated_by text` (`site` | `sheet`)
+  - `sheet_integrations`:
+    - `auto_sync_enabled boolean default true`
+    - `last_pull_at timestamptz`
+    - `last_push_at timestamptz`
+    - `sync_cursor text` (optional incremental token)
+  - New table `sheet_booking_links` (integration-scoped mapping):
+    - `integration_id`, `booking_id`, `sheet_row_key` (stable row identifier), `last_seen_at`, `row_hash`, `is_deleted`
+- Add indexes for fast reconciliation (`integration_id`, `booking_id`, `sheet_row_key`).
+- Keep existing RLS model; service-role edge functions continue controlled writes.
 
-Let me walk through the exact scenario you described: a new user messages on WhatsApp "need court for this saturday 10pm to 12am".
+3) Refactor sync engine in `supabase/functions/sync-sheet/index.ts`
+- Move from “rebuild sheet every time” to **incremental reconcile**:
+  - **Push path (site -> sheet)**: only changed bookings since `last_push_at`.
+  - **Pull path (sheet -> site)**: parse current rows, compare against link table + hashes.
+- Enforce deterministic row identity:
+  - Use full booking UUID in a dedicated hidden/locked column (not just 8-char prefix).
+  - Keep short booking ID as display-only.
+- Implement row-level actions during pull:
+  - Existing row changed -> compare timestamps and apply **most recent wins**.
+  - Unknown row with required fields -> create new booking (with overlap/blocked-slot checks).
+  - Missing previously-known row -> set booking status to `cancelled`.
+- Add strict validation and normalization:
+  - Date/time format parsing, status/payment enum validation, court-name mapping safety, duplicate-row guards.
+- Add anti-loop protection:
+  - Track `source_updated_by` and sync run id so write-backs don’t cause ping-pong updates.
+- Improve error taxonomy:
+  - Return actionable errors for API disabled, sharing permissions, invalid tab, malformed row, duplicate/overlap conflict.
 
----
+4) Automatic sync orchestration (near-real-time behavior)
+- Add a scheduled backend function (e.g. `auto-sync-sheets`) that:
+  - runs frequently (e.g. every minute),
+  - processes active integrations,
+  - executes pull reconcile safely with per-integration lock.
+- Add immediate push triggers from website mutation points:
+  - booking create/cancel/confirm/payment updates invoke sync push event path.
+- Keep manual buttons (`To Sheet`, `From Sheet`, `Full Sync`) as fallback and admin recovery tools.
 
-### The Conversation Flow
+5) Owner dashboard UX improvements (clarity + trust)
+- Upgrade `src/components/SheetIntegration.tsx` to show:
+  - Clear mode/status (“Connected”, “Auto-sync active”, “Attention needed”)
+  - Last push/pull timestamps
+  - Rows created/updated/cancelled in last run
+  - Conflict count and downloadable error details
+- Add “Sync Health” panel:
+  - API enabled check
+  - sheet access check
+  - tab schema check
+  - permissions check
+- Add an “integration setup checklist” UI for owners:
+  - API enabled
+  - sheet shared with service account
+  - correct tab name
+  - required columns present
 
-```text
-USER (WhatsApp)                         SYSTEM (via n8n + Edge Function)
-─────────────────                       ────────────────────────────────
+6) Booking workflow consistency updates
+- Ensure all booking mutations (customer booking, owner confirm/cancel, admin changes) update `source_updated_at/source_updated_by`.
+- Ensure sheet-originated updates preserve business rules (overlap/blocked slots/valid statuses).
+- Prevent silent conflicts by logging every overridden field decision in sync logs.
 
-"need court for this                    n8n receives message via WhatsApp
- saturday 10pm to 12am"                Business API trigger
-        │                                       │
-        │                              n8n calls whatsapp-booking
-        │                              edge function with:
-        │                              { phone: "+923001234567",
-        │                                message: "need court..." }
-        │                                       │
-        │                              Edge function:
-        │                              1. Checks whatsapp_sessions table
-        │                                 (no session → new user)
-        │                              2. Looks up phone in profiles
-        │                                 (not found → guest flow)
-        │                              3. AI parses intent:
-        │                                 date=Saturday, 10pm-12am
-        │                              4. Queries courts table for
-        │                                 available slots on that date
-        │                              5. Returns response to n8n
-        │                                       │
-        ◄───────────────────────────────────────┘
-"Hi! 👋 I found 3 courts
- available this Saturday
- (Mar 1) from 10:00 PM
- to 12:00 AM:
+7) Observability, logs, and recovery
+- Expand `sheet_sync_logs` usage to include:
+  - run type (`push`, `pull`, `full`, `auto`),
+  - counts (created/updated/cancelled/skipped/conflicted),
+  - per-row failure snippets.
+- Add a lightweight “replay last failed run” endpoint/action.
+- Add structured logs in sync function for quick diagnosis.
 
- 1️⃣ Indoor Badminton Court
-    FR Sports, Lahore
-    Rs. 3,000 (2 hrs)
+8) Test plan (before rollout)
+- Edge-function tests:
+  - site->sheet push, sheet->site update, new row create, row delete->cancel, conflict resolution.
+- Integration tests:
+  - owner edits sheet while customer books same slot; verify “most recent wins” and no duplicate booking.
+- UI tests:
+  - setup flow, health checks, error rendering, manual fallback actions.
+- Regression tests:
+  - booking creation/confirmation/cancellation still works when sync is enabled.
 
- 2️⃣ Tennis Court A
-    City Arena, Lahore
-    Rs. 4,500 (2 hrs)
+9) Rollout strategy
+- Phase 1: deploy schema + refactored sync with manual controls.
+- Phase 2: enable auto-sync scheduler for a subset (or all owners with active integrations).
+- Phase 3: tighten UX messaging and remove ambiguous legacy copy (“simple mode” wording) so owners clearly understand live bidirectional behavior.
 
- 3️⃣ Basketball Court
-    Sports Hub, Islamabad
-    Rs. 2,500 (2 hrs)
-
- Reply with the number
- to book, or type a
- city/sport to filter."
-        │
-"1"     │
-        │──────────────────────────────────────►
-        │                              AI understands: book court #1
-        │                              Checks: user not registered
-        │                                       │
-        ◄───────────────────────────────────────┘
-"Great choice! Indoor
- Badminton Court on
- Saturday 10 PM - 12 AM.
-
- To complete your booking,
- I need a few details:
- - Your full name
- - Your email
-
- (Or sign up at
- bookease.lovable.app
- for faster booking
- next time!)"
-        │
-"Ali Khan,                              
- ali@email.com"
-        │──────────────────────────────────────►
-        │                              Edge function:
-        │                              1. Creates profile (phone+name+email)
-        │                              2. Creates booking record
-        │                                 status: pending
-        │                              3. Looks up owner payment info
-        │                              4. Returns confirmation + payment
-        │                                       │
-        ◄───────────────────────────────────────┘
-"✅ Booking Confirmed!
-
- Court: Indoor Badminton
- Date: Sat, Mar 1
- Time: 10:00 PM - 12:00 AM
- Total: Rs. 3,000
-
- 💳 Payment Details:
- Bank: Meezan Bank
- Account: FR Sports
- No: 11650112706753
-
- 📱 Owner WhatsApp:
- +92 300 9876543
-
- Send payment screenshot
- here or on the app.
- Booking ID: #BK-4521"
-        │
-[sends screenshot]
-        │──────────────────────────────────────►
-        │                              Saves screenshot to storage
-        │                              Updates payment_status
-        │                              Notifies owner via webhook
-        │                              Updates Google Sheet
-        │                                       │
-        ◄───────────────────────────────────────┘
-"Payment received! ✅
- The court owner will
- confirm your booking
- shortly."
-```
-
----
-
-### What Gets Built
-
-#### 1. Database Changes
-- **`whatsapp_sessions` table** — tracks conversation state per phone number (selected court, step in flow, expiry)
-- **`n8n_webhook_url` column** on `profiles` — per-owner webhook URL
-- **Booking trigger** — fires on INSERT/UPDATE to notify n8n for Google Sheets sync and owner WhatsApp alerts
-
-#### 2. Edge Functions
-
-**`whatsapp-booking`** — the brain of the WhatsApp flow:
-- Receives `{ phone, message, media_url? }` from n8n
-- Uses AI (Gemini Flash via Lovable AI, free) to parse user intent
-- Manages multi-step conversation via `whatsapp_sessions`
-- Handles: browse courts, check availability, book, cancel, check bookings, receive payment screenshots
-- Returns structured response that n8n sends back via WhatsApp
-- For new/unregistered users: collects name + email inline, creates a lightweight profile linked by phone number
-
-**`booking-webhook`** — outbound notifications:
-- Fires on every booking status change (created, confirmed, cancelled, completed)
-- Sends enriched payload to n8n webhook
-- n8n routes to WhatsApp notification + Google Sheets update
-
-#### 3. Owner Dashboard Update
-- Add "n8n Webhook URL" field in the payment settings section
-- Owners paste their n8n webhook URL to receive booking notifications
-
-#### 4. n8n Workflows (user sets up — guide provided)
-
-**Inbound workflow:**
-1. WhatsApp Business trigger (receives user message)
-2. HTTP Request → calls `whatsapp-booking` edge function
-3. WhatsApp reply → sends response back to user
-
-**Outbound workflow:**
-1. Webhook trigger (receives booking changes)
-2. WhatsApp node → notifies customer and owner
-3. Google Sheets node → appends/updates booking row
-
----
-
-### Key Design Decisions
-
-| Decision | Choice | Why |
-|----------|--------|-----|
-| Guest booking | Yes — collect name+email via chat | Removes friction, user doesn't need an account |
-| AI model | Gemini Flash (free via Lovable AI) | No API key needed, fast enough for chat |
-| Payment | Show owner's bank details in chat | Matches existing bank transfer flow |
-| Screenshot | Accept via WhatsApp media | n8n forwards media URL to edge function |
-| Session expiry | 30 minutes | Prevents stale conversations |
-| Availability check | Real-time from bookings + blocked_slots | Same logic as court-assistant function |
-
----
-
-### What's Free
-
-- **Lovable AI gateway** — Gemini Flash for parsing WhatsApp messages (included)
-- **n8n Community Edition** — self-hosted, unlimited workflows
-- **WhatsApp Business API** — Meta provides 1,000 free service conversations/month
-- **Google Sheets API** — free tier covers this use case
-
+Technical details
+- “Automatic + instant” for Google Sheets is implemented as:
+  - immediate push on website-side mutations, plus
+  - high-frequency background pull for sheet-side edits (Google Sheets doesn’t provide dependable row-level webhooks for this exact flow).
+- Conflict engine uses `source_updated_at` timestamps and deterministic row mapping (`sheet_booking_links`) for idempotent reconciliation.
+- Deletion handling is snapshot-based: if a previously-linked row disappears from sheet, corresponding booking is cancelled (and logged).
+- New row ingestion from sheet requires minimum fields: court, date, start, end; all rows pass overlap and validation checks before insert.
