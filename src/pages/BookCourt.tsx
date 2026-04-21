@@ -221,7 +221,7 @@ export default function BookCourt() {
         return;
       }
       
-      const { error } = await supabase.from('bookings').insert({
+      const { data: createdBooking, error } = await supabase.from('bookings').insert({
         court_id: court.id,
         user_id: user?.id,
         booking_date: dateStr,
@@ -231,7 +231,9 @@ export default function BookCourt() {
         status: 'pending',
         payment_status: 'pending',
         notes: notes || null,
-      });
+        source_updated_at: new Date().toISOString(),
+        source_updated_by: 'site',
+      } as any).select('id').maybeSingle();
 
       if (error) {
         if (error.message.includes('overlaps with an existing booking') || 
@@ -251,6 +253,18 @@ export default function BookCourt() {
       const lock = getCurrentUserLock(startTime, endTime);
       if (lock) {
         await unlockSlot(lock.id);
+      }
+
+      try {
+        await supabase.functions.invoke('sync-sheet', {
+          body: {
+            action: 'sync_recent',
+            owner_id: court.owner_id,
+            booking_id: createdBooking?.id,
+          },
+        });
+      } catch (syncError) {
+        console.error('Auto push sync failed:', syncError);
       }
 
       // Send email notifications to user and owner

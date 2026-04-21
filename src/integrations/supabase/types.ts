@@ -72,6 +72,8 @@ export type Database = {
           payment_intent_id: string | null
           payment_screenshot: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
+          source_updated_at: string
+          source_updated_by: string
           start_time: string
           status: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -88,6 +90,8 @@ export type Database = {
           payment_intent_id?: string | null
           payment_screenshot?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          source_updated_at?: string
+          source_updated_by?: string
           start_time: string
           status?: Database["public"]["Enums"]["booking_status"]
           total_price: number
@@ -104,6 +108,8 @@ export type Database = {
           payment_intent_id?: string | null
           payment_screenshot?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          source_updated_at?: string
+          source_updated_by?: string
           start_time?: string
           status?: Database["public"]["Enums"]["booking_status"]
           total_price?: number
@@ -492,45 +498,108 @@ export type Database = {
           },
         ]
       }
+      sheet_booking_links: {
+        Row: {
+          booking_id: string
+          created_at: string
+          id: string
+          integration_id: string
+          is_deleted: boolean
+          last_seen_at: string | null
+          row_hash: string | null
+          sheet_row_key: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          id?: string
+          integration_id: string
+          is_deleted?: boolean
+          last_seen_at?: string | null
+          row_hash?: string | null
+          sheet_row_key: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          id?: string
+          integration_id?: string
+          is_deleted?: boolean
+          last_seen_at?: string | null
+          row_hash?: string | null
+          sheet_row_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sheet_booking_links_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sheet_booking_links_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "sheet_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sheet_integrations: {
         Row: {
+          auto_sync_enabled: boolean
           created_at: string
           id: string
           is_active: boolean
+          last_pull_at: string | null
+          last_push_at: string | null
           last_synced_at: string | null
           owner_id: string
           platform: string
           sheet_id: string | null
           sheet_name: string | null
           sheet_url: string
+          sync_cursor: string | null
           sync_error: string | null
           sync_status: string | null
           updated_at: string
         }
         Insert: {
+          auto_sync_enabled?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
+          last_pull_at?: string | null
+          last_push_at?: string | null
           last_synced_at?: string | null
           owner_id: string
           platform?: string
           sheet_id?: string | null
           sheet_name?: string | null
           sheet_url: string
+          sync_cursor?: string | null
           sync_error?: string | null
           sync_status?: string | null
           updated_at?: string
         }
         Update: {
+          auto_sync_enabled?: boolean
           created_at?: string
           id?: string
           is_active?: boolean
+          last_pull_at?: string | null
+          last_push_at?: string | null
           last_synced_at?: string | null
           owner_id?: string
           platform?: string
           sheet_id?: string | null
           sheet_name?: string | null
           sheet_url?: string
+          sync_cursor?: string | null
           sync_error?: string | null
           sync_status?: string | null
           updated_at?: string
@@ -544,8 +613,14 @@ export type Database = {
           error_details: string | null
           id: string
           integration_id: string
+          records_cancelled: number
+          records_conflicted: number
+          records_created: number
           records_failed: number | null
+          records_skipped: number
           records_synced: number | null
+          records_updated: number
+          run_type: string
           started_at: string
         }
         Insert: {
@@ -554,8 +629,14 @@ export type Database = {
           error_details?: string | null
           id?: string
           integration_id: string
+          records_cancelled?: number
+          records_conflicted?: number
+          records_created?: number
           records_failed?: number | null
+          records_skipped?: number
           records_synced?: number | null
+          records_updated?: number
+          run_type?: string
           started_at?: string
         }
         Update: {
@@ -564,8 +645,14 @@ export type Database = {
           error_details?: string | null
           id?: string
           integration_id?: string
+          records_cancelled?: number
+          records_conflicted?: number
+          records_created?: number
           records_failed?: number | null
+          records_skipped?: number
           records_synced?: number | null
+          records_updated?: number
+          run_type?: string
           started_at?: string
         }
         Relationships: [

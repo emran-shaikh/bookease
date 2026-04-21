@@ -936,11 +936,25 @@ export default function OwnerDashboard() {
                                 .from('bookings')
                                 .update({ 
                                   status: 'confirmed',
-                                  payment_status: 'succeeded'
-                                })
+                                  payment_status: 'succeeded',
+                                  source_updated_at: new Date().toISOString(),
+                                  source_updated_by: 'site',
+                                } as any)
                                 .eq('id', booking.id);
 
                               if (updateError) throw updateError;
+
+                              try {
+                                await supabase.functions.invoke('sync-sheet', {
+                                  body: {
+                                    action: 'sync_recent',
+                                    owner_id: user?.id,
+                                    booking_id: booking.id,
+                                  },
+                                });
+                              } catch (syncError) {
+                                console.error('Owner confirm auto sync failed:', syncError);
+                              }
 
                               // Create in-app notification
                               await supabase.from('notifications').insert([
@@ -1009,10 +1023,26 @@ export default function OwnerDashboard() {
                             try {
                               const { error } = await supabase
                                 .from('bookings')
-                                .update({ status: 'cancelled' })
+                                .update({
+                                  status: 'cancelled',
+                                  source_updated_at: new Date().toISOString(),
+                                  source_updated_by: 'site',
+                                } as any)
                                 .eq('id', booking.id);
 
                               if (error) throw error;
+
+                              try {
+                                await supabase.functions.invoke('sync-sheet', {
+                                  body: {
+                                    action: 'sync_recent',
+                                    owner_id: user?.id,
+                                    booking_id: booking.id,
+                                  },
+                                });
+                              } catch (syncError) {
+                                console.error('Owner cancel auto sync failed:', syncError);
+                              }
 
                               await supabase.from('notifications').insert([
                                 {
