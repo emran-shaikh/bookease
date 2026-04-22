@@ -348,21 +348,25 @@ async function ensureHeader(integration: SheetIntegration) {
   const sheetId = extractGoogleSheetId(integration.sheet_url);
   if (!sheetId) throw new Error("Invalid Google Sheet URL");
 
-  const sheetName = integration.sheet_name || "Bookings";
-  const range = `${sheetName}!${COLS}`;
+  const configuredSheetName = (integration.sheet_name || "Bookings").trim();
+  const availableTitles = await getSpreadsheetSheetTitles(sheetId);
+  const hasConfigured = availableTitles.includes(configuredSheetName);
+  const fallbackName = availableTitles.includes("Bookings") ? "Bookings" : (availableTitles[0] || configuredSheetName);
+  const sheetName = hasConfigured ? configuredSheetName : fallbackName;
+  const range = formatSheetRange(sheetName, COLS);
 
   const read = await googleSheetsRequest(sheetId, range, "GET");
   const rows: string[][] = read.values || [];
 
   if (!rows.length) {
-    await googleSheetsRequest(sheetId, `${sheetName}!A1:P1`, "PUT", { values: [HEADERS] });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:P1"), "PUT", { values: [HEADERS] });
     return { sheetId, sheetName, rows: [HEADERS] as string[][] };
   }
 
   const first = rows[0] || [];
   if ((first[1] || "").trim() !== "Booking UUID") {
     rows[0] = HEADERS;
-    await googleSheetsRequest(sheetId, `${sheetName}!A1:P${rows.length}`, "PUT", { values: rows });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:P${rows.length}`), "PUT", { values: rows });
   }
 
   return { sheetId, sheetName, rows };
