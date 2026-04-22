@@ -86,6 +86,11 @@ const COLS = "A:P";
 const VALID_STATUS = new Set(["pending", "confirmed", "cancelled", "completed"]);
 const VALID_PAYMENT_STATUS = new Set(["pending", "succeeded", "failed", "refunded"]);
 
+function formatSheetRange(sheetName: string, a1Range: string) {
+  const escaped = sheetName.replace(/'/g, "''");
+  return `'${escaped}'!${a1Range}`;
+}
+
 const toIso = (value?: string | null) => {
   if (!value) return new Date().toISOString();
   const d = new Date(value);
@@ -190,9 +195,17 @@ async function googleSheetsRequest(sheetId: string, range: string, method = "GET
   const token = await getGoogleAccessToken(serviceAccount);
   const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
 
-  const url = method === "GET"
-    ? `${baseUrl}/values/${encodeURIComponent(range)}`
-    : `${baseUrl}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  const url = (() => {
+    if (method === "POST") {
+      return `${baseUrl}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+    }
+
+    if (method === "PUT") {
+      return `${baseUrl}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+    }
+
+    return `${baseUrl}/values/${encodeURIComponent(range)}`;
+  })();
 
   const response = await fetch(url, {
     method,
@@ -215,6 +228,34 @@ async function googleSheetsRequest(sheetId: string, range: string, method = "GET
   }
 
   return response.json();
+}
+
+async function getSpreadsheetSheetTitles(sheetId: string): Promise<string[]> {
+  const GOOGLE_SERVICE_ACCOUNT_KEY = Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
+  if (!GOOGLE_SERVICE_ACCOUNT_KEY) return [];
+
+  let serviceAccount: any;
+  try {
+    serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
+  } catch {
+    return [];
+  }
+
+  const token = await getGoogleAccessToken(serviceAccount);
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties.title`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  if (!response.ok) return [];
+  const data = await response.json();
+  return (data?.sheets || []).map((sheet: any) => sheet?.properties?.title).filter(Boolean);
 }
 
 async function computeRowHash(row: string[]) {
@@ -307,21 +348,25 @@ async function ensureHeader(integration: SheetIntegration) {
   const sheetId = extractGoogleSheetId(integration.sheet_url);
   if (!sheetId) throw new Error("Invalid Google Sheet URL");
 
-  const sheetName = integration.sheet_name || "Bookings";
-  const range = `${sheetName}!${COLS}`;
+  const configuredSheetName = (integration.sheet_name || "Bookings").trim();
+  const availableTitles = await getSpreadsheetSheetTitles(sheetId);
+  const hasConfigured = availableTitles.includes(configuredSheetName);
+  const fallbackName = availableTitles.includes("Bookings") ? "Bookings" : (availableTitles[0] || configuredSheetName);
+  const sheetName = hasConfigured ? configuredSheetName : fallbackName;
+  const range = formatSheetRange(sheetName, COLS);
 
   const read = await googleSheetsRequest(sheetId, range, "GET");
   const rows: string[][] = read.values || [];
 
   if (!rows.length) {
-    await googleSheetsRequest(sheetId, `${sheetName}!A1:P1`, "PUT", { values: [HEADERS] });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:P1"), "PUT", { values: [HEADERS] });
     return { sheetId, sheetName, rows: [HEADERS] as string[][] };
   }
 
   const first = rows[0] || [];
   if ((first[1] || "").trim() !== "Booking UUID") {
     rows[0] = HEADERS;
-    await googleSheetsRequest(sheetId, `${sheetName}!A1:P${rows.length}`, "PUT", { values: rows });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:P${rows.length}`), "PUT", { values: rows });
   }
 
   return { sheetId, sheetName, rows };
@@ -435,10 +480,10 @@ async function syncToSheet(supabaseAdmin: any, integration: SheetIntegration, ru
 
       const knownRowIdx = uuidToRowIndex.get(booking.id);
       if (knownRowIdx) {
-        await googleSheetsRequest(sheetId, `${sheetName}!A${knownRowIdx}:P${knownRowIdx}`, "PUT", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:P${knownRowIdx}`), "PUT", { values: [rowData] });
         updated += 1;
       } else {
-        await googleSheetsRequest(sheetId, `${sheetName}!A:P`, "POST", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A:P"), "POST", { values: [rowData] });
         created += 1;
       }
 
