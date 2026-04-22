@@ -480,10 +480,10 @@ async function syncToSheet(supabaseAdmin: any, integration: SheetIntegration, ru
 
       const knownRowIdx = uuidToRowIndex.get(booking.id);
       if (knownRowIdx) {
-        await googleSheetsRequest(sheetId, `${sheetName}!A${knownRowIdx}:P${knownRowIdx}`, "PUT", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:P${knownRowIdx}`), "PUT", { values: [rowData] });
         updated += 1;
       } else {
-        await googleSheetsRequest(sheetId, `${sheetName}!A:P`, "POST", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A:P"), "POST", { values: [rowData] });
         created += 1;
       }
 
