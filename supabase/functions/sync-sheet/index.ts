@@ -86,6 +86,13 @@ const COLS = "A:P";
 const VALID_STATUS = new Set(["pending", "confirmed", "cancelled", "completed"]);
 const VALID_PAYMENT_STATUS = new Set(["pending", "succeeded", "failed", "refunded"]);
 
+const REQUIRED_COLUMN_INDEXES = {
+  court_name: 2,
+  booking_date: 3,
+  start_time: 4,
+  end_time: 5,
+} as const;
+
 function formatSheetRange(sheetName: string, a1Range: string) {
   const escaped = sheetName.replace(/'/g, "''");
   return `'${escaped}'!${a1Range}`;
@@ -287,6 +294,31 @@ function parseSheetRow(row: string[], fallbackRowIndex: number) {
     source_updated_at: (row[14] || "").trim(),
     created_at: (row[15] || "").trim(),
   };
+}
+
+function validateRequiredSheetColumns(rows: string[][]) {
+  const header = rows[0] || [];
+  const required = [
+    { key: "court_name", expected: HEADERS[REQUIRED_COLUMN_INDEXES.court_name], index: REQUIRED_COLUMN_INDEXES.court_name },
+    { key: "booking_date", expected: HEADERS[REQUIRED_COLUMN_INDEXES.booking_date], index: REQUIRED_COLUMN_INDEXES.booking_date },
+    { key: "start_time", expected: HEADERS[REQUIRED_COLUMN_INDEXES.start_time], index: REQUIRED_COLUMN_INDEXES.start_time },
+    { key: "end_time", expected: HEADERS[REQUIRED_COLUMN_INDEXES.end_time], index: REQUIRED_COLUMN_INDEXES.end_time },
+  ] as const;
+
+  const mismatches = required
+    .map((col) => {
+      const actual = String(header[col.index] || "").trim();
+      const expected = col.expected;
+      if (actual.toLowerCase() !== expected.toLowerCase()) {
+        return `Column ${String.fromCharCode(65 + col.index)} must be '${expected}' (found '${actual || "empty"}')`;
+      }
+      return null;
+    })
+    .filter(Boolean) as string[];
+
+  if (mismatches.length) {
+    throw new Error(`Sheet column validation failed. ${mismatches.join("; ")}`);
+  }
 }
 
 function toSheetRow(booking: BookingRow, courtName: string) {
@@ -584,6 +616,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
 
   try {
     const { rows } = await ensureHeader(integration);
+    validateRequiredSheetColumns(rows);
     const { courtIds, courtIdByName } = await getOwnerCourtData(supabaseAdmin, integration.owner_id);
 
     if (!courtIds.length) {
@@ -647,8 +680,28 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         const incomingSourceUpdatedAt = toIso(parsed.source_updated_at || new Date().toISOString());
 
         let booking: BookingRow | undefined;
-        if (parsed.booking_uuid && isUuid(parsed.booking_uuid)) {
+        const hasBookingUuid = parsed.booking_uuid.length > 0;
+
+        if (hasBookingUuid && !isUuid(parsed.booking_uuid)) {
+          failed += 1;
+          errors.push(`Row ${sheetIndex}: Booking UUID is invalid.`);
+          continue;
+        }
+
+        if (hasBookingUuid) {
           booking = bookingById.get(parsed.booking_uuid);
+          const linkedByUuid = linksByKey.get(parsed.booking_uuid);
+          if (linkedByUuid && linkedByUuid.booking_id !== parsed.booking_uuid) {
+            failed += 1;
+            errors.push(`Row ${sheetIndex}: Booking UUID does not match linked booking mapping.`);
+            continue;
+          }
+
+          if (!booking) {
+            failed += 1;
+            errors.push(`Row ${sheetIndex}: Booking UUID not found on website, cannot update.`);
+            continue;
+          }
         }
 
         if (!booking && linksByKey.has(parsed.row_key)) {
