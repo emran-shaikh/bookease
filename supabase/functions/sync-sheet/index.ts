@@ -79,9 +79,14 @@ const HEADERS = [
   "Notes",
   "Source Updated At",
   "Created At",
+  "Sync Status",
+  "Sync Error",
 ];
 
-const COLS = "A:P";
+const LAST_COL = "R";
+const COLS = `A:${LAST_COL}`;
+const SYNC_STATUS_COL = "Q";
+const SYNC_ERROR_COL = "R";
 
 const VALID_STATUS = new Set(["pending", "confirmed", "cancelled", "completed"]);
 const VALID_PAYMENT_STATUS = new Set(["pending", "succeeded", "failed", "refunded"]);
@@ -204,14 +209,14 @@ async function googleSheetsRequest(sheetId: string, range: string, method = "GET
 
   const url = (() => {
     if (method === "POST") {
-      return `${baseUrl}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+      return `${baseUrl}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
     }
 
     if (method === "PUT") {
-      return `${baseUrl}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+      return `${baseUrl}/values/${range}?valueInputOption=USER_ENTERED`;
     }
 
-    return `${baseUrl}/values/${encodeURIComponent(range)}`;
+    return `${baseUrl}/values/${range}`;
   })();
 
   const response = await fetch(url, {
@@ -339,7 +344,97 @@ function toSheetRow(booking: BookingRow, courtName: string) {
     booking.notes || "",
     toIso(booking.source_updated_at),
     booking.created_at ? new Date(booking.created_at).toISOString() : new Date().toISOString(),
+    "",
+    "",
   ];
+}
+
+async function hasBookingOverlap(
+  supabaseAdmin: any,
+  courtId: string,
+  bookingDate: string,
+  startTime: string,
+  endTime: string,
+  excludeBookingId?: string,
+) {
+  let query = supabaseAdmin
+    .from("bookings")
+    .select("id, start_time, end_time, status")
+    .eq("court_id", courtId)
+    .eq("booking_date", bookingDate)
+    .in("status", ["pending", "confirmed"]);
+
+  if (excludeBookingId) query = query.neq("id", excludeBookingId);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Failed overlap check: ${error.message}`);
+
+  const incomingStart = normalizeTime(startTime);
+  const incomingEnd = normalizeTime(endTime);
+
+  return (data || []).some((row: any) => {
+    const existingStart = normalizeTime(row.start_time);
+    const existingEnd = normalizeTime(row.end_time);
+    return incomingStart < existingEnd && incomingEnd > existingStart;
+  });
+}
+
+async function writeSheetFeedback(
+  sheetId: string,
+  sheetName: string,
+  rowNumber: number,
+  status: string,
+  errorMessage = "",
+) {
+  await googleSheetsRequest(
+    sheetId,
+    formatSheetRange(sheetName, `${SYNC_STATUS_COL}${rowNumber}:${SYNC_ERROR_COL}${rowNumber}`),
+    "PUT",
+    { values: [[status, errorMessage]] },
+  );
+}
+
+async function sendSheetBookingConfirmationEmail(payload: {
+  customerEmail: string;
+  customerName: string;
+  courtName: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  totalPrice: number;
+}) {
+  if (!payload.customerEmail) return { sent: false, reason: "missing_customer_email" as const };
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/send-booking-confirmation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify({
+      userEmail: payload.customerEmail,
+      userName: payload.customerName || "Customer",
+      courtName: payload.courtName,
+      bookingDate: payload.bookingDate,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      totalPrice: payload.totalPrice,
+      isManualBooking: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to send confirmation email: ${text}`);
+  }
+
+  const result = await response.json().catch(() => ({}));
+  if (result?.success === false) {
+    throw new Error(`Failed to send confirmation email: ${result.error || "unknown error"}`);
+  }
+
+  return { sent: true };
 }
 
 async function getIntegration(supabaseAdmin: any, integrationId: string, ownerId?: string): Promise<SheetIntegration> {
@@ -391,14 +486,14 @@ async function ensureHeader(integration: SheetIntegration) {
   const rows: string[][] = read.values || [];
 
   if (!rows.length) {
-    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:P1"), "PUT", { values: [HEADERS] });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:R1"), "PUT", { values: [HEADERS] });
     return { sheetId, sheetName, rows: [HEADERS] as string[][] };
   }
 
   const first = rows[0] || [];
-  if ((first[1] || "").trim() !== "Booking UUID") {
+  if ((first[1] || "").trim() !== "Booking UUID" || first.length < HEADERS.length) {
     rows[0] = HEADERS;
-    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:P${rows.length}`), "PUT", { values: rows });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:R${rows.length}`), "PUT", { values: rows });
   }
 
   return { sheetId, sheetName, rows };
@@ -512,10 +607,10 @@ async function syncToSheet(supabaseAdmin: any, integration: SheetIntegration, ru
 
       const knownRowIdx = uuidToRowIndex.get(booking.id);
       if (knownRowIdx) {
-        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:P${knownRowIdx}`), "PUT", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:R${knownRowIdx}`), "PUT", { values: [rowData] });
         updated += 1;
       } else {
-        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A:P"), "POST", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, COLS), "POST", { values: [rowData] });
         created += 1;
       }
 
@@ -615,8 +710,13 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
   const nowIso = new Date().toISOString();
 
   try {
-    const { rows } = await ensureHeader(integration);
-    validateRequiredSheetColumns(rows);
+    const { sheetId, sheetName, rows } = await ensureHeader(integration);
+    try {
+      validateRequiredSheetColumns(rows);
+    } catch (validationError: any) {
+      await writeSheetFeedback(sheetId, sheetName, 1, "INVALID_SCHEMA", validationError.message || "Sheet columns are invalid");
+      throw validationError;
+    }
     const { courtIds, courtIdByName } = await getOwnerCourtData(supabaseAdmin, integration.owner_id);
 
     if (!courtIds.length) {
@@ -665,6 +765,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
 
         if (!parsed.court_name || !parsed.booking_date || !parsed.start_time || !parsed.end_time) {
           skipped += 1;
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "INVALID_ROW", "Missing required values: Court Name, Booking Date, Start Time, End Time");
           continue;
         }
 
@@ -672,12 +773,16 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         if (!courtId) {
           failed += 1;
           errors.push(`Row ${sheetIndex}: Unknown court '${parsed.court_name}'`);
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "INVALID_COURT", `Unknown court '${parsed.court_name}'`);
           continue;
         }
 
         const incomingStatus = VALID_STATUS.has(parsed.status) ? parsed.status : "confirmed";
         const incomingPayment = VALID_PAYMENT_STATUS.has(parsed.payment_status) ? parsed.payment_status : "pending";
         const incomingSourceUpdatedAt = toIso(parsed.source_updated_at || new Date().toISOString());
+        const normalizedDate = normalizeDate(parsed.booking_date);
+        const normalizedStart = normalizeTime(parsed.start_time);
+        const normalizedEnd = normalizeTime(parsed.end_time);
 
         let booking: BookingRow | undefined;
         const hasBookingUuid = parsed.booking_uuid.length > 0;
@@ -685,6 +790,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         if (hasBookingUuid && !isUuid(parsed.booking_uuid)) {
           failed += 1;
           errors.push(`Row ${sheetIndex}: Booking UUID is invalid.`);
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "INVALID_UUID", "Booking UUID is invalid");
           continue;
         }
 
@@ -694,12 +800,14 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           if (linkedByUuid && linkedByUuid.booking_id !== parsed.booking_uuid) {
             failed += 1;
             errors.push(`Row ${sheetIndex}: Booking UUID does not match linked booking mapping.`);
+            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "UUID_MISMATCH", "Booking UUID does not match linked row mapping");
             continue;
           }
 
           if (!booking) {
             failed += 1;
             errors.push(`Row ${sheetIndex}: Booking UUID not found on website, cannot update.`);
+            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "UUID_NOT_FOUND", "Booking UUID not found on website");
             continue;
           }
         }
@@ -710,14 +818,29 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         }
 
         if (!booking) {
+          const overlapsExisting = await hasBookingOverlap(
+            supabaseAdmin,
+            courtId,
+            normalizedDate,
+            normalizedStart,
+            normalizedEnd,
+          );
+
+          if (overlapsExisting) {
+            conflicted += 1;
+            errors.push(`Row ${sheetIndex}: Slot overlaps an existing booking.`);
+            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Slot overlaps an existing confirmed/pending booking");
+            continue;
+          }
+
           const userId = await resolveUserId(supabaseAdmin, integration.owner_id, parsed.customer_email, parsed.customer_phone);
 
           const insertPayload = {
             court_id: courtId,
             user_id: userId,
-            booking_date: normalizeDate(parsed.booking_date),
-            start_time: normalizeTime(parsed.start_time),
-            end_time: normalizeTime(parsed.end_time),
+            booking_date: normalizedDate,
+            start_time: normalizedStart,
+            end_time: normalizedEnd,
             total_price: Number(parsed.total_price || 0),
             status: incomingStatus,
             payment_status: incomingPayment,
@@ -736,8 +859,31 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           if (insertError) {
             failed += 1;
             errors.push(`Row ${sheetIndex}: ${insertError.message}`);
+            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "INSERT_FAILED", insertError.message);
             continue;
           }
+
+          let syncStatus = "CREATED";
+          let syncError = "";
+          if (incomingStatus === "confirmed" && parsed.customer_email) {
+            try {
+              await sendSheetBookingConfirmationEmail({
+                customerEmail: parsed.customer_email,
+                customerName: parsed.customer_name,
+                courtName: parsed.court_name,
+                bookingDate: normalizedDate,
+                startTime: normalizedStart.slice(0, 5),
+                endTime: normalizedEnd.slice(0, 5),
+                totalPrice: Number(parsed.total_price || 0),
+              });
+              syncStatus = "CREATED+EMAILED";
+            } catch (emailError: any) {
+              syncStatus = "CREATED_EMAIL_FAILED";
+              syncError = emailError.message || "Booking created but confirmation email failed";
+            }
+          }
+
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, syncStatus, syncError);
 
           created += 1;
           seenKeys.add(parsed.row_key);
@@ -760,6 +906,8 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           conflicted += 1;
           seenKeys.add(parsed.row_key);
 
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "STALE_ROW", "Website has a newer update; sheet row ignored");
+
           linkUpserts.push({
             integration_id: integration.id,
             booking_id: booking.id,
@@ -771,10 +919,26 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           continue;
         }
 
+        const overlapsExisting = await hasBookingOverlap(
+          supabaseAdmin,
+          courtId,
+          normalizedDate,
+          normalizedStart,
+          normalizedEnd,
+          booking.id,
+        );
+
+        if (overlapsExisting) {
+          conflicted += 1;
+          errors.push(`Row ${sheetIndex}: Update would overlap an existing booking.`);
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Update rejected: slot overlaps another confirmed/pending booking");
+          continue;
+        }
+
         const patch: Record<string, unknown> = {
-          booking_date: normalizeDate(parsed.booking_date),
-          start_time: normalizeTime(parsed.start_time),
-          end_time: normalizeTime(parsed.end_time),
+          booking_date: normalizedDate,
+          start_time: normalizedStart,
+          end_time: normalizedEnd,
           status: incomingStatus,
           payment_status: incomingPayment,
           total_price: Number(parsed.total_price || booking.total_price || 0),
@@ -792,8 +956,31 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         if (updateError) {
           failed += 1;
           errors.push(`Row ${sheetIndex}: ${updateError.message}`);
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "UPDATE_FAILED", updateError.message);
           continue;
         }
+
+        let syncStatus = "UPDATED";
+        let syncError = "";
+        if (incomingStatus === "confirmed" && parsed.customer_email) {
+          try {
+            await sendSheetBookingConfirmationEmail({
+              customerEmail: parsed.customer_email,
+              customerName: parsed.customer_name,
+              courtName: parsed.court_name,
+              bookingDate: normalizedDate,
+              startTime: normalizedStart.slice(0, 5),
+              endTime: normalizedEnd.slice(0, 5),
+              totalPrice: Number(parsed.total_price || booking.total_price || 0),
+            });
+            syncStatus = "UPDATED+EMAILED";
+          } catch (emailError: any) {
+            syncStatus = "UPDATED_EMAIL_FAILED";
+            syncError = emailError.message || "Booking updated but confirmation email failed";
+          }
+        }
+
+        await writeSheetFeedback(sheetId, sheetName, sheetIndex, syncStatus, syncError);
 
         updated += 1;
         seenKeys.add(parsed.row_key);
@@ -809,6 +996,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
       } catch (rowError: any) {
         failed += 1;
         errors.push(`Row ${sheetIndex}: ${rowError.message}`);
+        await writeSheetFeedback(sheetId, sheetName, sheetIndex, "ROW_ERROR", rowError.message || "Unexpected row processing error");
       }
     }
 
