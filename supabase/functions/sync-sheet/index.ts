@@ -79,9 +79,14 @@ const HEADERS = [
   "Notes",
   "Source Updated At",
   "Created At",
+  "Sync Status",
+  "Sync Error",
 ];
 
-const COLS = "A:P";
+const LAST_COL = "R";
+const COLS = `A:${LAST_COL}`;
+const SYNC_STATUS_COL = "Q";
+const SYNC_ERROR_COL = "R";
 
 const VALID_STATUS = new Set(["pending", "confirmed", "cancelled", "completed"]);
 const VALID_PAYMENT_STATUS = new Set(["pending", "succeeded", "failed", "refunded"]);
@@ -204,14 +209,14 @@ async function googleSheetsRequest(sheetId: string, range: string, method = "GET
 
   const url = (() => {
     if (method === "POST") {
-      return `${baseUrl}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+      return `${baseUrl}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
     }
 
     if (method === "PUT") {
-      return `${baseUrl}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+      return `${baseUrl}/values/${range}?valueInputOption=USER_ENTERED`;
     }
 
-    return `${baseUrl}/values/${encodeURIComponent(range)}`;
+    return `${baseUrl}/values/${range}`;
   })();
 
   const response = await fetch(url, {
@@ -339,7 +344,97 @@ function toSheetRow(booking: BookingRow, courtName: string) {
     booking.notes || "",
     toIso(booking.source_updated_at),
     booking.created_at ? new Date(booking.created_at).toISOString() : new Date().toISOString(),
+    "",
+    "",
   ];
+}
+
+async function hasBookingOverlap(
+  supabaseAdmin: any,
+  courtId: string,
+  bookingDate: string,
+  startTime: string,
+  endTime: string,
+  excludeBookingId?: string,
+) {
+  let query = supabaseAdmin
+    .from("bookings")
+    .select("id, start_time, end_time, status")
+    .eq("court_id", courtId)
+    .eq("booking_date", bookingDate)
+    .in("status", ["pending", "confirmed"]);
+
+  if (excludeBookingId) query = query.neq("id", excludeBookingId);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Failed overlap check: ${error.message}`);
+
+  const incomingStart = normalizeTime(startTime);
+  const incomingEnd = normalizeTime(endTime);
+
+  return (data || []).some((row: any) => {
+    const existingStart = normalizeTime(row.start_time);
+    const existingEnd = normalizeTime(row.end_time);
+    return incomingStart < existingEnd && incomingEnd > existingStart;
+  });
+}
+
+async function writeSheetFeedback(
+  sheetId: string,
+  sheetName: string,
+  rowNumber: number,
+  status: string,
+  errorMessage = "",
+) {
+  await googleSheetsRequest(
+    sheetId,
+    formatSheetRange(sheetName, `${SYNC_STATUS_COL}${rowNumber}:${SYNC_ERROR_COL}${rowNumber}`),
+    "PUT",
+    { values: [[status, errorMessage]] },
+  );
+}
+
+async function sendSheetBookingConfirmationEmail(payload: {
+  customerEmail: string;
+  customerName: string;
+  courtName: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  totalPrice: number;
+}) {
+  if (!payload.customerEmail) return { sent: false, reason: "missing_customer_email" as const };
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/send-booking-confirmation`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+    },
+    body: JSON.stringify({
+      userEmail: payload.customerEmail,
+      userName: payload.customerName || "Customer",
+      courtName: payload.courtName,
+      bookingDate: payload.bookingDate,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      totalPrice: payload.totalPrice,
+      isManualBooking: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Failed to send confirmation email: ${text}`);
+  }
+
+  const result = await response.json().catch(() => ({}));
+  if (result?.success === false) {
+    throw new Error(`Failed to send confirmation email: ${result.error || "unknown error"}`);
+  }
+
+  return { sent: true };
 }
 
 async function getIntegration(supabaseAdmin: any, integrationId: string, ownerId?: string): Promise<SheetIntegration> {
