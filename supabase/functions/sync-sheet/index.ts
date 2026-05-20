@@ -79,14 +79,15 @@ const HEADERS = [
   "Notes",
   "Source Updated At",
   "Created At",
+  "Cancel/Replace",
   "Sync Status",
   "Sync Error",
 ];
 
-const LAST_COL = "R";
+const LAST_COL = "S";
 const COLS = `A:${LAST_COL}`;
-const SYNC_STATUS_COL = "Q";
-const SYNC_ERROR_COL = "R";
+const SYNC_STATUS_COL = "R";
+const SYNC_ERROR_COL = "S";
 
 const VALID_STATUS = new Set(["pending", "confirmed", "cancelled", "completed"]);
 const VALID_PAYMENT_STATUS = new Set(["pending", "succeeded", "failed", "refunded"]);
@@ -298,7 +299,12 @@ function parseSheetRow(row: string[], fallbackRowIndex: number) {
     notes: (row[13] || "").trim(),
     source_updated_at: (row[14] || "").trim(),
     created_at: (row[15] || "").trim(),
+    cancel_replace: (row[16] || "").trim().toLowerCase(),
   };
+}
+
+function isCancelReplaceEnabled(value: string) {
+  return ["1", "true", "yes", "y", "replace", "cancel/replace", "cancel_replace"].includes(value.trim().toLowerCase());
 }
 
 function validateRequiredSheetColumns(rows: string[][]) {
@@ -346,10 +352,11 @@ function toSheetRow(booking: BookingRow, courtName: string) {
     booking.created_at ? new Date(booking.created_at).toISOString() : new Date().toISOString(),
     "",
     "",
+    "",
   ];
 }
 
-async function hasBookingOverlap(
+async function getOverlappingBookings(
   supabaseAdmin: any,
   courtId: string,
   bookingDate: string,
@@ -372,11 +379,32 @@ async function hasBookingOverlap(
   const incomingStart = normalizeTime(startTime);
   const incomingEnd = normalizeTime(endTime);
 
-  return (data || []).some((row: any) => {
+  return (data || []).filter((row: any) => {
     const existingStart = normalizeTime(row.start_time);
     const existingEnd = normalizeTime(row.end_time);
     return incomingStart < existingEnd && incomingEnd > existingStart;
   });
+}
+
+async function cancelConflictingBookings(
+  supabaseAdmin: any,
+  conflictingBookings: Array<{ id: string }>,
+  sourceUpdatedAt: string,
+) {
+  if (!conflictingBookings.length) return 0;
+
+  const ids = conflictingBookings.map((b) => b.id);
+  const { error } = await supabaseAdmin
+    .from("bookings")
+    .update({
+      status: "cancelled",
+      source_updated_by: "sheet",
+      source_updated_at: sourceUpdatedAt,
+    })
+    .in("id", ids);
+
+  if (error) throw new Error(`Failed to cancel conflicting booking(s): ${error.message}`);
+  return ids.length;
 }
 
 async function writeSheetFeedback(
