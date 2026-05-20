@@ -646,7 +646,7 @@ export default function CourtDetail() {
           .eq('booking_date', dateStr)
           .in('status', ['confirmed', 'pending']),
         supabase
-          .from('blocked_slots')
+          .from('blocked_slots_public')
           .select('start_time, end_time')
           .eq('court_id', courtId)
           .eq('date', dateStr)
