@@ -514,14 +514,14 @@ async function ensureHeader(integration: SheetIntegration) {
   const rows: string[][] = read.values || [];
 
   if (!rows.length) {
-    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:R1"), "PUT", { values: [HEADERS] });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:S1"), "PUT", { values: [HEADERS] });
     return { sheetId, sheetName, rows: [HEADERS] as string[][] };
   }
 
   const first = rows[0] || [];
   if ((first[1] || "").trim() !== "Booking UUID" || first.length < HEADERS.length) {
     rows[0] = HEADERS;
-    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:R${rows.length}`), "PUT", { values: rows });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:S${rows.length}`), "PUT", { values: rows });
   }
 
   return { sheetId, sheetName, rows };
@@ -635,7 +635,7 @@ async function syncToSheet(supabaseAdmin: any, integration: SheetIntegration, ru
 
       const knownRowIdx = uuidToRowIndex.get(booking.id);
       if (knownRowIdx) {
-        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:R${knownRowIdx}`), "PUT", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:S${knownRowIdx}`), "PUT", { values: [rowData] });
         updated += 1;
       } else {
         await googleSheetsRequest(sheetId, formatSheetRange(sheetName, COLS), "POST", { values: [rowData] });
