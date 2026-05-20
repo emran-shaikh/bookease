@@ -857,7 +857,44 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      blocked_slots_public: {
+        Row: {
+          court_id: string | null
+          created_at: string | null
+          date: string | null
+          end_time: string | null
+          id: string | null
+          reason: string | null
+          start_time: string | null
+        }
+        Insert: {
+          court_id?: string | null
+          created_at?: string | null
+          date?: string | null
+          end_time?: string | null
+          id?: string | null
+          reason?: string | null
+          start_time?: string | null
+        }
+        Update: {
+          court_id?: string | null
+          created_at?: string | null
+          date?: string | null
+          end_time?: string | null
+          id?: string | null
+          reason?: string | null
+          start_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "blocked_slots_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       cleanup_expired_slot_locks: { Args: never; Returns: undefined }
