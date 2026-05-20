@@ -166,7 +166,7 @@ export default function BookCourt() {
       
       // Check for blocked slots that overlap with the booking time
       const { data: blockedSlots, error: blockedError } = await supabase
-        .from('blocked_slots')
+        .from('blocked_slots_public')
         .select('start_time, end_time')
         .eq('court_id', court.id)
         .eq('date', dateStr);
