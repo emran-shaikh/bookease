@@ -846,7 +846,8 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         }
 
         if (!booking) {
-          const overlapsExisting = await hasBookingOverlap(
+          const cancelReplace = isCancelReplaceEnabled(parsed.cancel_replace || "");
+          const overlappingBookings = await getOverlappingBookings(
             supabaseAdmin,
             courtId,
             normalizedDate,
@@ -854,11 +855,17 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
             normalizedEnd,
           );
 
-          if (overlapsExisting) {
-            conflicted += 1;
-            errors.push(`Row ${sheetIndex}: Slot overlaps an existing booking.`);
-            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Slot overlaps an existing confirmed/pending booking");
-            continue;
+          let replacedCount = 0;
+          if (overlappingBookings.length > 0) {
+            if (!cancelReplace) {
+              conflicted += 1;
+              errors.push(`Row ${sheetIndex}: Slot overlaps an existing booking.`);
+              await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Slot overlaps an existing confirmed/pending booking. Set Cancel/Replace=YES to auto-cancel conflict(s). ");
+              continue;
+            }
+
+            replacedCount = await cancelConflictingBookings(supabaseAdmin, overlappingBookings, incomingSourceUpdatedAt);
+            cancelled += replacedCount;
           }
 
           const userId = await resolveUserId(supabaseAdmin, integration.owner_id, parsed.customer_email, parsed.customer_phone);
@@ -891,7 +898,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
             continue;
           }
 
-          let syncStatus = "CREATED";
+          let syncStatus = replacedCount > 0 ? "CREATED_REPLACED" : "CREATED";
           let syncError = "";
           if (incomingStatus === "confirmed" && parsed.customer_email) {
             try {
@@ -904,9 +911,9 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
                 endTime: normalizedEnd.slice(0, 5),
                 totalPrice: Number(parsed.total_price || 0),
               });
-              syncStatus = "CREATED+EMAILED";
+              syncStatus = replacedCount > 0 ? "CREATED_REPLACED+EMAILED" : "CREATED+EMAILED";
             } catch (emailError: any) {
-              syncStatus = "CREATED_EMAIL_FAILED";
+              syncStatus = replacedCount > 0 ? "CREATED_REPLACED_EMAIL_FAILED" : "CREATED_EMAIL_FAILED";
               syncError = emailError.message || "Booking created but confirmation email failed";
             }
           }
