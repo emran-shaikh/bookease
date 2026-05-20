@@ -79,14 +79,15 @@ const HEADERS = [
   "Notes",
   "Source Updated At",
   "Created At",
+  "Cancel/Replace",
   "Sync Status",
   "Sync Error",
 ];
 
-const LAST_COL = "R";
+const LAST_COL = "S";
 const COLS = `A:${LAST_COL}`;
-const SYNC_STATUS_COL = "Q";
-const SYNC_ERROR_COL = "R";
+const SYNC_STATUS_COL = "R";
+const SYNC_ERROR_COL = "S";
 
 const VALID_STATUS = new Set(["pending", "confirmed", "cancelled", "completed"]);
 const VALID_PAYMENT_STATUS = new Set(["pending", "succeeded", "failed", "refunded"]);
@@ -298,7 +299,12 @@ function parseSheetRow(row: string[], fallbackRowIndex: number) {
     notes: (row[13] || "").trim(),
     source_updated_at: (row[14] || "").trim(),
     created_at: (row[15] || "").trim(),
+    cancel_replace: (row[16] || "").trim().toLowerCase(),
   };
+}
+
+function isCancelReplaceEnabled(value: string) {
+  return ["1", "true", "yes", "y", "replace", "cancel/replace", "cancel_replace"].includes(value.trim().toLowerCase());
 }
 
 function validateRequiredSheetColumns(rows: string[][]) {
@@ -346,10 +352,11 @@ function toSheetRow(booking: BookingRow, courtName: string) {
     booking.created_at ? new Date(booking.created_at).toISOString() : new Date().toISOString(),
     "",
     "",
+    "",
   ];
 }
 
-async function hasBookingOverlap(
+async function getOverlappingBookings(
   supabaseAdmin: any,
   courtId: string,
   bookingDate: string,
@@ -372,11 +379,32 @@ async function hasBookingOverlap(
   const incomingStart = normalizeTime(startTime);
   const incomingEnd = normalizeTime(endTime);
 
-  return (data || []).some((row: any) => {
+  return (data || []).filter((row: any) => {
     const existingStart = normalizeTime(row.start_time);
     const existingEnd = normalizeTime(row.end_time);
     return incomingStart < existingEnd && incomingEnd > existingStart;
   });
+}
+
+async function cancelConflictingBookings(
+  supabaseAdmin: any,
+  conflictingBookings: Array<{ id: string }>,
+  sourceUpdatedAt: string,
+) {
+  if (!conflictingBookings.length) return 0;
+
+  const ids = conflictingBookings.map((b) => b.id);
+  const { error } = await supabaseAdmin
+    .from("bookings")
+    .update({
+      status: "cancelled",
+      source_updated_by: "sheet",
+      source_updated_at: sourceUpdatedAt,
+    })
+    .in("id", ids);
+
+  if (error) throw new Error(`Failed to cancel conflicting booking(s): ${error.message}`);
+  return ids.length;
 }
 
 async function writeSheetFeedback(
@@ -486,14 +514,14 @@ async function ensureHeader(integration: SheetIntegration) {
   const rows: string[][] = read.values || [];
 
   if (!rows.length) {
-    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:R1"), "PUT", { values: [HEADERS] });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, "A1:S1"), "PUT", { values: [HEADERS] });
     return { sheetId, sheetName, rows: [HEADERS] as string[][] };
   }
 
   const first = rows[0] || [];
   if ((first[1] || "").trim() !== "Booking UUID" || first.length < HEADERS.length) {
     rows[0] = HEADERS;
-    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:R${rows.length}`), "PUT", { values: rows });
+    await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A1:S${rows.length}`), "PUT", { values: rows });
   }
 
   return { sheetId, sheetName, rows };
@@ -607,7 +635,7 @@ async function syncToSheet(supabaseAdmin: any, integration: SheetIntegration, ru
 
       const knownRowIdx = uuidToRowIndex.get(booking.id);
       if (knownRowIdx) {
-        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:R${knownRowIdx}`), "PUT", { values: [rowData] });
+        await googleSheetsRequest(sheetId, formatSheetRange(sheetName, `A${knownRowIdx}:S${knownRowIdx}`), "PUT", { values: [rowData] });
         updated += 1;
       } else {
         await googleSheetsRequest(sheetId, formatSheetRange(sheetName, COLS), "POST", { values: [rowData] });
@@ -818,7 +846,8 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         }
 
         if (!booking) {
-          const overlapsExisting = await hasBookingOverlap(
+          const cancelReplace = isCancelReplaceEnabled(parsed.cancel_replace || "");
+          const overlappingBookings = await getOverlappingBookings(
             supabaseAdmin,
             courtId,
             normalizedDate,
@@ -826,11 +855,17 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
             normalizedEnd,
           );
 
-          if (overlapsExisting) {
-            conflicted += 1;
-            errors.push(`Row ${sheetIndex}: Slot overlaps an existing booking.`);
-            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Slot overlaps an existing confirmed/pending booking");
-            continue;
+          let replacedCount = 0;
+          if (overlappingBookings.length > 0) {
+            if (!cancelReplace) {
+              conflicted += 1;
+              errors.push(`Row ${sheetIndex}: Slot overlaps an existing booking.`);
+              await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Slot overlaps an existing confirmed/pending booking. Set Cancel/Replace=YES to auto-cancel conflict(s). ");
+              continue;
+            }
+
+            replacedCount = await cancelConflictingBookings(supabaseAdmin, overlappingBookings, incomingSourceUpdatedAt);
+            cancelled += replacedCount;
           }
 
           const userId = await resolveUserId(supabaseAdmin, integration.owner_id, parsed.customer_email, parsed.customer_phone);
@@ -863,7 +898,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
             continue;
           }
 
-          let syncStatus = "CREATED";
+          let syncStatus = replacedCount > 0 ? "CREATED_REPLACED" : "CREATED";
           let syncError = "";
           if (incomingStatus === "confirmed" && parsed.customer_email) {
             try {
@@ -876,9 +911,9 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
                 endTime: normalizedEnd.slice(0, 5),
                 totalPrice: Number(parsed.total_price || 0),
               });
-              syncStatus = "CREATED+EMAILED";
+              syncStatus = replacedCount > 0 ? "CREATED_REPLACED+EMAILED" : "CREATED+EMAILED";
             } catch (emailError: any) {
-              syncStatus = "CREATED_EMAIL_FAILED";
+              syncStatus = replacedCount > 0 ? "CREATED_REPLACED_EMAIL_FAILED" : "CREATED_EMAIL_FAILED";
               syncError = emailError.message || "Booking created but confirmation email failed";
             }
           }
@@ -919,7 +954,8 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           continue;
         }
 
-        const overlapsExisting = await hasBookingOverlap(
+        const cancelReplace = isCancelReplaceEnabled(parsed.cancel_replace || "");
+        const overlappingBookings = await getOverlappingBookings(
           supabaseAdmin,
           courtId,
           normalizedDate,
@@ -928,11 +964,17 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           booking.id,
         );
 
-        if (overlapsExisting) {
-          conflicted += 1;
-          errors.push(`Row ${sheetIndex}: Update would overlap an existing booking.`);
-          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Update rejected: slot overlaps another confirmed/pending booking");
-          continue;
+        let replacedCount = 0;
+        if (overlappingBookings.length > 0) {
+          if (!cancelReplace) {
+            conflicted += 1;
+            errors.push(`Row ${sheetIndex}: Update would overlap an existing booking.`);
+            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "OVERLAP", "Update rejected: slot overlaps another confirmed/pending booking. Set Cancel/Replace=YES to auto-cancel conflict(s).");
+            continue;
+          }
+
+          replacedCount = await cancelConflictingBookings(supabaseAdmin, overlappingBookings, incomingSourceUpdatedAt);
+          cancelled += replacedCount;
         }
 
         const patch: Record<string, unknown> = {
@@ -960,7 +1002,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           continue;
         }
 
-        let syncStatus = "UPDATED";
+        let syncStatus = replacedCount > 0 ? "UPDATED_REPLACED" : "UPDATED";
         let syncError = "";
         if (incomingStatus === "confirmed" && parsed.customer_email) {
           try {
@@ -973,9 +1015,9 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
               endTime: normalizedEnd.slice(0, 5),
               totalPrice: Number(parsed.total_price || booking.total_price || 0),
             });
-            syncStatus = "UPDATED+EMAILED";
+            syncStatus = replacedCount > 0 ? "UPDATED_REPLACED+EMAILED" : "UPDATED+EMAILED";
           } catch (emailError: any) {
-            syncStatus = "UPDATED_EMAIL_FAILED";
+            syncStatus = replacedCount > 0 ? "UPDATED_REPLACED_EMAIL_FAILED" : "UPDATED_EMAIL_FAILED";
             syncError = emailError.message || "Booking updated but confirmation email failed";
           }
         }
