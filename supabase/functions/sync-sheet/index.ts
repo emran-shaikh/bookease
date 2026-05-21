@@ -803,7 +803,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
       await writeSheetFeedback(sheetId, sheetName, 1, "INVALID_SCHEMA", validationError.message || "Sheet columns are invalid");
       throw validationError;
     }
-    const { courtIds, courtIdByName } = await getOwnerCourtData(supabaseAdmin, integration.owner_id);
+    const { courtIds, courtIdByName, duplicateCourtNames } = await getOwnerCourtData(supabaseAdmin, integration.owner_id);
 
     if (!courtIds.length) {
       await setIntegrationStatus(supabaseAdmin, integration.id, {
@@ -855,11 +855,21 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           continue;
         }
 
-        const courtId = courtIdByName[parsed.court_name.toLowerCase()];
+        const normalizedCourtName = parsed.court_name.toLowerCase();
+        const courtId = courtIdByName[normalizedCourtName];
         if (!courtId) {
+          const isAmbiguous = duplicateCourtNames.has(normalizedCourtName);
           failed += 1;
-          errors.push(`Row ${sheetIndex}: Unknown court '${parsed.court_name}'`);
-          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "INVALID_COURT", `Unknown court '${parsed.court_name}'`);
+          errors.push(`Row ${sheetIndex}: Unknown/ambiguous court '${parsed.court_name}'`);
+          await writeSheetFeedback(
+            sheetId,
+            sheetName,
+            sheetIndex,
+            isAmbiguous ? "AMBIGUOUS_COURT" : "INVALID_COURT",
+            isAmbiguous
+              ? `Court name '${parsed.court_name}' matches multiple courts. Use 'Venue / Court Name'.`
+              : `Unknown court '${parsed.court_name}' for this owner`,
+          );
           continue;
         }
 
@@ -904,6 +914,21 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         }
 
         if (!booking) {
+          const blockedOverlaps = await getOverlappingBlockedSlots(
+            supabaseAdmin,
+            courtId,
+            normalizedDate,
+            normalizedStart,
+            normalizedEnd,
+          );
+
+          if (blockedOverlaps.length > 0) {
+            conflicted += 1;
+            errors.push(`Row ${sheetIndex}: Slot overlaps an owner blocked slot.`);
+            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "BLOCKED_SLOT", "Slot conflicts with owner blocked time on website");
+            continue;
+          }
+
           const cancelReplace = isCancelReplaceEnabled(parsed.cancel_replace || "");
           const overlappingBookings = await getOverlappingBookings(
             supabaseAdmin,
@@ -1009,6 +1034,21 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
             last_seen_at: nowIso,
             is_deleted: false,
           });
+          continue;
+        }
+
+        const blockedOverlaps = await getOverlappingBlockedSlots(
+          supabaseAdmin,
+          courtId,
+          normalizedDate,
+          normalizedStart,
+          normalizedEnd,
+        );
+
+        if (blockedOverlaps.length > 0) {
+          conflicted += 1;
+          errors.push(`Row ${sheetIndex}: Update conflicts with owner blocked slot.`);
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "BLOCKED_SLOT", "Update rejected: conflicts with owner blocked time on website");
           continue;
         }
 
