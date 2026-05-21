@@ -386,6 +386,31 @@ async function getOverlappingBookings(
   });
 }
 
+async function getOverlappingBlockedSlots(
+  supabaseAdmin: any,
+  courtId: string,
+  bookingDate: string,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabaseAdmin
+    .from("blocked_slots")
+    .select("id, start_time, end_time")
+    .eq("court_id", courtId)
+    .eq("date", bookingDate);
+
+  if (error) throw new Error(`Failed blocked-slot check: ${error.message}`);
+
+  const incomingStart = normalizeTime(startTime);
+  const incomingEnd = normalizeTime(endTime);
+
+  return (data || []).filter((row: any) => {
+    const blockedStart = normalizeTime(row.start_time);
+    const blockedEnd = normalizeTime(row.end_time);
+    return incomingStart < blockedEnd && incomingEnd > blockedStart;
+  });
+}
+
 async function cancelConflictingBookings(
   supabaseAdmin: any,
   conflictingBookings: Array<{ id: string }>,
@@ -483,16 +508,49 @@ async function getIntegration(supabaseAdmin: any, integrationId: string, ownerId
 async function getOwnerCourtData(supabaseAdmin: any, ownerId: string) {
   const { data: courts, error } = await supabaseAdmin
     .from("courts")
-    .select("id, name")
+    .select("id, name, venue_id")
     .eq("owner_id", ownerId);
 
   if (error) throw new Error(`Failed to load courts: ${error.message}`);
 
   const courtIds = (courts || []).map((c: any) => c.id);
   const courtNameById = Object.fromEntries((courts || []).map((c: any) => [c.id, c.name]));
-  const courtIdByName = Object.fromEntries((courts || []).map((c: any) => [String(c.name).trim().toLowerCase(), c.id]));
 
-  return { courtIds, courtNameById, courtIdByName };
+  const venueIds = [...new Set((courts || []).map((c: any) => c.venue_id).filter(Boolean))];
+  const { data: venues } = venueIds.length
+    ? await supabaseAdmin.from("venues").select("id, name").in("id", venueIds)
+    : { data: [] };
+  const venueNameById = Object.fromEntries((venues || []).map((v: any) => [v.id, String(v.name || "").trim()]));
+
+  const nameToCourtIds = new Map<string, string[]>();
+  for (const court of courts || []) {
+    const key = String(court.name || "").trim().toLowerCase();
+    if (!key) continue;
+    nameToCourtIds.set(key, [...(nameToCourtIds.get(key) || []), court.id]);
+  }
+
+  const duplicateCourtNames = new Set(
+    [...nameToCourtIds.entries()].filter(([, ids]) => ids.length > 1).map(([name]) => name),
+  );
+
+  const courtIdByName: Record<string, string> = {};
+  for (const court of courts || []) {
+    const courtName = String(court.name || "").trim();
+    const simpleKey = courtName.toLowerCase();
+    const venueName = court.venue_id ? String(venueNameById[court.venue_id] || "").trim() : "";
+
+    if (!duplicateCourtNames.has(simpleKey)) {
+      courtIdByName[simpleKey] = court.id;
+    }
+
+    if (venueName) {
+      courtIdByName[`${venueName.toLowerCase()} / ${simpleKey}`] = court.id;
+      courtIdByName[`${venueName.toLowerCase()} - ${simpleKey}`] = court.id;
+      courtIdByName[`${simpleKey} (${venueName.toLowerCase()})`] = court.id;
+    }
+  }
+
+  return { courtIds, courtNameById, courtIdByName, duplicateCourtNames };
 }
 
 async function ensureHeader(integration: SheetIntegration) {
@@ -745,7 +803,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
       await writeSheetFeedback(sheetId, sheetName, 1, "INVALID_SCHEMA", validationError.message || "Sheet columns are invalid");
       throw validationError;
     }
-    const { courtIds, courtIdByName } = await getOwnerCourtData(supabaseAdmin, integration.owner_id);
+    const { courtIds, courtIdByName, duplicateCourtNames } = await getOwnerCourtData(supabaseAdmin, integration.owner_id);
 
     if (!courtIds.length) {
       await setIntegrationStatus(supabaseAdmin, integration.id, {
@@ -797,11 +855,21 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           continue;
         }
 
-        const courtId = courtIdByName[parsed.court_name.toLowerCase()];
+        const normalizedCourtName = parsed.court_name.toLowerCase();
+        const courtId = courtIdByName[normalizedCourtName];
         if (!courtId) {
+          const isAmbiguous = duplicateCourtNames.has(normalizedCourtName);
           failed += 1;
-          errors.push(`Row ${sheetIndex}: Unknown court '${parsed.court_name}'`);
-          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "INVALID_COURT", `Unknown court '${parsed.court_name}'`);
+          errors.push(`Row ${sheetIndex}: Unknown/ambiguous court '${parsed.court_name}'`);
+          await writeSheetFeedback(
+            sheetId,
+            sheetName,
+            sheetIndex,
+            isAmbiguous ? "AMBIGUOUS_COURT" : "INVALID_COURT",
+            isAmbiguous
+              ? `Court name '${parsed.court_name}' matches multiple courts. Use 'Venue / Court Name'.`
+              : `Unknown court '${parsed.court_name}' for this owner`,
+          );
           continue;
         }
 
@@ -846,6 +914,21 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         }
 
         if (!booking) {
+          const blockedOverlaps = await getOverlappingBlockedSlots(
+            supabaseAdmin,
+            courtId,
+            normalizedDate,
+            normalizedStart,
+            normalizedEnd,
+          );
+
+          if (blockedOverlaps.length > 0) {
+            conflicted += 1;
+            errors.push(`Row ${sheetIndex}: Slot overlaps an owner blocked slot.`);
+            await writeSheetFeedback(sheetId, sheetName, sheetIndex, "BLOCKED_SLOT", "Slot conflicts with owner blocked time on website");
+            continue;
+          }
+
           const cancelReplace = isCancelReplaceEnabled(parsed.cancel_replace || "");
           const overlappingBookings = await getOverlappingBookings(
             supabaseAdmin,
@@ -951,6 +1034,21 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
             last_seen_at: nowIso,
             is_deleted: false,
           });
+          continue;
+        }
+
+        const blockedOverlaps = await getOverlappingBlockedSlots(
+          supabaseAdmin,
+          courtId,
+          normalizedDate,
+          normalizedStart,
+          normalizedEnd,
+        );
+
+        if (blockedOverlaps.length > 0) {
+          conflicted += 1;
+          errors.push(`Row ${sheetIndex}: Update conflicts with owner blocked slot.`);
+          await writeSheetFeedback(sheetId, sheetName, sheetIndex, "BLOCKED_SLOT", "Update rejected: conflicts with owner blocked time on website");
           continue;
         }
 
@@ -1191,6 +1289,30 @@ async function syncRecentForOwner(supabaseAdmin: any, ownerId: string) {
   return { pushed, failed: failures.length, failures };
 }
 
+async function resolveOwnerIdForBooking(supabaseAdmin: any, bookingId: string): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("bookings")
+    .select("court_id")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (error || !data?.court_id) {
+    throw new Error("Unable to resolve booking owner for sync_recent");
+  }
+
+  const { data: court, error: courtError } = await supabaseAdmin
+    .from("courts")
+    .select("owner_id")
+    .eq("id", data.court_id)
+    .maybeSingle();
+
+  if (courtError || !court?.owner_id) {
+    throw new Error("Unable to resolve court owner for sync_recent");
+  }
+
+  return court.owner_id as string;
+}
+
 async function replayLastFailedRun(supabaseAdmin: any, integrationId: string, ownerId?: string) {
   const integration = await getIntegration(supabaseAdmin, integrationId, ownerId);
 
@@ -1222,6 +1344,7 @@ Deno.serve(async (req) => {
     const action = body.action as SyncAction;
     const integrationId = body.integration_id as string | undefined;
     const ownerId = body.owner_id as string | undefined;
+    const bookingId = body.booking_id as string | undefined;
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -1247,8 +1370,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === "sync_recent") {
-      if (!ownerId) throw new Error("owner_id is required for sync_recent");
-      const result = await syncRecentForOwner(supabaseAdmin, ownerId);
+      const resolvedOwnerId = bookingId
+        ? await resolveOwnerIdForBooking(supabaseAdmin, bookingId)
+        : ownerId;
+
+      if (!resolvedOwnerId) throw new Error("owner_id or booking_id is required for sync_recent");
+      const result = await syncRecentForOwner(supabaseAdmin, resolvedOwnerId);
       return new Response(JSON.stringify({ success: true, ...result }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
