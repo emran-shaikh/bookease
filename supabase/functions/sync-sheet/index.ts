@@ -1289,6 +1289,30 @@ async function syncRecentForOwner(supabaseAdmin: any, ownerId: string) {
   return { pushed, failed: failures.length, failures };
 }
 
+async function resolveOwnerIdForBooking(supabaseAdmin: any, bookingId: string): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("bookings")
+    .select("court_id")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (error || !data?.court_id) {
+    throw new Error("Unable to resolve booking owner for sync_recent");
+  }
+
+  const { data: court, error: courtError } = await supabaseAdmin
+    .from("courts")
+    .select("owner_id")
+    .eq("id", data.court_id)
+    .maybeSingle();
+
+  if (courtError || !court?.owner_id) {
+    throw new Error("Unable to resolve court owner for sync_recent");
+  }
+
+  return court.owner_id as string;
+}
+
 async function replayLastFailedRun(supabaseAdmin: any, integrationId: string, ownerId?: string) {
   const integration = await getIntegration(supabaseAdmin, integrationId, ownerId);
 
@@ -1320,6 +1344,7 @@ Deno.serve(async (req) => {
     const action = body.action as SyncAction;
     const integrationId = body.integration_id as string | undefined;
     const ownerId = body.owner_id as string | undefined;
+    const bookingId = body.booking_id as string | undefined;
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -1345,8 +1370,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === "sync_recent") {
-      if (!ownerId) throw new Error("owner_id is required for sync_recent");
-      const result = await syncRecentForOwner(supabaseAdmin, ownerId);
+      const resolvedOwnerId = bookingId
+        ? await resolveOwnerIdForBooking(supabaseAdmin, bookingId)
+        : ownerId;
+
+      if (!resolvedOwnerId) throw new Error("owner_id or booking_id is required for sync_recent");
+      const result = await syncRecentForOwner(supabaseAdmin, resolvedOwnerId);
       return new Response(JSON.stringify({ success: true, ...result }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
