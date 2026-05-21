@@ -386,6 +386,31 @@ async function getOverlappingBookings(
   });
 }
 
+async function getOverlappingBlockedSlots(
+  supabaseAdmin: any,
+  courtId: string,
+  bookingDate: string,
+  startTime: string,
+  endTime: string,
+) {
+  const { data, error } = await supabaseAdmin
+    .from("blocked_slots")
+    .select("id, start_time, end_time")
+    .eq("court_id", courtId)
+    .eq("date", bookingDate);
+
+  if (error) throw new Error(`Failed blocked-slot check: ${error.message}`);
+
+  const incomingStart = normalizeTime(startTime);
+  const incomingEnd = normalizeTime(endTime);
+
+  return (data || []).filter((row: any) => {
+    const blockedStart = normalizeTime(row.start_time);
+    const blockedEnd = normalizeTime(row.end_time);
+    return incomingStart < blockedEnd && incomingEnd > blockedStart;
+  });
+}
+
 async function cancelConflictingBookings(
   supabaseAdmin: any,
   conflictingBookings: Array<{ id: string }>,
@@ -483,16 +508,49 @@ async function getIntegration(supabaseAdmin: any, integrationId: string, ownerId
 async function getOwnerCourtData(supabaseAdmin: any, ownerId: string) {
   const { data: courts, error } = await supabaseAdmin
     .from("courts")
-    .select("id, name")
+    .select("id, name, venue_id")
     .eq("owner_id", ownerId);
 
   if (error) throw new Error(`Failed to load courts: ${error.message}`);
 
   const courtIds = (courts || []).map((c: any) => c.id);
   const courtNameById = Object.fromEntries((courts || []).map((c: any) => [c.id, c.name]));
-  const courtIdByName = Object.fromEntries((courts || []).map((c: any) => [String(c.name).trim().toLowerCase(), c.id]));
 
-  return { courtIds, courtNameById, courtIdByName };
+  const venueIds = [...new Set((courts || []).map((c: any) => c.venue_id).filter(Boolean))];
+  const { data: venues } = venueIds.length
+    ? await supabaseAdmin.from("venues").select("id, name").in("id", venueIds)
+    : { data: [] };
+  const venueNameById = Object.fromEntries((venues || []).map((v: any) => [v.id, String(v.name || "").trim()]));
+
+  const nameToCourtIds = new Map<string, string[]>();
+  for (const court of courts || []) {
+    const key = String(court.name || "").trim().toLowerCase();
+    if (!key) continue;
+    nameToCourtIds.set(key, [...(nameToCourtIds.get(key) || []), court.id]);
+  }
+
+  const duplicateCourtNames = new Set(
+    [...nameToCourtIds.entries()].filter(([, ids]) => ids.length > 1).map(([name]) => name),
+  );
+
+  const courtIdByName: Record<string, string> = {};
+  for (const court of courts || []) {
+    const courtName = String(court.name || "").trim();
+    const simpleKey = courtName.toLowerCase();
+    const venueName = court.venue_id ? String(venueNameById[court.venue_id] || "").trim() : "";
+
+    if (!duplicateCourtNames.has(simpleKey)) {
+      courtIdByName[simpleKey] = court.id;
+    }
+
+    if (venueName) {
+      courtIdByName[`${venueName.toLowerCase()} / ${simpleKey}`] = court.id;
+      courtIdByName[`${venueName.toLowerCase()} - ${simpleKey}`] = court.id;
+      courtIdByName[`${simpleKey} (${venueName.toLowerCase()})`] = court.id;
+    }
+  }
+
+  return { courtIds, courtNameById, courtIdByName, duplicateCourtNames };
 }
 
 async function ensureHeader(integration: SheetIntegration) {
