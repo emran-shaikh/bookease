@@ -415,10 +415,44 @@ async function cancelConflictingBookings(
   supabaseAdmin: any,
   conflictingBookings: Array<{ id: string }>,
   sourceUpdatedAt: string,
+  ownerId: string,
+  courtId: string,
 ) {
   if (!conflictingBookings.length) return 0;
 
   const ids = conflictingBookings.map((b) => b.id);
+
+  const { data: court, error: courtError } = await supabaseAdmin
+    .from("courts")
+    .select("owner_id")
+    .eq("id", courtId)
+    .maybeSingle();
+
+  if (courtError || !court?.owner_id) {
+    throw new Error("Failed to validate court ownership for Cancel/Replace");
+  }
+
+  if (court.owner_id !== ownerId) {
+    throw new Error("Cancel/Replace safety check failed: court does not belong to this owner");
+  }
+
+  const { data: eligible, error: eligibleError } = await supabaseAdmin
+    .from("bookings")
+    .select("id")
+    .in("id", ids)
+    .eq("court_id", courtId)
+    .in("status", ["pending", "confirmed"]);
+
+  if (eligibleError) {
+    throw new Error(`Failed to validate conflicting booking scope: ${eligibleError.message}`);
+  }
+
+  const eligibleIds = (eligible || []).map((b: any) => b.id as string);
+
+  if (eligibleIds.length !== ids.length) {
+    throw new Error("Cancel/Replace blocked: conflicting rows include bookings outside this court scope");
+  }
+
   const { error } = await supabaseAdmin
     .from("bookings")
     .update({
@@ -426,10 +460,12 @@ async function cancelConflictingBookings(
       source_updated_by: "sheet",
       source_updated_at: sourceUpdatedAt,
     })
-    .in("id", ids);
+    .in("id", eligibleIds)
+    .eq("court_id", courtId)
+    .in("status", ["pending", "confirmed"]);
 
   if (error) throw new Error(`Failed to cancel conflicting booking(s): ${error.message}`);
-  return ids.length;
+  return eligibleIds.length;
 }
 
 async function writeSheetFeedback(
@@ -922,6 +958,19 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           booking = bookingById.get(linked.booking_id);
         }
 
+        if (booking && booking.court_id !== courtId) {
+          failed += 1;
+          errors.push(`Row ${sheetIndex}: Booking UUID court does not match sheet court.`);
+          await writeSheetFeedback(
+            sheetId,
+            sheetName,
+            sheetIndex,
+            "COURT_MISMATCH",
+            "Booking UUID belongs to a different court than the sheet row. Update court name or use the correct Booking UUID.",
+          );
+          continue;
+        }
+
         if (!booking) {
           const blockedOverlaps = await getOverlappingBlockedSlots(
             supabaseAdmin,
@@ -956,7 +1005,13 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
               continue;
             }
 
-            replacedCount = await cancelConflictingBookings(supabaseAdmin, overlappingBookings, incomingSourceUpdatedAt);
+            replacedCount = await cancelConflictingBookings(
+              supabaseAdmin,
+              overlappingBookings,
+              incomingSourceUpdatedAt,
+              integration.owner_id,
+              courtId,
+            );
             cancelled += replacedCount;
           }
 
@@ -1080,7 +1135,13 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
             continue;
           }
 
-          replacedCount = await cancelConflictingBookings(supabaseAdmin, overlappingBookings, incomingSourceUpdatedAt);
+          replacedCount = await cancelConflictingBookings(
+            supabaseAdmin,
+            overlappingBookings,
+            incomingSourceUpdatedAt,
+            integration.owner_id,
+            courtId,
+          );
           cancelled += replacedCount;
         }
 
