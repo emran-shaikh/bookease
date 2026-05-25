@@ -614,7 +614,12 @@ async function upsertLinks(supabaseAdmin: any, rows: Array<Partial<LinkRow> & { 
   if (error) throw new Error(`Failed to upsert sync links: ${error.message}`);
 }
 
-async function syncToSheet(supabaseAdmin: any, integration: SheetIntegration, runType: "manual" | "auto" = "manual") {
+async function syncToSheet(
+  supabaseAdmin: any,
+  integration: SheetIntegration,
+  runType: "manual" | "auto" = "manual",
+  forcedBookingId?: string,
+) {
   await setIntegrationStatus(supabaseAdmin, integration.id, { sync_status: "syncing", sync_error: null });
 
   const startedAt = new Date().toISOString();
@@ -638,6 +643,10 @@ async function syncToSheet(supabaseAdmin: any, integration: SheetIntegration, ru
       .select("*, profiles(full_name, email, phone)")
       .in("court_id", courtIds)
       .order("source_updated_at", { ascending: true });
+
+    if (forcedBookingId) {
+      query = query.eq("id", forcedBookingId);
+    }
 
     if (integration.last_push_at) {
       query = query.gt("source_updated_at", integration.last_push_at).eq("source_updated_by", "site");
@@ -1264,7 +1273,7 @@ async function syncAllAutoPull(supabaseAdmin: any) {
   };
 }
 
-async function syncRecentForOwner(supabaseAdmin: any, ownerId: string) {
+async function syncRecentForOwner(supabaseAdmin: any, ownerId: string, bookingId?: string) {
   const { data: integrations, error } = await supabaseAdmin
     .from("sheet_integrations")
     .select("*")
@@ -1279,7 +1288,7 @@ async function syncRecentForOwner(supabaseAdmin: any, ownerId: string) {
 
   for (const integration of integrations || []) {
     try {
-      await syncToSheet(supabaseAdmin, integration as SheetIntegration, "auto");
+      await syncToSheet(supabaseAdmin, integration as SheetIntegration, "auto", bookingId);
       pushed += 1;
     } catch (e: any) {
       failures.push(`${integration.id}: ${e.message}`);
@@ -1375,7 +1384,7 @@ Deno.serve(async (req) => {
         : ownerId;
 
       if (!resolvedOwnerId) throw new Error("owner_id or booking_id is required for sync_recent");
-      const result = await syncRecentForOwner(supabaseAdmin, resolvedOwnerId);
+      const result = await syncRecentForOwner(supabaseAdmin, resolvedOwnerId, bookingId);
       return new Response(JSON.stringify({ success: true, ...result }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
