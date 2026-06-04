@@ -55,14 +55,23 @@ const WhatsAppSimulator = () => {
     const fetchPhone = async () => {
       if (!user) return;
       const { data } = await supabase
-        .from("profiles")
-        .select("phone, whatsapp_number")
-        .eq("id", user.id)
+        .from("owner_payment_settings")
+        .select("whatsapp_number")
+        .eq("owner_id", user.id)
         .maybeSingle();
+
       if (data?.whatsapp_number) {
         setPhone(data.whatsapp_number);
-      } else if (data?.phone) {
-        setPhone(data.phone);
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("phone")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (profileData?.phone) {
+        setPhone(profileData.phone);
       }
     };
     fetchPhone();
