@@ -115,7 +115,25 @@ export default function OwnerDashboard() {
 
       setCourts(courtsData.data || []);
       setVenues(venuesData.data || []);
-      setBookings(bookingsData.data || []);
+      const bookingsWithSignedScreenshots = await Promise.all(
+        (bookingsData.data || []).map(async (booking: any) => {
+          const screenshotPath = booking.payment_screenshot as string | null;
+          if (!screenshotPath || screenshotPath.startsWith('http://') || screenshotPath.startsWith('https://')) {
+            return booking;
+          }
+
+          const { data: signedData } = await supabase.storage
+            .from('payment-screenshots')
+            .createSignedUrl(screenshotPath, 60 * 30);
+
+          return {
+            ...booking,
+            payment_screenshot: signedData?.signedUrl ?? null,
+          };
+        })
+      );
+
+      setBookings(bookingsWithSignedScreenshots);
       setBlockedSlots(blockedData.data || []);
       setPricingRules(pricingData.data || []);
 
