@@ -136,20 +136,16 @@ serve(async (req) => {
         try {
           const mediaResponse = await fetch(media_url);
           const mediaBlob = await mediaResponse.blob();
-          const fileName = `whatsapp/${normalizedPhone.replace(/\D/g, "")}/${Date.now()}.jpg`;
+          const fileName = `bookings/${state.pending_booking_id}/whatsapp-${Date.now()}.jpg`;
 
           await supabase.storage
             .from("payment-screenshots")
             .upload(fileName, mediaBlob, { contentType: "image/jpeg" });
 
-          const { data: urlData } = supabase.storage
-            .from("payment-screenshots")
-            .getPublicUrl(fileName);
-
           // Update booking with screenshot
           await supabase
             .from("bookings")
-            .update({ payment_screenshot: urlData.publicUrl })
+            .update({ payment_screenshot: fileName })
             .eq("id", state.pending_booking_id);
 
           await updateSession(supabase, session.id, {
