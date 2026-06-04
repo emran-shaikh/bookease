@@ -94,8 +94,7 @@ export default function OwnerDashboard() {
         supabase.from('venues').select('*').eq('owner_id', user?.id),
         supabase.from('bookings').select(`
           *,
-          courts!inner(owner_id, name),
-          profiles(full_name, email)
+          courts!inner(owner_id, name)
         `).eq('courts.owner_id', user?.id),
         supabase.from('blocked_slots').select(`
           *,
@@ -115,11 +114,20 @@ export default function OwnerDashboard() {
 
       setCourts(courtsData.data || []);
       setVenues(venuesData.data || []);
+      const { data: customerProfiles } = await supabase
+        .from('owner_customer_contacts')
+        .select('customer_id, full_name, email')
+        .eq('owner_id', user?.id);
+      const profileMap = new Map((customerProfiles || []).map((profile: any) => [profile.customer_id, profile]));
+
       const bookingsWithSignedScreenshots = await Promise.all(
         (bookingsData.data || []).map(async (booking: any) => {
           const screenshotPath = booking.payment_screenshot as string | null;
           if (!screenshotPath || screenshotPath.startsWith('http://') || screenshotPath.startsWith('https://')) {
-            return booking;
+            return {
+              ...booking,
+              profiles: profileMap.get(booking.user_id) || null,
+            };
           }
 
           const { data: signedData } = await supabase.storage
@@ -128,6 +136,7 @@ export default function OwnerDashboard() {
 
           return {
             ...booking,
+            profiles: profileMap.get(booking.user_id) || null,
             payment_screenshot: signedData?.signedUrl ?? null,
           };
         })

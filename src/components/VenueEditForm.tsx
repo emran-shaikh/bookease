@@ -122,7 +122,7 @@ export function VenueEditForm({ venue, onSuccess, onCancel }: VenueEditFormProps
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `venue-${venue.id}-${Date.now()}.${fileExt}`;
-      const filePath = `venue-images/${fileName}`;
+      const filePath = `${venue.owner_id}/venue-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('review-images')

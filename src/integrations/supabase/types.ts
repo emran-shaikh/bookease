@@ -128,6 +128,13 @@ export type Database = {
             foreignKeyName: "bookings_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "bookings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -222,6 +229,13 @@ export type Database = {
           zip_code?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "courts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
           {
             foreignKeyName: "courts_owner_id_fkey"
             columns: ["owner_id"]
@@ -332,6 +346,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "courts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "notifications_user_id_fkey"
@@ -521,6 +542,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "courts"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
           },
           {
             foreignKeyName: "reviews_user_id_fkey"
@@ -744,6 +772,13 @@ export type Database = {
             foreignKeyName: "slot_locks_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "slot_locks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -769,6 +804,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
           {
             foreignKeyName: "user_roles_user_id_fkey"
             columns: ["user_id"]
@@ -883,6 +925,13 @@ export type Database = {
             foreignKeyName: "whatsapp_sessions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -924,6 +973,30 @@ export type Database = {
             columns: ["court_id"]
             isOneToOne: false
             referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_customer_contacts: {
+        Row: {
+          customer_id: string | null
+          email: string | null
+          full_name: string | null
+          owner_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "courts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "courts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

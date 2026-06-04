@@ -177,7 +177,7 @@ export function CourtEditForm({ court, onSuccess, onCancel }: CourtEditFormProps
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${court.id}-${Date.now()}.${fileExt}`;
-      const filePath = `court-images/${fileName}`;
+      const filePath = `${court.owner_id}/court-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('review-images')
