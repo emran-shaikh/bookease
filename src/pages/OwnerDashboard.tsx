@@ -918,9 +918,17 @@ export default function OwnerDashboard() {
                           {format(new Date(booking.booking_date), 'MMMM d, yyyy')}
                         </CardDescription>
                       </div>
-                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
-                        {booking.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {matchPostsByBooking[booking.id] && (
+                          <Badge variant="outline" className="gap-1">
+                            <Users className="h-3 w-3" />
+                            {matchPostsByBooking[booking.id].joined_players}/{matchPostsByBooking[booking.id].needed_players}
+                          </Badge>
+                        )}
+                        <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
+                          {booking.status}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
