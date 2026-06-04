@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu, Trophy } from 'lucide-react';
+import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu, Trophy, Users } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 
 export function Header() {
@@ -73,6 +73,9 @@ export function Header() {
           </Link>
           <Link to="/courts" className="text-sm font-medium hover:text-primary transition-colors">
             Courts
+          </Link>
+          <Link to="/matches" className="text-sm font-medium hover:text-primary transition-colors">
+            Matches
           </Link>
           {user ? (
             <>
@@ -153,6 +156,14 @@ export function Header() {
                   onClick={() => handleNavigation('/courts')}
                 >
                   Courts
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start h-12 text-base"
+                  onClick={() => handleNavigation('/matches')}
+                >
+                  <Users className="mr-2 h-5 w-5" />
+                  Matches
                 </Button>
                 {user ? (
                   <>

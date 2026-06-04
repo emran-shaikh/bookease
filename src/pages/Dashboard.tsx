@@ -6,9 +6,10 @@ import { Header } from '@/components/Header';
 import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Calendar, Star, User, Upload, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar, Star, User, Upload, Clock, AlertCircle, Users, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, addMinutes, isAfter } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
@@ -25,6 +26,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);
   const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
+  const [openingMatchBookingId, setOpeningMatchBookingId] = useState<string | null>(null);
+  const [neededPlayersByBooking, setNeededPlayersByBooking] = useState<Record<string, string>>({});
+  const [matchPostsByBooking, setMatchPostsByBooking] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (user) {
@@ -34,13 +38,17 @@ export default function Dashboard() {
 
   async function fetchDashboardData() {
     try {
-      const [profileData, bookingsData, reviewsData] = await Promise.all([
+      const [profileData, bookingsData, reviewsData, matchPostsData] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user?.id).maybeSingle(),
         supabase.from('bookings').select(`
           *,
           courts (name, location, city, images)
         `).eq('user_id', user?.id).order('booking_date', { ascending: false }),
         supabase.from('reviews').select('booking_id').eq('user_id', user?.id),
+        supabase
+          .from('match_posts')
+          .select('id, booking_id, status, needed_players, joined_players')
+          .eq('host_user_id', user?.id),
       ]);
 
       // Profile can be null for new users
@@ -48,10 +56,18 @@ export default function Dashboard() {
         console.error('Error fetching profile:', profileData.error);
       }
       if (bookingsData.error) throw bookingsData.error;
+      if (matchPostsData.error) throw matchPostsData.error;
 
       setProfile(profileData.data);
       setBookings(bookingsData.data || []);
       setReviews(reviewsData.data || []);
+      const posts = (matchPostsData.data || []) as any[];
+      setMatchPostsByBooking(
+        posts.reduce((acc, post) => {
+          acc[post.booking_id] = post;
+          return acc;
+        }, {} as Record<string, any>)
+      );
     } catch (error: any) {
       toast({
         title: 'Error loading dashboard',
@@ -60,6 +76,41 @@ export default function Dashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleOpenMatch(booking: any) {
+    if (!user?.id) return;
+
+    const neededPlayers = Number(neededPlayersByBooking[booking.id] || '2');
+    if (Number.isNaN(neededPlayers) || neededPlayers < 1 || neededPlayers > 20) {
+      toast({
+        title: 'Invalid player count',
+        description: 'Please choose between 1 and 20 players.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setOpeningMatchBookingId(booking.id);
+      const { error } = await supabase.rpc('create_match_post_from_booking', {
+        _booking_id: booking.id,
+        _host_user_id: user.id,
+        _needed_players: neededPlayers,
+      });
+      if (error) throw error;
+
+      toast({ title: 'Match post is live', description: 'Players can now join your booking instantly.' });
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: 'Could not open match',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setOpeningMatchBookingId(null);
     }
   }
 
@@ -171,6 +222,7 @@ export default function Dashboard() {
                 const isPending = booking.status === 'pending' && booking.payment_status === 'pending';
                 const timeInfo = isPending ? getTimeRemaining(booking.created_at) : null;
                 const hasScreenshot = !!booking.payment_screenshot;
+                const matchPost = matchPostsByBooking[booking.id];
 
                 return (
                   <Card key={booking.id} className={isPending ? 'border-amber-500/50' : ''}>
@@ -261,6 +313,68 @@ export default function Dashboard() {
                             </div>
                           )}
                         </Collapsible>
+                      )}
+
+                      {(booking.status === 'confirmed' || booking.status === 'pending') && (
+                        <div className="mt-3 rounded-md border p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-medium">Need Players</p>
+                            {matchPost ? (
+                              <Badge variant={matchPost.status === 'full' ? 'secondary' : 'default'}>
+                                {matchPost.joined_players}/{matchPost.needed_players} • {matchPost.status}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">Not live</Badge>
+                            )}
+                          </div>
+
+                          {!matchPost && (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={neededPlayersByBooking[booking.id] ?? '2'}
+                                onChange={(e) =>
+                                  setNeededPlayersByBooking((prev) => ({
+                                    ...prev,
+                                    [booking.id]: e.target.value,
+                                  }))
+                                }
+                                className="h-8 text-xs"
+                              />
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => handleOpenMatch(booking)}
+                                disabled={openingMatchBookingId === booking.id}
+                              >
+                                {openingMatchBookingId === booking.id && (
+                                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                )}
+                                <PlusCircle className="h-3 w-3 mr-1" />
+                                Open Match
+                              </Button>
+                            </div>
+                          )}
+
+                          {matchPost && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-[11px] text-muted-foreground">
+                                Players can join from Match Finder instantly.
+                              </p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                onClick={() => navigate('/matches')}
+                              >
+                                <Users className="h-3 w-3 mr-1" />
+                                View Feed
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </CardContent>
                   </Card>

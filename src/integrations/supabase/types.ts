@@ -308,6 +308,177 @@ export type Database = {
         }
         Relationships: []
       }
+      match_participants: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          id: string
+          joined_at: string
+          post_id: string
+          status: Database["public"]["Enums"]["match_participant_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          joined_at?: string
+          post_id: string
+          status?: Database["public"]["Enums"]["match_participant_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          joined_at?: string
+          post_id?: string
+          status?: Database["public"]["Enums"]["match_participant_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_participants_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "match_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "match_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_posts: {
+        Row: {
+          booking_id: string
+          city: string | null
+          court_id: string
+          created_at: string
+          end_time: string
+          host_display_name: string | null
+          host_user_id: string
+          id: string
+          joined_players: number
+          match_date: string
+          needed_players: number
+          notes: string | null
+          owner_id: string
+          skill_level: string | null
+          sport_type: string
+          start_time: string
+          status: Database["public"]["Enums"]["match_post_status"]
+          updated_at: string
+          venue_id: string | null
+        }
+        Insert: {
+          booking_id: string
+          city?: string | null
+          court_id: string
+          created_at?: string
+          end_time: string
+          host_display_name?: string | null
+          host_user_id: string
+          id?: string
+          joined_players?: number
+          match_date: string
+          needed_players: number
+          notes?: string | null
+          owner_id: string
+          skill_level?: string | null
+          sport_type: string
+          start_time: string
+          status?: Database["public"]["Enums"]["match_post_status"]
+          updated_at?: string
+          venue_id?: string | null
+        }
+        Update: {
+          booking_id?: string
+          city?: string | null
+          court_id?: string
+          created_at?: string
+          end_time?: string
+          host_display_name?: string | null
+          host_user_id?: string
+          id?: string
+          joined_players?: number
+          match_date?: string
+          needed_players?: number
+          notes?: string | null
+          owner_id?: string
+          skill_level?: string | null
+          sport_type?: string
+          start_time?: string
+          status?: Database["public"]["Enums"]["match_post_status"]
+          updated_at?: string
+          venue_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_posts_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_posts_court_id_fkey"
+            columns: ["court_id"]
+            isOneToOne: false
+            referencedRelation: "courts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_posts_host_user_id_fkey"
+            columns: ["host_user_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "match_posts_host_user_id_fkey"
+            columns: ["host_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_posts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "match_posts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_posts_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "venues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           created_at: string
@@ -395,6 +566,57 @@ export type Database = {
           whatsapp_number?: string | null
         }
         Relationships: []
+      }
+      player_reliability: {
+        Row: {
+          attended_count: number
+          created_at: string
+          joined_count: number
+          last_event_at: string | null
+          late_cancel_count: number
+          no_show_count: number
+          score: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attended_count?: number
+          created_at?: string
+          joined_count?: number
+          last_event_at?: string | null
+          late_cancel_count?: number
+          no_show_count?: number
+          score?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attended_count?: number
+          created_at?: string
+          joined_count?: number
+          last_event_at?: string | null
+          late_cancel_count?: number
+          no_show_count?: number
+          score?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_reliability_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "player_reliability_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pricing_rules: {
         Row: {
@@ -1028,6 +1250,43 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_slot_locks: { Args: never; Returns: undefined }
+      close_expired_match_posts: { Args: never; Returns: number }
+      create_match_post_from_booking: {
+        Args: {
+          _booking_id: string
+          _host_user_id: string
+          _needed_players: number
+          _notes?: string
+          _skill_level?: string
+        }
+        Returns: {
+          booking_id: string
+          city: string | null
+          court_id: string
+          created_at: string
+          end_time: string
+          host_display_name: string | null
+          host_user_id: string
+          id: string
+          joined_players: number
+          match_date: string
+          needed_players: number
+          notes: string | null
+          owner_id: string
+          skill_level: string | null
+          sport_type: string
+          start_time: string
+          status: Database["public"]["Enums"]["match_post_status"]
+          updated_at: string
+          venue_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "match_posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       generate_court_slug: {
         Args: { court_id: string; court_name: string }
         Returns: string
@@ -1044,11 +1303,73 @@ export type Database = {
         }
         Returns: boolean
       }
+      join_match_post: {
+        Args: { _post_id: string; _user_id: string }
+        Returns: {
+          booking_id: string
+          city: string | null
+          court_id: string
+          created_at: string
+          end_time: string
+          host_display_name: string | null
+          host_user_id: string
+          id: string
+          joined_players: number
+          match_date: string
+          needed_players: number
+          notes: string | null
+          owner_id: string
+          skill_level: string | null
+          sport_type: string
+          start_time: string
+          status: Database["public"]["Enums"]["match_post_status"]
+          updated_at: string
+          venue_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "match_posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      leave_match_post: {
+        Args: { _post_id: string; _user_id: string }
+        Returns: {
+          booking_id: string
+          city: string | null
+          court_id: string
+          created_at: string
+          end_time: string
+          host_display_name: string | null
+          host_user_id: string
+          id: string
+          joined_players: number
+          match_date: string
+          needed_players: number
+          notes: string | null
+          owner_id: string
+          skill_level: string | null
+          sport_type: string
+          start_time: string
+          status: Database["public"]["Enums"]["match_post_status"]
+          updated_at: string
+          venue_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "match_posts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_role: "admin" | "court_owner" | "customer"
       booking_status: "pending" | "confirmed" | "cancelled" | "completed"
       court_status: "pending" | "approved" | "rejected"
+      match_participant_status: "joined" | "cancelled" | "attended" | "no_show"
+      match_post_status: "open" | "full" | "cancelled" | "completed"
       payment_status: "pending" | "succeeded" | "failed" | "refunded"
     }
     CompositeTypes: {
@@ -1180,6 +1501,8 @@ export const Constants = {
       app_role: ["admin", "court_owner", "customer"],
       booking_status: ["pending", "confirmed", "cancelled", "completed"],
       court_status: ["pending", "approved", "rejected"],
+      match_participant_status: ["joined", "cancelled", "attended", "no_show"],
+      match_post_status: ["open", "full", "cancelled", "completed"],
       payment_status: ["pending", "succeeded", "failed", "refunded"],
     },
   },

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Calendar, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard, Home, FileSpreadsheet } from 'lucide-react';
+import { Loader2, Building2, Calendar, Plus, Clock, Ban, Trash2, Bell, CheckCircle, Edit, Image, CreditCard, Home, FileSpreadsheet, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { CourtForm } from '@/components/CourtForm';
@@ -49,6 +49,7 @@ export default function OwnerDashboard() {
   const [editingVenue, setEditingVenue] = useState<any>(null);
   const [showVenueEditDialog, setShowVenueEditDialog] = useState(false);
   const [bookingFilters, setBookingFilters] = useState<FilterState>({});
+  const [matchPostsByBooking, setMatchPostsByBooking] = useState<Record<string, any>>({});
 
   // Block slot form state
   const [blockSlotData, setBlockSlotData] = useState({
@@ -89,7 +90,7 @@ export default function OwnerDashboard() {
 
   async function fetchOwnerData() {
     try {
-      const [courtsData, venuesData, bookingsData, blockedData, pricingData] = await Promise.all([
+      const [courtsData, venuesData, bookingsData, blockedData, pricingData, matchPostsData] = await Promise.all([
         supabase.from('courts').select('*').eq('owner_id', user?.id),
         supabase.from('venues').select('*').eq('owner_id', user?.id),
         supabase.from('bookings').select(`
@@ -104,6 +105,10 @@ export default function OwnerDashboard() {
           *,
           courts!inner(name)
         `).eq('courts.owner_id', user?.id),
+        supabase
+          .from('match_posts')
+          .select('id, booking_id, status, needed_players, joined_players')
+          .eq('owner_id', user?.id),
       ]);
 
       if (courtsData.error) throw courtsData.error;
@@ -111,6 +116,7 @@ export default function OwnerDashboard() {
       if (bookingsData.error) throw bookingsData.error;
       if (blockedData.error) throw blockedData.error;
       if (pricingData.error) throw pricingData.error;
+      if (matchPostsData.error) throw matchPostsData.error;
 
       setCourts(courtsData.data || []);
       setVenues(venuesData.data || []);
@@ -145,6 +151,12 @@ export default function OwnerDashboard() {
       setBookings(bookingsWithSignedScreenshots);
       setBlockedSlots(blockedData.data || []);
       setPricingRules(pricingData.data || []);
+      setMatchPostsByBooking(
+        (matchPostsData.data || []).reduce((acc: Record<string, any>, post: any) => {
+          acc[post.booking_id] = post;
+          return acc;
+        }, {})
+      );
 
       const totalEarnings = bookingsData.data
         ?.filter((b: any) => b.payment_status === 'succeeded')
@@ -906,9 +918,17 @@ export default function OwnerDashboard() {
                           {format(new Date(booking.booking_date), 'MMMM d, yyyy')}
                         </CardDescription>
                       </div>
-                      <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
-                        {booking.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        {matchPostsByBooking[booking.id] && (
+                          <Badge variant="outline" className="gap-1">
+                            <Users className="h-3 w-3" />
+                            {matchPostsByBooking[booking.id].joined_players}/{matchPostsByBooking[booking.id].needed_players}
+                          </Badge>
+                        )}
+                        <Badge variant={booking.status === 'confirmed' ? 'default' : 'secondary'}>
+                          {booking.status}
+                        </Badge>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
