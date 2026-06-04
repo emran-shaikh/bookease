@@ -114,11 +114,11 @@ export default function OwnerDashboard() {
 
       setCourts(courtsData.data || []);
       setVenues(venuesData.data || []);
-      const customerIds = [...new Set((bookingsData.data || []).map((booking: any) => booking.user_id).filter(Boolean))];
-      const { data: customerProfiles } = customerIds.length
-        ? await supabase.from('profiles').select('id, full_name, email').in('id', customerIds)
-        : { data: [] };
-      const profileMap = new Map((customerProfiles || []).map((profile: any) => [profile.id, profile]));
+      const { data: customerProfiles } = await supabase
+        .from('owner_customer_contacts')
+        .select('customer_id, full_name, email')
+        .eq('owner_id', user?.id);
+      const profileMap = new Map((customerProfiles || []).map((profile: any) => [profile.customer_id, profile]));
 
       const bookingsWithSignedScreenshots = await Promise.all(
         (bookingsData.data || []).map(async (booking: any) => {
