@@ -18,7 +18,7 @@ export const useFavorites = (userId: string | undefined) => {
 
     // Subscribe to realtime updates
     const channel = supabase
-      .channel('favorites-changes')
+      .channel(`favorites:${userId}`)
       .on(
         'postgres_changes',
         {
