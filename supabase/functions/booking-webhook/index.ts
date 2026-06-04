@@ -60,9 +60,9 @@ serve(async (req) => {
 
     // Get owner info
     const { data: owner } = await supabase
-      .from("profiles")
+      .from("owner_payment_settings")
       .select("full_name, whatsapp_number, n8n_webhook_url, bank_name, account_title, account_number")
-      .eq("id", court?.owner_id)
+      .eq("owner_id", court?.owner_id)
       .maybeSingle();
 
     // Build enriched payload
