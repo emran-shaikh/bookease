@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
-import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu, Trophy } from 'lucide-react';
+import { User, LayoutDashboard, LogOut, Calendar, Heart, Menu, Trophy, Users } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
 
 export function Header() {
