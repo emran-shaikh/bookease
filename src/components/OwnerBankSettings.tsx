@@ -38,9 +38,9 @@ export function OwnerBankSettings() {
   async function fetchSettings() {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('owner_payment_settings')
         .select('bank_name, account_title, account_number, whatsapp_number, n8n_webhook_url')
-        .eq('id', user?.id)
+        .eq('owner_id', user?.id)
         .maybeSingle();
 
       if (error) throw error;
@@ -67,15 +67,15 @@ export function OwnerBankSettings() {
 
     try {
       const { error } = await supabase
-        .from('profiles')
-        .update({
+        .from('owner_payment_settings')
+        .upsert({
+          owner_id: user?.id,
           bank_name: settings.bank_name || null,
           account_title: settings.account_title || null,
           account_number: settings.account_number || null,
           whatsapp_number: settings.whatsapp_number || null,
           n8n_webhook_url: settings.n8n_webhook_url || null,
-        } as any)
-        .eq('id', user?.id);
+        } as any);
 
       if (error) throw error;
 

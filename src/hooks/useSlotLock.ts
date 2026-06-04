@@ -23,10 +23,7 @@ export function useSlotLock(courtId: string, date: Date | null) {
 
     setLoading(true);
     try {
-      // First cleanup expired locks
-      await supabase.rpc('cleanup_expired_slot_locks');
-
-      // Then fetch active locks for this court and date
+      // Fetch active locks for this court and date
       const { data, error } = await supabase
         .from('slot_locks')
         .select('*')

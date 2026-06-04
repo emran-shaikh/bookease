@@ -120,7 +120,7 @@ export default function CourtDetail() {
       // Set up real-time subscription for bookings
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const channel = supabase
-        .channel(`court-bookings-${courtId}-${dateStr}`)
+        .channel(`court_bookings:${courtId}`)
         .on(
           'postgres_changes',
           {
