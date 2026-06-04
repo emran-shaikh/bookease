@@ -6,9 +6,10 @@ import { Header } from '@/components/Header';
 import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Calendar, Star, User, Upload, Clock, AlertCircle } from 'lucide-react';
+import { Loader2, Calendar, Star, User, Upload, Clock, AlertCircle, Users, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format, addMinutes, isAfter } from 'date-fns';
 import { formatPrice } from '@/lib/currency';
@@ -25,6 +26,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);
   const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
+  const [openingMatchBookingId, setOpeningMatchBookingId] = useState<string | null>(null);
+  const [neededPlayersByBooking, setNeededPlayersByBooking] = useState<Record<string, string>>({});
+  const [matchPostsByBooking, setMatchPostsByBooking] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (user) {
@@ -41,6 +45,10 @@ export default function Dashboard() {
           courts (name, location, city, images)
         `).eq('user_id', user?.id).order('booking_date', { ascending: false }),
         supabase.from('reviews').select('booking_id').eq('user_id', user?.id),
+        supabase
+          .from('match_posts')
+          .select('id, booking_id, status, needed_players, joined_players')
+          .eq('host_user_id', user?.id),
       ]);
 
       // Profile can be null for new users
@@ -52,6 +60,15 @@ export default function Dashboard() {
       setProfile(profileData.data);
       setBookings(bookingsData.data || []);
       setReviews(reviewsData.data || []);
+      const postMap = new Map((reviewsData as any).data);
+      const matchMap = ((arguments as any)[0]);
+      const posts = (Array.isArray((matchMap?.data)) ? matchMap.data : []) as any[];
+      setMatchPostsByBooking(
+        posts.reduce((acc, post) => {
+          acc[post.booking_id] = post;
+          return acc;
+        }, {} as Record<string, any>)
+      );
     } catch (error: any) {
       toast({
         title: 'Error loading dashboard',
@@ -60,6 +77,41 @@ export default function Dashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleOpenMatch(booking: any) {
+    if (!user?.id) return;
+
+    const neededPlayers = Number(neededPlayersByBooking[booking.id] || '2');
+    if (Number.isNaN(neededPlayers) || neededPlayers < 1 || neededPlayers > 20) {
+      toast({
+        title: 'Invalid player count',
+        description: 'Please choose between 1 and 20 players.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setOpeningMatchBookingId(booking.id);
+      const { error } = await supabase.rpc('create_match_post_from_booking', {
+        _booking_id: booking.id,
+        _host_user_id: user.id,
+        _needed_players: neededPlayers,
+      });
+      if (error) throw error;
+
+      toast({ title: 'Match post is live', description: 'Players can now join your booking instantly.' });
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: 'Could not open match',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setOpeningMatchBookingId(null);
     }
   }
 
