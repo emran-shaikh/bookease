@@ -202,10 +202,6 @@ export default function Index() {
           let totalReviews = 0;
 
           for (const court of venue.courts) {
-            const { data: countData } = await supabase
-              .rpc('get_court_booking_count', { court_uuid: court.id });
-            totalBookings += countData || 0;
-
             const { data: reviewsData } = await supabase
               .from('reviews')
               .select('rating')
@@ -214,6 +210,7 @@ export default function Index() {
             if (reviewsData && reviewsData.length > 0) {
               totalRating += reviewsData.reduce((acc, r) => acc + r.rating, 0);
               totalReviews += reviewsData.length;
+              totalBookings += reviewsData.length;
             }
           }
 
@@ -229,9 +226,6 @@ export default function Index() {
 
       const courtStats = await Promise.all(
         standaloneList.slice(0, 4).map(async (court) => {
-          const { data: countData } = await supabase
-            .rpc('get_court_booking_count', { court_uuid: court.id });
-
           const { data: reviewsData } = await supabase
             .from('reviews')
             .select('rating')
@@ -242,9 +236,9 @@ export default function Index() {
             : 0;
 
           return {
-            item: { ...court, booking_count: countData || 0, average_rating: averageRating, review_count: reviewsData?.length || 0 },
+            item: { ...court, booking_count: reviewsData?.length || 0, average_rating: averageRating, review_count: reviewsData?.length || 0 },
             type: 'court' as const,
-            booking_count: countData || 0,
+            booking_count: reviewsData?.length || 0,
             average_rating: averageRating,
             review_count: reviewsData?.length || 0,
           };
