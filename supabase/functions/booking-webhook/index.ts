@@ -58,11 +58,17 @@ serve(async (req) => {
       .eq("id", user_id)
       .maybeSingle();
 
-    // Get owner info
+    // Get owner payment/webhook info
     const { data: owner } = await supabase
       .from("owner_payment_settings")
-      .select("full_name, whatsapp_number, n8n_webhook_url, bank_name, account_title, account_number")
+      .select("whatsapp_number, n8n_webhook_url, bank_name, account_title, account_number")
       .eq("owner_id", court?.owner_id)
+      .maybeSingle();
+
+    const { data: ownerProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", court?.owner_id)
       .maybeSingle();
 
     // Build enriched payload
@@ -84,7 +90,7 @@ serve(async (req) => {
       previous_status: previous_status || null,
       payment_status,
       payment_screenshot: payment_screenshot || null,
-      owner_name: owner?.full_name,
+      owner_name: ownerProfile?.full_name,
       owner_whatsapp: owner?.whatsapp_number,
       owner_bank: owner?.bank_name ? {
         bank_name: owner.bank_name,
