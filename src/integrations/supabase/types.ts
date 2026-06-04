@@ -342,6 +342,39 @@ export type Database = {
           },
         ]
       }
+      owner_payment_settings: {
+        Row: {
+          account_number: string | null
+          account_title: string | null
+          bank_name: string | null
+          created_at: string
+          n8n_webhook_url: string | null
+          owner_id: string
+          updated_at: string
+          whatsapp_number: string | null
+        }
+        Insert: {
+          account_number?: string | null
+          account_title?: string | null
+          bank_name?: string | null
+          created_at?: string
+          n8n_webhook_url?: string | null
+          owner_id: string
+          updated_at?: string
+          whatsapp_number?: string | null
+        }
+        Update: {
+          account_number?: string | null
+          account_title?: string | null
+          bank_name?: string | null
+          created_at?: string
+          n8n_webhook_url?: string | null
+          owner_id?: string
+          updated_at?: string
+          whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
       pricing_rules: {
         Row: {
           court_id: string
@@ -894,6 +927,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      owner_payment_public: {
+        Row: {
+          account_number: string | null
+          account_title: string | null
+          bank_name: string | null
+          owner_id: string | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          account_number?: string | null
+          account_title?: string | null
+          bank_name?: string | null
+          owner_id?: string | null
+          whatsapp_number?: string | null
+        }
+        Update: {
+          account_number?: string | null
+          account_title?: string | null
+          bank_name?: string | null
+          owner_id?: string | null
+          whatsapp_number?: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
