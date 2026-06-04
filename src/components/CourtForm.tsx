@@ -121,7 +121,7 @@ export function CourtForm() {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `court-${user?.id}-${Date.now()}.${fileExt}`;
-      const filePath = `court-images/${fileName}`;
+      const filePath = `${user?.id}/court-images/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('review-images')
