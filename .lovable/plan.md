@@ -1,106 +1,88 @@
+## Goal
+Add a **public “Need Players” module** on top of bookings so a user can open slots for a booked court, others can **join instantly**, and the system stays reliable for real-life play.
 
-1) Define the sync contract (owner-facing + system rules)
-- Make Google Sheets a first-class “operations console” for owners, with true two-way behavior:
-  - Website changes push to sheet automatically.
-  - Sheet edits pull to website automatically in background.
-- Apply your chosen conflict policy:
-  - **Most recent wins**
-  - **Automatic + instant** (implemented as immediate push from site + frequent background pull from sheet)
-  - **Allow new rows from sheet**
-  - **Deleted row in sheet => cancel booking on website**
-- Standardize the sheet schema so sync is deterministic (no ambiguous columns).
+## What we’ll build
 
-2) Database upgrades for reliable bidirectional sync
-- Create a migration to add sync metadata and mapping state:
-  - `bookings`:
-    - `source_updated_at timestamptz` (last authoritative change time for conflict resolution)
-    - `source_updated_by text` (`site` | `sheet`)
-  - `sheet_integrations`:
-    - `auto_sync_enabled boolean default true`
-    - `last_pull_at timestamptz`
-    - `last_push_at timestamptz`
-    - `sync_cursor text` (optional incremental token)
-  - New table `sheet_booking_links` (integration-scoped mapping):
-    - `integration_id`, `booking_id`, `sheet_row_key` (stable row identifier), `last_seen_at`, `row_hash`, `is_deleted`
-- Add indexes for fast reconciliation (`integration_id`, `booking_id`, `sheet_row_key`).
-- Keep existing RLS model; service-role edge functions continue controlled writes.
+### 1) Core module: “Open Match” linked to a booking
+- Host books a court as usual.
+- Host can enable **Need Players** and set required players (e.g., 2–5).
+- This creates a public match post tied to the booking (court, venue, date/time).
+- Match post auto-closes when full, booking is canceled, or start time passes.
 
-3) Refactor sync engine in `supabase/functions/sync-sheet/index.ts`
-- Move from “rebuild sheet every time” to **incremental reconcile**:
-  - **Push path (site -> sheet)**: only changed bookings since `last_push_at`.
-  - **Pull path (sheet -> site)**: parse current rows, compare against link table + hashes.
-- Enforce deterministic row identity:
-  - Use full booking UUID in a dedicated hidden/locked column (not just 8-char prefix).
-  - Keep short booking ID as display-only.
-- Implement row-level actions during pull:
-  - Existing row changed -> compare timestamps and apply **most recent wins**.
-  - Unknown row with required fields -> create new booking (with overlap/blocked-slot checks).
-  - Missing previously-known row -> set booking status to `cancelled`.
-- Add strict validation and normalization:
-  - Date/time format parsing, status/payment enum validation, court-name mapping safety, duplicate-row guards.
-- Add anti-loop protection:
-  - Track `source_updated_by` and sync run id so write-backs don’t cause ping-pong updates.
-- Improve error taxonomy:
-  - Return actionable errors for API disabled, sharing permissions, invalid tab, malformed row, duplicate/overlap conflict.
+### 2) Public instant-join flow (no approval queue)
+- Discovery feed shows active open matches.
+- Player taps **Join** → immediate confirmation if seat available.
+- Last seat is protected by atomic server logic (no double-book race).
+- If full, user gets immediate “already full” response.
 
-4) Automatic sync orchestration (near-real-time behavior)
-- Add a scheduled backend function (e.g. `auto-sync-sheets`) that:
-  - runs frequently (e.g. every minute),
-  - processes active integrations,
-  - executes pull reconcile safely with per-integration lock.
-- Add immediate push triggers from website mutation points:
-  - booking create/cancel/confirm/payment updates invoke sync push event path.
-- Keep manual buttons (`To Sheet`, `From Sheet`, `Full Sync`) as fallback and admin recovery tools.
+### 3) Smart filtered discovery
+- Feed ranked/filtered by:
+  - city/location proximity
+  - sport compatibility
+  - skill range compatibility
+  - date/time window relevance
+- Hide irrelevant/expired/full/canceled matches.
+- Optional “For You” sort first, manual filters second.
 
-5) Owner dashboard UX improvements (clarity + trust)
-- Upgrade `src/components/SheetIntegration.tsx` to show:
-  - Clear mode/status (“Connected”, “Auto-sync active”, “Attention needed”)
-  - Last push/pull timestamps
-  - Rows created/updated/cancelled in last run
-  - Conflict count and downloadable error details
-- Add “Sync Health” panel:
-  - API enabled check
-  - sheet access check
-  - tab schema check
-  - permissions check
-- Add an “integration setup checklist” UI for owners:
-  - API enabled
-  - sheet shared with service account
-  - correct tab name
-  - required columns present
+### 4) Soft no-show policy
+- No money penalty in v1.
+- Track attendance/reliability score:
+  - join → attended = positive
+  - join → no-show/late-cancel = warning + score reduction
+- Repeat low reliability can reduce ranking priority in discovery.
 
-6) Booking workflow consistency updates
-- Ensure all booking mutations (customer booking, owner confirm/cancel, admin changes) update `source_updated_at/source_updated_by`.
-- Ensure sheet-originated updates preserve business rules (overlap/blocked slots/valid statuses).
-- Prevent silent conflicts by logging every overridden field decision in sync logs.
+### 5) Real-life reliability integration
+- Pre-game reminders (in-app + WhatsApp/push if enabled).
+- Join cutoff (e.g., 15–30 min before start) to stabilize final roster.
+- Host roster view with participant status and quick contact actions.
+- Post-game attendance confirmation prompt for host and participants.
 
-7) Observability, logs, and recovery
-- Expand `sheet_sync_logs` usage to include:
-  - run type (`push`, `pull`, `full`, `auto`),
-  - counts (created/updated/cancelled/skipped/conflicted),
-  - per-row failure snippets.
-- Add a lightweight “replay last failed run” endpoint/action.
-- Add structured logs in sync function for quick diagnosis.
+### 6) Owner / venue / court safety and sync alignment
+- Match post must always inherit exact `booking_id`, `court_id`, `venue_id`, and owner scope.
+- If booking changes from sheet sync/cancel-replace/conflict handling:
+  - linked match post updates immediately or closes
+  - participants notified immediately
+- No cross-owner or cross-court side effects.
 
-8) Test plan (before rollout)
-- Edge-function tests:
-  - site->sheet push, sheet->site update, new row create, row delete->cancel, conflict resolution.
-- Integration tests:
-  - owner edits sheet while customer books same slot; verify “most recent wins” and no duplicate booking.
-- UI tests:
-  - setup flow, health checks, error rendering, manual fallback actions.
-- Regression tests:
-  - booking creation/confirmation/cancellation still works when sync is enabled.
+## Technical details
 
-9) Rollout strategy
-- Phase 1: deploy schema + refactored sync with manual controls.
-- Phase 2: enable auto-sync scheduler for a subset (or all owners with active integrations).
-- Phase 3: tighten UX messaging and remove ambiguous legacy copy (“simple mode” wording) so owners clearly understand live bidirectional behavior.
+### Data model (new module tables)
+- `match_posts`
+  - booking link, host, venue/court, schedule snapshot, needed slots, joined count, status
+  - discovery attributes (sport, city, skill_band)
+- `match_participants`
+  - post_id, user_id, joined_at, status (joined/canceled/attended/no_show)
+- `player_reliability`
+  - user_id, score, no_show_count, late_cancel_count, last_event_at
+- Optional `match_events` (audit timeline)
 
-Technical details
-- “Automatic + instant” for Google Sheets is implemented as:
-  - immediate push on website-side mutations, plus
-  - high-frequency background pull for sheet-side edits (Google Sheets doesn’t provide dependable row-level webhooks for this exact flow).
-- Conflict engine uses `source_updated_at` timestamps and deterministic row mapping (`sheet_booking_links`) for idempotent reconciliation.
-- Deletion handling is snapshot-based: if a previously-linked row disappears from sheet, corresponding booking is cancelled (and logged).
-- New row ingestion from sheet requires minimum fields: court, date, start, end; all rows pass overlap and validation checks before insert.
+### Access control
+- Public read for active discovery-safe fields only.
+- Authenticated users required to join/cancel.
+- Host can manage own post; owners/admins can moderate where needed.
+- Strict RLS by user ownership + booking linkage.
+
+### Concurrency/performance
+- Use one atomic backend operation for join (single transaction path).
+- Capacity check and insert in same critical section.
+- Indexes on active status + datetime + venue/court + sport/city.
+- Realtime updates for seat count and closure.
+
+### Integration points
+- Booking lifecycle hooks/events update match post state.
+- Existing notifications/reminder pipelines reused.
+- Existing sheet-sync pipeline updates linked match posts via `booking_id`.
+
+## Rollout plan
+1. **Phase 1 (MVP):** create/open match, public feed, instant join, auto-close, basic notifications.
+2. **Phase 2:** smart ranking, reliability scoring, attendance confirmation UX.
+3. **Phase 3:** stronger trust features (optional profile verification, advanced moderation).
+
+## Success metrics
+- Match fill rate (% of open posts that reach full roster)
+- Time-to-fill per sport/city
+- No-show rate trend
+- Rebooking/repeat play rate
+- Cancellation due to low participation
+
+If you approve this plan, I’ll implement Phase 1 first with production-safe owner/court scoping and race-safe instant joins.
