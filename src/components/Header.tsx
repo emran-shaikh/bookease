@@ -74,6 +74,9 @@ export function Header() {
           <Link to="/courts" className="text-sm font-medium hover:text-primary transition-colors">
             Courts
           </Link>
+          <Link to="/matches" className="text-sm font-medium hover:text-primary transition-colors">
+            Matches
+          </Link>
           {user ? (
             <>
               <Link to="/favorites" className="text-sm font-medium hover:text-primary transition-colors flex items-center gap-1">
@@ -153,6 +156,14 @@ export function Header() {
                   onClick={() => handleNavigation('/courts')}
                 >
                   Courts
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="justify-start h-12 text-base"
+                  onClick={() => handleNavigation('/matches')}
+                >
+                  <Users className="mr-2 h-5 w-5" />
+                  Matches
                 </Button>
                 {user ? (
                   <>
