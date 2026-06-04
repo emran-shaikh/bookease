@@ -102,9 +102,9 @@ export default function BookCourt() {
   async function fetchOwnerPaymentInfo() {
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from('owner_payment_public')
         .select('bank_name, account_title, account_number, whatsapp_number')
-        .eq('id', court.owner_id)
+        .eq('owner_id', court.owner_id)
         .maybeSingle();
 
       if (error) throw error;
