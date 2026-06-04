@@ -683,9 +683,9 @@ async function handleCreateBooking(
 
   // Get owner payment details
   const { data: ownerProfile } = await supabase
-    .from("profiles")
+    .from("owner_payment_settings")
     .select("bank_name, account_title, account_number, whatsapp_number")
-    .eq("id", court.owner_id)
+    .eq("owner_id", court.owner_id)
     .maybeSingle();
 
   return {
