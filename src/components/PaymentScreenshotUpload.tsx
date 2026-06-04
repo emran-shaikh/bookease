@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,35 @@ export function PaymentScreenshotUpload({
 }: PaymentScreenshotUploadProps) {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(existingScreenshot || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const resolvePreview = async () => {
+      if (!existingScreenshot) {
+        setPreviewUrl(null);
+        return;
+      }
+
+      if (existingScreenshot.startsWith('http://') || existingScreenshot.startsWith('https://')) {
+        setPreviewUrl(existingScreenshot);
+        return;
+      }
+
+      const { data, error } = await supabase.storage
+        .from('payment-screenshots')
+        .createSignedUrl(existingScreenshot, 60 * 30);
+
+      if (error) {
+        console.error('Failed to create signed preview URL:', error);
+        setPreviewUrl(null);
+        return;
+      }
+
+      setPreviewUrl(data.signedUrl);
+    };
+
+    resolvePreview();
+  }, [existingScreenshot]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -51,32 +79,29 @@ export function PaymentScreenshotUpload({
     try {
       // Create a unique filename
       const fileExt = file.name.split('.').pop();
-      const fileName = `payment-${bookingId}-${Date.now()}.${fileExt}`;
-      const filePath = `payment-screenshots/${fileName}`;
+      const fileName = `payment-${Date.now()}.${fileExt}`;
+      const filePath = `bookings/${bookingId}/${fileName}`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
-        .from('review-images')
+        .from('payment-screenshots')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('review-images')
-        .getPublicUrl(filePath);
-
-      const screenshotUrl = urlData.publicUrl;
-
       // Update booking with screenshot URL
       const { error: updateError } = await supabase
         .from('bookings')
-        .update({ payment_screenshot: screenshotUrl })
+        .update({ payment_screenshot: filePath })
         .eq('id', bookingId);
 
       if (updateError) throw updateError;
 
-      setPreviewUrl(screenshotUrl);
+      const { data: signedData } = await supabase.storage
+        .from('payment-screenshots')
+        .createSignedUrl(filePath, 60 * 30);
+
+      setPreviewUrl(signedData?.signedUrl ?? null);
       toast({
         title: 'Screenshot Uploaded',
         description: 'Your payment screenshot has been uploaded. The owner will verify and confirm your booking.',
