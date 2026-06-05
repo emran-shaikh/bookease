@@ -308,6 +308,56 @@ export type Database = {
         }
         Relationships: []
       }
+      match_action_events: {
+        Row: {
+          action: string
+          created_at: string
+          event_at: string
+          id: string
+          is_suspicious: boolean
+          metadata: Json
+          post_id: string
+          suspicion_reason: string | null
+          updated_at: string
+          user_id: string
+          window_action_count: number | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          event_at?: string
+          id?: string
+          is_suspicious?: boolean
+          metadata?: Json
+          post_id: string
+          suspicion_reason?: string | null
+          updated_at?: string
+          user_id: string
+          window_action_count?: number | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          event_at?: string
+          id?: string
+          is_suspicious?: boolean
+          metadata?: Json
+          post_id?: string
+          suspicion_reason?: string | null
+          updated_at?: string
+          user_id?: string
+          window_action_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_action_events_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "match_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_participants: {
         Row: {
           cancelled_at: string | null
