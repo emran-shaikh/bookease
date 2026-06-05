@@ -545,7 +545,9 @@ async function getOwnerCourtData(supabaseAdmin: any, ownerId: string) {
   const { data: courts, error } = await supabaseAdmin
     .from("courts")
     .select("id, name, venue_id")
-    .eq("owner_id", ownerId);
+    .eq("owner_id", ownerId)
+    .eq("is_active", true)
+    .eq("status", "approved");
 
   if (error) throw new Error(`Failed to load courts: ${error.message}`);
 
