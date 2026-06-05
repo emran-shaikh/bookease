@@ -33,6 +33,11 @@ export default function MatchFinder() {
     try {
       setLoading(true);
 
+      const { error: closeExpiredError } = await supabase.rpc('close_expired_match_posts');
+      if (closeExpiredError) {
+        console.warn('Unable to close expired match posts before fetch:', closeExpiredError.message);
+      }
+
       const postsQuery = supabase
         .from('match_posts')
         .select(`
@@ -146,6 +151,13 @@ export default function MatchFinder() {
     const today = format(now, 'yyyy-MM-dd');
 
     return posts.filter((post) => {
+      const matchStart = new Date(`${post.match_date}T${post.start_time}`);
+      const isUpcoming = !Number.isNaN(matchStart.getTime()) && matchStart > now;
+
+      if (!isUpcoming) {
+        return false;
+      }
+
       const q = search.trim().toLowerCase();
       const matchesSearch =
         q.length === 0 ||
@@ -270,6 +282,7 @@ export default function MatchFinder() {
               const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
               const joined = joinedPostIds.has(post.id);
               const isHost = user?.id === post.host_user_id;
+              const locationLabel = post.courts?.location || post.city || post.courts?.city || 'N/A';
 
               return (
                 <Card key={post.id}>
@@ -286,7 +299,7 @@ export default function MatchFinder() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="grid gap-1 text-sm">
-                      <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{post.city || post.courts?.city || 'N/A'}</p>
+                      <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{locationLabel}</p>
                       <p className="flex items-center gap-2"><Calendar className="h-4 w-4" />{format(new Date(post.match_date), 'MMM d, yyyy')}</p>
                       <p className="flex items-center gap-2"><Clock className="h-4 w-4" />{post.start_time?.slice(0, 5)} - {post.end_time?.slice(0, 5)}</p>
                       <p className="flex items-center gap-2"><Users className="h-4 w-4" />{post.joined_players}/{post.needed_players} joined ({seatsLeft} left)</p>
