@@ -1137,6 +1137,47 @@ export default function OwnerDashboard() {
             )}
           </TabsContent>
 
+          <TabsContent value="match-contacts" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Match Join Contacts</CardTitle>
+                <CardDescription>Contact numbers shared by guests and players for open matches.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {matchGuestContacts.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground">
+                    No guest contact requests yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {matchGuestContacts.map((contact) => (
+                      <div key={contact.id} className="rounded-md border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-sm">
+                            {contact.guest_name || 'Guest player'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(contact.created_at), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                        <div className="mt-2 grid gap-1 text-sm">
+                          <p><span className="font-medium">Phone:</span> {contact.guest_phone}</p>
+                          <p>
+                            <span className="font-medium">Match:</span>{' '}
+                            {contact.match_posts?.courts?.name || 'Court'} • {format(new Date(contact.match_posts?.match_date), 'MMM d, yyyy')} • {String(contact.match_posts?.start_time || '').slice(0, 5)}
+                          </p>
+                          {contact.guest_note && (
+                            <p><span className="font-medium">Note:</span> {contact.guest_note}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="notifications" className="space-y-4">
             <Card>
               <CardHeader>
