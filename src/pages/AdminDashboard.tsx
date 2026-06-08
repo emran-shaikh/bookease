@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [allVenues, setAllVenues] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [matchGuestContacts, setMatchGuestContacts] = useState<any[]>([]);
   const [bookingSort, setBookingSort] = useState<SortOption>('date-desc');
   const [courtSort, setCourtSort] = useState<SortOption>('name-asc');
   const [venueSort, setVenueSort] = useState<SortOption>('name-asc');
@@ -77,13 +78,27 @@ export default function AdminDashboard() {
 
   async function fetchAdminData() {
     try {
-      const [courtsData, allCourtsData, venuesData, allVenuesData, usersData, bookingsData] = await Promise.all([
+      const [courtsData, allCourtsData, venuesData, allVenuesData, usersData, bookingsData, matchGuestContactsData] = await Promise.all([
         supabase.from('courts').select('*, profiles(full_name, email)').eq('status', 'pending'),
         supabase.from('courts').select('*, profiles(full_name, email)'),
         supabase.from('venues').select('*').eq('status', 'pending'),
         supabase.from('venues').select('*'),
         supabase.from('profiles').select('*, user_roles(role)'),
         supabase.from('bookings').select('*, courts(name, owner_id), profiles(full_name, email)'),
+        supabase
+          .from('match_guest_contacts')
+          .select(`
+            id,
+            guest_name,
+            guest_phone,
+            guest_note,
+            created_at,
+            match_posts(courts(name), match_date, start_time),
+            profiles!match_guest_contacts_host_user_id_fkey(full_name, email),
+            profiles!match_guest_contacts_owner_id_fkey(full_name, email)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(200),
       ]);
 
       if (courtsData.error) throw courtsData.error;
@@ -92,6 +107,7 @@ export default function AdminDashboard() {
       if (allVenuesData.error) throw allVenuesData.error;
       if (usersData.error) throw usersData.error;
       if (bookingsData.error) throw bookingsData.error;
+      if (matchGuestContactsData.error) throw matchGuestContactsData.error;
 
       setPendingCourts(courtsData.data || []);
       setAllCourts(allCourtsData.data || []);
@@ -99,6 +115,7 @@ export default function AdminDashboard() {
       setAllVenues(allVenuesData.data || []);
       setUsers(usersData.data || []);
       setBookings(bookingsData.data || []);
+      setMatchGuestContacts(matchGuestContactsData.data || []);
 
       const totalRevenue = bookingsData.data
         ?.filter((b: any) => b.payment_status === 'succeeded')
