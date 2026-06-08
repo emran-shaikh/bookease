@@ -358,6 +358,105 @@ export type Database = {
           },
         ]
       }
+      match_guest_contacts: {
+        Row: {
+          booking_id: string
+          contact_user_id: string | null
+          created_at: string
+          guest_name: string | null
+          guest_note: string | null
+          guest_phone: string
+          host_user_id: string
+          id: string
+          owner_id: string
+          post_id: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          contact_user_id?: string | null
+          created_at?: string
+          guest_name?: string | null
+          guest_note?: string | null
+          guest_phone: string
+          host_user_id: string
+          id?: string
+          owner_id: string
+          post_id: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          contact_user_id?: string | null
+          created_at?: string
+          guest_name?: string | null
+          guest_note?: string | null
+          guest_phone?: string
+          host_user_id?: string
+          id?: string
+          owner_id?: string
+          post_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_guest_contacts_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_contact_user_id_fkey"
+            columns: ["contact_user_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_contact_user_id_fkey"
+            columns: ["contact_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_host_user_id_fkey"
+            columns: ["host_user_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_host_user_id_fkey"
+            columns: ["host_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "match_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       match_participants: {
         Row: {
           cancelled_at: string | null
@@ -1412,6 +1511,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      request_guest_match_contact: {
+        Args: {
+          _contact_user_id?: string
+          _guest_name: string
+          _guest_note?: string
+          _guest_phone: string
+          _post_id: string
+        }
+        Returns: string
       }
     }
     Enums: {

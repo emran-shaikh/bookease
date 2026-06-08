@@ -50,6 +50,7 @@ export default function OwnerDashboard() {
   const [showVenueEditDialog, setShowVenueEditDialog] = useState(false);
   const [bookingFilters, setBookingFilters] = useState<FilterState>({});
   const [matchPostsByBooking, setMatchPostsByBooking] = useState<Record<string, any>>({});
+  const [matchGuestContacts, setMatchGuestContacts] = useState<any[]>([]);
 
   // Block slot form state
   const [blockSlotData, setBlockSlotData] = useState({
@@ -90,7 +91,7 @@ export default function OwnerDashboard() {
 
   async function fetchOwnerData() {
     try {
-      const [courtsData, venuesData, bookingsData, blockedData, pricingData, matchPostsData] = await Promise.all([
+      const [courtsData, venuesData, bookingsData, blockedData, pricingData, matchPostsData, matchGuestContactsData] = await Promise.all([
         supabase.from('courts').select('*').eq('owner_id', user?.id),
         supabase.from('venues').select('*').eq('owner_id', user?.id),
         supabase.from('bookings').select(`
@@ -109,6 +110,20 @@ export default function OwnerDashboard() {
           .from('match_posts')
           .select('id, booking_id, status, needed_players, joined_players')
           .eq('owner_id', user?.id),
+        supabase
+          .from('match_guest_contacts')
+          .select(`
+            id,
+            post_id,
+            booking_id,
+            guest_name,
+            guest_phone,
+            guest_note,
+            created_at,
+            match_posts(courts(name), match_date, start_time)
+          `)
+          .eq('owner_id', user?.id)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (courtsData.error) throw courtsData.error;
@@ -117,6 +132,7 @@ export default function OwnerDashboard() {
       if (blockedData.error) throw blockedData.error;
       if (pricingData.error) throw pricingData.error;
       if (matchPostsData.error) throw matchPostsData.error;
+      if (matchGuestContactsData.error) throw matchGuestContactsData.error;
 
       setCourts(courtsData.data || []);
       setVenues(venuesData.data || []);
@@ -157,6 +173,7 @@ export default function OwnerDashboard() {
           return acc;
         }, {})
       );
+      setMatchGuestContacts(matchGuestContactsData.data || []);
 
       const totalEarnings = bookingsData.data
         ?.filter((b: any) => b.payment_status === 'succeeded')
@@ -609,6 +626,7 @@ export default function OwnerDashboard() {
             </TabsTrigger>
             <TabsTrigger value="courts">My Courts</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="match-contacts">Match Contacts</TabsTrigger>
             <TabsTrigger value="settings" className="gap-1">
               <CreditCard className="h-3 w-3" />
               Payment
@@ -1117,6 +1135,47 @@ export default function OwnerDashboard() {
                 </Card>
               ))
             )}
+          </TabsContent>
+
+          <TabsContent value="match-contacts" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Match Join Contacts</CardTitle>
+                <CardDescription>Contact numbers shared by guests and players for open matches.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {matchGuestContacts.length === 0 ? (
+                  <div className="py-10 text-center text-muted-foreground">
+                    No guest contact requests yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {matchGuestContacts.map((contact) => (
+                      <div key={contact.id} className="rounded-md border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-sm">
+                            {contact.guest_name || 'Guest player'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(contact.created_at), 'MMM d, yyyy h:mm a')}
+                          </p>
+                        </div>
+                        <div className="mt-2 grid gap-1 text-sm">
+                          <p><span className="font-medium">Phone:</span> {contact.guest_phone}</p>
+                          <p>
+                            <span className="font-medium">Match:</span>{' '}
+                            {contact.match_posts?.courts?.name || 'Court'} • {contact.match_posts?.match_date ? format(new Date(contact.match_posts.match_date), 'MMM d, yyyy') : 'N/A'} • {String(contact.match_posts?.start_time || '').slice(0, 5)}
+                          </p>
+                          {contact.guest_note && (
+                            <p><span className="font-medium">Note:</span> {contact.guest_note}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="notifications" className="space-y-4">

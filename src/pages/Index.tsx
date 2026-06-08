@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp, Building2, LayoutGrid, Map } from 'lucide-react';
+import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp, Building2, LayoutGrid, Map, Users, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/currency';
@@ -57,6 +58,29 @@ interface Venue {
   distance?: number;
 }
 
+interface OpenMatchPost {
+  id: string;
+  court_id: string;
+  venue_id: string | null;
+  sport_type: string;
+  city: string | null;
+  match_date: string;
+  start_time: string;
+  end_time: string;
+  needed_players: number;
+  joined_players: number;
+  status: 'open' | 'full' | 'cancelled' | 'completed';
+  host_display_name: string | null;
+  courts?: {
+    name: string;
+    location: string | null;
+    city: string | null;
+  } | null;
+  venues?: {
+    name: string;
+  } | null;
+}
+
 const sportImages: { [key: string]: string } = {
   tennis: tennisImage,
   basketball: basketballImage,
@@ -81,6 +105,9 @@ export default function Index() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const [openMatches, setOpenMatches] = useState<OpenMatchPost[]>([]);
+  const [guestContactByPost, setGuestContactByPost] = useState<Record<string, { name: string; phone: string }>>({});
+  const [contactLoadingPostId, setContactLoadingPostId] = useState<string | null>(null);
 
   // Get user location on mount
   useEffect(() => {
@@ -108,23 +135,52 @@ export default function Index() {
 
   const fetchData = async () => {
     try {
-      // Fetch all approved venues
-      const { data: venuesData, error: venuesError } = await supabase
-        .from('venues')
-        .select('*')
-        .eq('status', 'approved')
-        .eq('is_active', true);
+      const { error: closeExpiredError } = await supabase.rpc('close_expired_match_posts');
+      if (closeExpiredError) {
+        console.warn('Unable to close expired match posts on homepage:', closeExpiredError.message);
+      }
 
-      if (venuesError) throw venuesError;
+      const [venuesResponse, courtsResponse, matchesResponse] = await Promise.all([
+        supabase
+          .from('venues')
+          .select('*')
+          .eq('status', 'approved')
+          .eq('is_active', true),
+        supabase
+          .from('courts')
+          .select('*')
+          .eq('status', 'approved')
+          .eq('is_active', true),
+        supabase
+          .from('match_posts')
+          .select(`
+            id,
+            court_id,
+            venue_id,
+            sport_type,
+            city,
+            match_date,
+            start_time,
+            end_time,
+            needed_players,
+            joined_players,
+            status,
+            host_display_name,
+            courts(name, location, city),
+            venues(name)
+          `)
+          .eq('status', 'open')
+          .order('match_date', { ascending: true })
+          .order('start_time', { ascending: true })
+          .limit(6),
+      ]);
 
-      // Fetch all approved courts
-      const { data: courtsData, error: courtsError } = await supabase
-        .from('courts')
-        .select('*')
-        .eq('status', 'approved')
-        .eq('is_active', true);
+      if (venuesResponse.error) throw venuesResponse.error;
+      if (courtsResponse.error) throw courtsResponse.error;
+      if (matchesResponse.error) throw matchesResponse.error;
 
-      if (courtsError) throw courtsError;
+      const venuesData = venuesResponse.data;
+      const courtsData = courtsResponse.data;
 
       // Separate courts into venue courts and standalone courts
       const venueCourts = (courtsData || []).filter(c => c.venue_id);
@@ -172,6 +228,14 @@ export default function Index() {
       setStandaloneCourts(processedStandalone);
       setFilteredVenues(processedVenues);
       setFilteredStandaloneCourts(processedStandalone);
+
+      const now = new Date();
+      const upcomingOpenMatches = ((matchesResponse.data || []) as OpenMatchPost[]).filter((post) => {
+        const start = new Date(`${post.match_date}T${post.start_time}`);
+        const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
+        return !Number.isNaN(start.getTime()) && start > now && seatsLeft > 0;
+      });
+      setOpenMatches(upcomingOpenMatches);
 
       // Fetch popular items (venues with most bookings)
       await fetchPopularItems(processedVenues, processedStandalone);
@@ -344,6 +408,51 @@ export default function Index() {
   };
 
   const totalResults = filteredVenues.length + filteredStandaloneCourts.length;
+
+  const handlePublicMatchContactShare = async (postId: string) => {
+    const entry = guestContactByPost[postId] || { name: '', phone: '' };
+    const normalizedPhone = entry.phone.replace(/[^\d+]/g, '');
+    const digitCount = normalizedPhone.replace(/\+/g, '').length;
+
+    if (digitCount < 10 || digitCount > 15) {
+      toast({
+        title: 'Invalid contact number',
+        description: 'Enter a valid phone number to join this match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setContactLoadingPostId(postId);
+      const { error } = await supabase.rpc('request_guest_match_contact', {
+        _post_id: postId,
+        _guest_name: entry.name.trim() || (user?.email?.split('@')[0] ?? 'Guest'),
+        _guest_phone: normalizedPhone,
+        _contact_user_id: user?.id ?? null,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Contact shared',
+        description: 'Your number was shared with the host. They can contact you directly.',
+      });
+
+      setGuestContactByPost((prev) => ({
+        ...prev,
+        [postId]: { name: '', phone: '' },
+      }));
+    } catch (error: any) {
+      toast({
+        title: 'Could not share contact',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setContactLoadingPostId(null);
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
@@ -823,6 +932,88 @@ export default function Index() {
             </Carousel>
           </section>
         )}
+
+        <section className="pb-8 sm:pb-12 md:pb-16">
+            <div className="mb-4 sm:mb-6 md:mb-8 flex items-center gap-2 sm:gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-primary/10">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Join Open Matches</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">Guests can join by sharing a contact number.</p>
+              </div>
+            </div>
+
+            {openMatches.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">No open matches at the moment.</p>
+                  <Button variant="outline" onClick={() => navigate('/matches')}>Open Match Finder</Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {openMatches.map((post) => {
+                const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
+                const guestInput = guestContactByPost[post.id] || { name: '', phone: '' };
+
+                return (
+                  <Card key={post.id}>
+                    <CardHeader>
+                      <CardTitle className="text-base">{post.courts?.name || 'Court'}</CardTitle>
+                      <CardDescription>
+                        {post.venues?.name || 'Venue'} • {post.sport_type}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid gap-1 text-sm">
+                        <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{post.courts?.location || post.city || post.courts?.city || 'N/A'}</p>
+                        <p className="flex items-center gap-2"><Calendar className="h-4 w-4" />{format(new Date(post.match_date), 'MMM d, yyyy')}</p>
+                        <p className="flex items-center gap-2"><Clock className="h-4 w-4" />{post.start_time.slice(0, 5)} - {post.end_time.slice(0, 5)}</p>
+                        <p className="flex items-center gap-2"><Users className="h-4 w-4" />{post.joined_players}/{post.needed_players} joined ({seatsLeft} left)</p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Input
+                          placeholder="Your name (optional)"
+                          value={guestInput.name}
+                          onChange={(e) =>
+                            setGuestContactByPost((prev) => ({
+                              ...prev,
+                              [post.id]: { ...guestInput, name: e.target.value },
+                            }))
+                          }
+                        />
+                        <Input
+                          placeholder="Contact number"
+                          inputMode="tel"
+                          value={guestInput.phone}
+                          onChange={(e) =>
+                            setGuestContactByPost((prev) => ({
+                              ...prev,
+                              [post.id]: { ...guestInput, phone: e.target.value },
+                            }))
+                          }
+                        />
+                        <Button
+                          className="w-full"
+                          disabled={contactLoadingPostId === post.id || seatsLeft <= 0}
+                          onClick={() => handlePublicMatchContactShare(post.id)}
+                        >
+                          {contactLoadingPostId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Share Contact to Join
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground">
+                          Visible only to the booking user, court owner, and admin.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              </div>
+            )}
+          </section>
 
         {/* Features Section */}
         <section className="grid gap-4 sm:gap-6 md:gap-8 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-12 md:pb-16 grid-cols-2 lg:grid-cols-4">

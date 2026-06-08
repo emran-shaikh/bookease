@@ -35,6 +35,7 @@ export default function AdminDashboard() {
   const [allVenues, setAllVenues] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [matchGuestContacts, setMatchGuestContacts] = useState<any[]>([]);
   const [bookingSort, setBookingSort] = useState<SortOption>('date-desc');
   const [courtSort, setCourtSort] = useState<SortOption>('name-asc');
   const [venueSort, setVenueSort] = useState<SortOption>('name-asc');
@@ -77,13 +78,27 @@ export default function AdminDashboard() {
 
   async function fetchAdminData() {
     try {
-      const [courtsData, allCourtsData, venuesData, allVenuesData, usersData, bookingsData] = await Promise.all([
+      const [courtsData, allCourtsData, venuesData, allVenuesData, usersData, bookingsData, matchGuestContactsData] = await Promise.all([
         supabase.from('courts').select('*, profiles(full_name, email)').eq('status', 'pending'),
         supabase.from('courts').select('*, profiles(full_name, email)'),
         supabase.from('venues').select('*').eq('status', 'pending'),
         supabase.from('venues').select('*'),
         supabase.from('profiles').select('*, user_roles(role)'),
         supabase.from('bookings').select('*, courts(name, owner_id), profiles(full_name, email)'),
+        supabase
+          .from('match_guest_contacts')
+          .select(`
+            id,
+            guest_name,
+            guest_phone,
+            guest_note,
+            created_at,
+            match_posts(courts(name), match_date, start_time),
+            host_profile:profiles!match_guest_contacts_host_user_id_fkey(full_name, email),
+            owner_profile:profiles!match_guest_contacts_owner_id_fkey(full_name, email)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(200),
       ]);
 
       if (courtsData.error) throw courtsData.error;
@@ -92,6 +107,7 @@ export default function AdminDashboard() {
       if (allVenuesData.error) throw allVenuesData.error;
       if (usersData.error) throw usersData.error;
       if (bookingsData.error) throw bookingsData.error;
+      if (matchGuestContactsData.error) throw matchGuestContactsData.error;
 
       setPendingCourts(courtsData.data || []);
       setAllCourts(allCourtsData.data || []);
@@ -99,6 +115,7 @@ export default function AdminDashboard() {
       setAllVenues(allVenuesData.data || []);
       setUsers(usersData.data || []);
       setBookings(bookingsData.data || []);
+      setMatchGuestContacts(matchGuestContactsData.data || []);
 
       const totalRevenue = bookingsData.data
         ?.filter((b: any) => b.payment_status === 'succeeded')
@@ -501,6 +518,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="all-venues">All Venues</TabsTrigger>
             <TabsTrigger value="all-courts">All Courts</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="match-contacts">Match Contacts</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
@@ -940,6 +958,52 @@ export default function AdminDashboard() {
                       ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="match-contacts">
+            <Card>
+              <CardHeader>
+                <CardTitle>Match Join Contact Log</CardTitle>
+                <CardDescription>Oversight of guest/player contact sharing for open match joins.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {matchGuestContacts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No contact entries yet</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Shared At</TableHead>
+                        <TableHead>Guest</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Match</TableHead>
+                        <TableHead>Host</TableHead>
+                        <TableHead>Owner</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matchGuestContacts.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>{format(new Date(entry.created_at), 'MMM d, yyyy h:mm a')}</TableCell>
+                          <TableCell>{entry.guest_name || 'Guest'}</TableCell>
+                          <TableCell>{entry.guest_phone}</TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div className="font-medium">{entry.match_posts?.courts?.name || 'Court'}</div>
+                              <div className="text-muted-foreground">
+                                {entry.match_posts?.match_date ? format(new Date(entry.match_posts.match_date), 'MMM d, yyyy') : 'N/A'} • {String(entry.match_posts?.start_time || '').slice(0, 5)}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{entry.host_profile?.full_name || entry.host_profile?.email || 'N/A'}</TableCell>
+                          <TableCell>{entry.owner_profile?.full_name || entry.owner_profile?.email || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
