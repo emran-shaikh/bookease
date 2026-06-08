@@ -932,6 +932,81 @@ export default function Index() {
           </section>
         )}
 
+        {openMatches.length > 0 && (
+          <section className="pb-8 sm:pb-12 md:pb-16">
+            <div className="mb-4 sm:mb-6 md:mb-8 flex items-center gap-2 sm:gap-3">
+              <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-primary/10">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Join Open Matches</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">Guests can join by sharing a contact number.</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {openMatches.map((post) => {
+                const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
+                const guestInput = guestContactByPost[post.id] || { name: '', phone: '' };
+
+                return (
+                  <Card key={post.id}>
+                    <CardHeader>
+                      <CardTitle className="text-base">{post.courts?.name || 'Court'}</CardTitle>
+                      <CardDescription>
+                        {post.venues?.name || 'Venue'} • {post.sport_type}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid gap-1 text-sm">
+                        <p className="flex items-center gap-2"><MapPin className="h-4 w-4" />{post.courts?.location || post.city || post.courts?.city || 'N/A'}</p>
+                        <p className="flex items-center gap-2"><Calendar className="h-4 w-4" />{format(new Date(post.match_date), 'MMM d, yyyy')}</p>
+                        <p className="flex items-center gap-2"><Clock className="h-4 w-4" />{post.start_time.slice(0, 5)} - {post.end_time.slice(0, 5)}</p>
+                        <p className="flex items-center gap-2"><Users className="h-4 w-4" />{post.joined_players}/{post.needed_players} joined ({seatsLeft} left)</p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Input
+                          placeholder="Your name (optional)"
+                          value={guestInput.name}
+                          onChange={(e) =>
+                            setGuestContactByPost((prev) => ({
+                              ...prev,
+                              [post.id]: { ...guestInput, name: e.target.value },
+                            }))
+                          }
+                        />
+                        <Input
+                          placeholder="Contact number"
+                          inputMode="tel"
+                          value={guestInput.phone}
+                          onChange={(e) =>
+                            setGuestContactByPost((prev) => ({
+                              ...prev,
+                              [post.id]: { ...guestInput, phone: e.target.value },
+                            }))
+                          }
+                        />
+                        <Button
+                          className="w-full"
+                          disabled={contactLoadingPostId === post.id || seatsLeft <= 0}
+                          onClick={() => handlePublicMatchContactShare(post.id)}
+                        >
+                          {contactLoadingPostId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Share Contact to Join
+                        </Button>
+                        <p className="text-[11px] text-muted-foreground">
+                          Visible only to the booking user, court owner, and admin.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
         {/* Features Section */}
         <section className="grid gap-4 sm:gap-6 md:gap-8 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-12 md:pb-16 grid-cols-2 lg:grid-cols-4">
           <div className="group flex flex-col items-center space-y-2 sm:space-y-3 text-center p-4 sm:p-6 rounded-xl bg-card/50 backdrop-blur-sm border border-border/50 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
