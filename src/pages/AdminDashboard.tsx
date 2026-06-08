@@ -518,6 +518,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="all-venues">All Venues</TabsTrigger>
             <TabsTrigger value="all-courts">All Courts</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="match-contacts">Match Contacts</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
           </TabsList>
@@ -957,6 +958,50 @@ export default function AdminDashboard() {
                       ))}
                   </TableBody>
                 </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="match-contacts">
+            <Card>
+              <CardHeader>
+                <CardTitle>Match Join Contact Log</CardTitle>
+                <CardDescription>Oversight of guest/player contact sharing for open match joins.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {matchGuestContacts.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No contact entries yet</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Shared At</TableHead>
+                        <TableHead>Guest</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Match</TableHead>
+                        <TableHead>Host</TableHead>
+                        <TableHead>Owner</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matchGuestContacts.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell>{format(new Date(entry.created_at), 'MMM d, yyyy h:mm a')}</TableCell>
+                          <TableCell>{entry.guest_name || 'Guest'}</TableCell>
+                          <TableCell>{entry.guest_phone}</TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <div className="font-medium">{entry.match_posts?.courts?.name || 'Court'}</div>
+                              <div className="text-muted-foreground">{format(new Date(entry.match_posts?.match_date), 'MMM d, yyyy')} • {String(entry.match_posts?.start_time || '').slice(0, 5)}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{entry.profiles?.[0]?.full_name || entry.profiles?.[0]?.email || 'N/A'}</TableCell>
+                          <TableCell>{entry.profiles?.[1]?.full_name || entry.profiles?.[1]?.email || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
