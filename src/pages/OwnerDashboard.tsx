@@ -50,6 +50,7 @@ export default function OwnerDashboard() {
   const [showVenueEditDialog, setShowVenueEditDialog] = useState(false);
   const [bookingFilters, setBookingFilters] = useState<FilterState>({});
   const [matchPostsByBooking, setMatchPostsByBooking] = useState<Record<string, any>>({});
+  const [matchGuestContacts, setMatchGuestContacts] = useState<any[]>([]);
 
   // Block slot form state
   const [blockSlotData, setBlockSlotData] = useState({
@@ -90,7 +91,7 @@ export default function OwnerDashboard() {
 
   async function fetchOwnerData() {
     try {
-      const [courtsData, venuesData, bookingsData, blockedData, pricingData, matchPostsData] = await Promise.all([
+      const [courtsData, venuesData, bookingsData, blockedData, pricingData, matchPostsData, matchGuestContactsData] = await Promise.all([
         supabase.from('courts').select('*').eq('owner_id', user?.id),
         supabase.from('venues').select('*').eq('owner_id', user?.id),
         supabase.from('bookings').select(`
@@ -109,6 +110,20 @@ export default function OwnerDashboard() {
           .from('match_posts')
           .select('id, booking_id, status, needed_players, joined_players')
           .eq('owner_id', user?.id),
+        supabase
+          .from('match_guest_contacts')
+          .select(`
+            id,
+            post_id,
+            booking_id,
+            guest_name,
+            guest_phone,
+            guest_note,
+            created_at,
+            match_posts(courts(name), match_date, start_time)
+          `)
+          .eq('owner_id', user?.id)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (courtsData.error) throw courtsData.error;
@@ -117,6 +132,7 @@ export default function OwnerDashboard() {
       if (blockedData.error) throw blockedData.error;
       if (pricingData.error) throw pricingData.error;
       if (matchPostsData.error) throw matchPostsData.error;
+      if (matchGuestContactsData.error) throw matchGuestContactsData.error;
 
       setCourts(courtsData.data || []);
       setVenues(venuesData.data || []);
@@ -157,6 +173,7 @@ export default function OwnerDashboard() {
           return acc;
         }, {})
       );
+      setMatchGuestContacts(matchGuestContactsData.data || []);
 
       const totalEarnings = bookingsData.data
         ?.filter((b: any) => b.payment_status === 'succeeded')
@@ -609,6 +626,7 @@ export default function OwnerDashboard() {
             </TabsTrigger>
             <TabsTrigger value="courts">My Courts</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="match-contacts">Match Contacts</TabsTrigger>
             <TabsTrigger value="settings" className="gap-1">
               <CreditCard className="h-3 w-3" />
               Payment
