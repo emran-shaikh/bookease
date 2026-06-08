@@ -94,8 +94,8 @@ export default function AdminDashboard() {
             guest_note,
             created_at,
             match_posts(courts(name), match_date, start_time),
-            profiles!match_guest_contacts_host_user_id_fkey(full_name, email),
-            profiles!match_guest_contacts_owner_id_fkey(full_name, email)
+            host_profile:profiles!match_guest_contacts_host_user_id_fkey(full_name, email),
+            owner_profile:profiles!match_guest_contacts_owner_id_fkey(full_name, email)
           `)
           .order('created_at', { ascending: false })
           .limit(200),
@@ -992,11 +992,13 @@ export default function AdminDashboard() {
                           <TableCell>
                             <div className="text-sm">
                               <div className="font-medium">{entry.match_posts?.courts?.name || 'Court'}</div>
-                              <div className="text-muted-foreground">{format(new Date(entry.match_posts?.match_date), 'MMM d, yyyy')} • {String(entry.match_posts?.start_time || '').slice(0, 5)}</div>
+                              <div className="text-muted-foreground">
+                                {entry.match_posts?.match_date ? format(new Date(entry.match_posts.match_date), 'MMM d, yyyy') : 'N/A'} • {String(entry.match_posts?.start_time || '').slice(0, 5)}
+                              </div>
                             </div>
                           </TableCell>
-                          <TableCell>{entry.profiles?.[0]?.full_name || entry.profiles?.[0]?.email || 'N/A'}</TableCell>
-                          <TableCell>{entry.profiles?.[1]?.full_name || entry.profiles?.[1]?.email || 'N/A'}</TableCell>
+                          <TableCell>{entry.host_profile?.full_name || entry.host_profile?.email || 'N/A'}</TableCell>
+                          <TableCell>{entry.owner_profile?.full_name || entry.owner_profile?.email || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
