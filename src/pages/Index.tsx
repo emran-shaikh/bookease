@@ -57,6 +57,29 @@ interface Venue {
   distance?: number;
 }
 
+interface OpenMatchPost {
+  id: string;
+  court_id: string;
+  venue_id: string | null;
+  sport_type: string;
+  city: string | null;
+  match_date: string;
+  start_time: string;
+  end_time: string;
+  needed_players: number;
+  joined_players: number;
+  status: 'open' | 'full' | 'cancelled' | 'completed';
+  host_display_name: string | null;
+  courts?: {
+    name: string;
+    location: string | null;
+    city: string | null;
+  } | null;
+  venues?: {
+    name: string;
+  } | null;
+}
+
 const sportImages: { [key: string]: string } = {
   tennis: tennisImage,
   basketball: basketballImage,
@@ -81,6 +104,9 @@ export default function Index() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const [openMatches, setOpenMatches] = useState<OpenMatchPost[]>([]);
+  const [guestContactByPost, setGuestContactByPost] = useState<Record<string, { name: string; phone: string }>>({});
+  const [contactLoadingPostId, setContactLoadingPostId] = useState<string | null>(null);
 
   // Get user location on mount
   useEffect(() => {
@@ -108,23 +134,52 @@ export default function Index() {
 
   const fetchData = async () => {
     try {
-      // Fetch all approved venues
-      const { data: venuesData, error: venuesError } = await supabase
-        .from('venues')
-        .select('*')
-        .eq('status', 'approved')
-        .eq('is_active', true);
+      const { error: closeExpiredError } = await supabase.rpc('close_expired_match_posts');
+      if (closeExpiredError) {
+        console.warn('Unable to close expired match posts on homepage:', closeExpiredError.message);
+      }
 
-      if (venuesError) throw venuesError;
+      const [venuesResponse, courtsResponse, matchesResponse] = await Promise.all([
+        supabase
+          .from('venues')
+          .select('*')
+          .eq('status', 'approved')
+          .eq('is_active', true),
+        supabase
+          .from('courts')
+          .select('*')
+          .eq('status', 'approved')
+          .eq('is_active', true),
+        supabase
+          .from('match_posts')
+          .select(`
+            id,
+            court_id,
+            venue_id,
+            sport_type,
+            city,
+            match_date,
+            start_time,
+            end_time,
+            needed_players,
+            joined_players,
+            status,
+            host_display_name,
+            courts(name, location, city),
+            venues(name)
+          `)
+          .eq('status', 'open')
+          .order('match_date', { ascending: true })
+          .order('start_time', { ascending: true })
+          .limit(6),
+      ]);
 
-      // Fetch all approved courts
-      const { data: courtsData, error: courtsError } = await supabase
-        .from('courts')
-        .select('*')
-        .eq('status', 'approved')
-        .eq('is_active', true);
+      if (venuesResponse.error) throw venuesResponse.error;
+      if (courtsResponse.error) throw courtsResponse.error;
+      if (matchesResponse.error) throw matchesResponse.error;
 
-      if (courtsError) throw courtsError;
+      const venuesData = venuesResponse.data;
+      const courtsData = courtsResponse.data;
 
       // Separate courts into venue courts and standalone courts
       const venueCourts = (courtsData || []).filter(c => c.venue_id);
@@ -172,6 +227,14 @@ export default function Index() {
       setStandaloneCourts(processedStandalone);
       setFilteredVenues(processedVenues);
       setFilteredStandaloneCourts(processedStandalone);
+
+      const now = new Date();
+      const upcomingOpenMatches = ((matchesResponse.data || []) as OpenMatchPost[]).filter((post) => {
+        const start = new Date(`${post.match_date}T${post.start_time}`);
+        const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
+        return !Number.isNaN(start.getTime()) && start > now && seatsLeft > 0;
+      });
+      setOpenMatches(upcomingOpenMatches);
 
       // Fetch popular items (venues with most bookings)
       await fetchPopularItems(processedVenues, processedStandalone);
@@ -344,6 +407,51 @@ export default function Index() {
   };
 
   const totalResults = filteredVenues.length + filteredStandaloneCourts.length;
+
+  const handlePublicMatchContactShare = async (postId: string) => {
+    const entry = guestContactByPost[postId] || { name: '', phone: '' };
+    const normalizedPhone = entry.phone.replace(/[^\d+]/g, '');
+    const digitCount = normalizedPhone.replace(/\+/g, '').length;
+
+    if (digitCount < 10 || digitCount > 15) {
+      toast({
+        title: 'Invalid contact number',
+        description: 'Enter a valid phone number to join this match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setContactLoadingPostId(postId);
+      const { error } = await supabase.rpc('request_guest_match_contact', {
+        _post_id: postId,
+        _guest_name: entry.name.trim() || (user?.email?.split('@')[0] ?? 'Guest'),
+        _guest_phone: normalizedPhone,
+        _contact_user_id: user?.id ?? null,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Contact shared',
+        description: 'Your number was shared with the host. They can contact you directly.',
+      });
+
+      setGuestContactByPost((prev) => ({
+        ...prev,
+        [postId]: { name: '', phone: '' },
+      }));
+    } catch (error: any) {
+      toast({
+        title: 'Could not share contact',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setContactLoadingPostId(null);
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
