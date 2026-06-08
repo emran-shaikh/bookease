@@ -933,8 +933,7 @@ export default function Index() {
           </section>
         )}
 
-        {openMatches.length > 0 && (
-          <section className="pb-8 sm:pb-12 md:pb-16">
+        <section className="pb-8 sm:pb-12 md:pb-16">
             <div className="mb-4 sm:mb-6 md:mb-8 flex items-center gap-2 sm:gap-3">
               <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-primary/10">
                 <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
@@ -945,8 +944,16 @@ export default function Index() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {openMatches.map((post) => {
+            {openMatches.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">No open matches at the moment.</p>
+                  <Button variant="outline" onClick={() => navigate('/matches')}>Open Match Finder</Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {openMatches.map((post) => {
                 const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
                 const guestInput = guestContactByPost[post.id] || { name: '', phone: '' };
 
@@ -1004,9 +1011,9 @@ export default function Index() {
                   </Card>
                 );
               })}
-            </div>
+              </div>
+            )}
           </section>
-        )}
 
         {/* Features Section */}
         <section className="grid gap-4 sm:gap-6 md:gap-8 pt-4 sm:pt-6 md:pt-8 pb-8 sm:pb-12 md:pb-16 grid-cols-2 lg:grid-cols-4">
