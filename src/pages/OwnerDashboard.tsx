@@ -1164,7 +1164,7 @@ export default function OwnerDashboard() {
                           <p><span className="font-medium">Phone:</span> {contact.guest_phone}</p>
                           <p>
                             <span className="font-medium">Match:</span>{' '}
-                            {contact.match_posts?.courts?.name || 'Court'} • {format(new Date(contact.match_posts?.match_date), 'MMM d, yyyy')} • {String(contact.match_posts?.start_time || '').slice(0, 5)}
+                            {contact.match_posts?.courts?.name || 'Court'} • {contact.match_posts?.match_date ? format(new Date(contact.match_posts.match_date), 'MMM d, yyyy') : 'N/A'} • {String(contact.match_posts?.start_time || '').slice(0, 5)}
                           </p>
                           {contact.guest_note && (
                             <p><span className="font-medium">Note:</span> {contact.guest_note}</p>
