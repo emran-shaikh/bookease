@@ -29,12 +29,51 @@ export default function Dashboard() {
   const [openingMatchBookingId, setOpeningMatchBookingId] = useState<string | null>(null);
   const [neededPlayersByBooking, setNeededPlayersByBooking] = useState<Record<string, string>>({});
   const [matchPostsByBooking, setMatchPostsByBooking] = useState<Record<string, any>>({});
+  const [participantsByPost, setParticipantsByPost] = useState<Record<string, any[]>>({});
+  const [guestRequestsByPost, setGuestRequestsByPost] = useState<Record<string, any[]>>({});
+  const [requestActionLoadingId, setRequestActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`dashboard-match-host:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'match_posts',
+          filter: `host_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'match_guest_contacts',
+          filter: `host_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   async function fetchDashboardData() {
     try {
@@ -68,6 +107,54 @@ export default function Dashboard() {
           return acc;
         }, {} as Record<string, any>)
       );
+
+      if (posts.length > 0) {
+        const postIds = posts.map((post) => post.id);
+
+        const [participantsData, guestRequestsData] = await Promise.all([
+          supabase
+            .from('match_participants')
+            .select('id, post_id, user_id, status, joined_at, profiles(full_name, email, phone)')
+            .in('post_id', postIds)
+            .order('joined_at', { ascending: true }),
+          supabase
+            .from('match_guest_contacts')
+            .select(`
+              id,
+              post_id,
+              guest_name,
+              guest_phone,
+              guest_note,
+              created_at,
+              status,
+              decided_at,
+              contact_user_id,
+              contact_profile:profiles!match_guest_contacts_contact_user_id_fkey(full_name, email, phone)
+            `)
+            .in('post_id', postIds)
+            .order('created_at', { ascending: false }),
+        ]);
+
+        if (participantsData.error) throw participantsData.error;
+        if (guestRequestsData.error) throw guestRequestsData.error;
+
+        setParticipantsByPost(
+          (participantsData.data || []).reduce((acc: Record<string, any[]>, participant: any) => {
+            acc[participant.post_id] = [...(acc[participant.post_id] || []), participant];
+            return acc;
+          }, {})
+        );
+
+        setGuestRequestsByPost(
+          (guestRequestsData.data || []).reduce((acc: Record<string, any[]>, request: any) => {
+            acc[request.post_id] = [...(acc[request.post_id] || []), request];
+            return acc;
+          }, {})
+        );
+      } else {
+        setParticipantsByPost({});
+        setGuestRequestsByPost({});
+      }
     } catch (error: any) {
       toast({
         title: 'Error loading dashboard',
@@ -76,6 +163,36 @@ export default function Dashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGuestRequestDecision(contactId: string, nextStatus: 'accepted' | 'rejected') {
+    if (!user?.id) return;
+
+    try {
+      setRequestActionLoadingId(contactId);
+      const { error } = await supabase.rpc('update_guest_match_contact_status', {
+        _contact_id: contactId,
+        _status: nextStatus,
+        _actor_user_id: user.id,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: nextStatus === 'accepted' ? 'Request accepted' : 'Request rejected',
+        description: 'Guest request status has been updated.',
+      });
+
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: 'Could not update request',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRequestActionLoadingId(null);
     }
   }
 
