@@ -363,6 +363,8 @@ export type Database = {
           booking_id: string
           contact_user_id: string | null
           created_at: string
+          decided_at: string | null
+          decided_by: string | null
           guest_name: string | null
           guest_note: string | null
           guest_phone: string
@@ -370,12 +372,15 @@ export type Database = {
           id: string
           owner_id: string
           post_id: string
+          status: Database["public"]["Enums"]["match_guest_contact_status"]
           updated_at: string
         }
         Insert: {
           booking_id: string
           contact_user_id?: string | null
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
           guest_name?: string | null
           guest_note?: string | null
           guest_phone: string
@@ -383,12 +388,15 @@ export type Database = {
           id?: string
           owner_id: string
           post_id: string
+          status?: Database["public"]["Enums"]["match_guest_contact_status"]
           updated_at?: string
         }
         Update: {
           booking_id?: string
           contact_user_id?: string | null
           created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
           guest_name?: string | null
           guest_note?: string | null
           guest_phone?: string
@@ -396,6 +404,7 @@ export type Database = {
           id?: string
           owner_id?: string
           post_id?: string
+          status?: Database["public"]["Enums"]["match_guest_contact_status"]
           updated_at?: string
         }
         Relationships: [
@@ -416,6 +425,20 @@ export type Database = {
           {
             foreignKeyName: "match_guest_contacts_contact_user_id_fkey"
             columns: ["contact_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "owner_customer_contacts"
+            referencedColumns: ["customer_id"]
+          },
+          {
+            foreignKeyName: "match_guest_contacts_decided_by_fkey"
+            columns: ["decided_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1522,11 +1545,41 @@ export type Database = {
         }
         Returns: string
       }
+      update_guest_match_contact_status: {
+        Args: {
+          _actor_user_id: string
+          _contact_id: string
+          _status: Database["public"]["Enums"]["match_guest_contact_status"]
+        }
+        Returns: {
+          booking_id: string
+          contact_user_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          guest_name: string | null
+          guest_note: string | null
+          guest_phone: string
+          host_user_id: string
+          id: string
+          owner_id: string
+          post_id: string
+          status: Database["public"]["Enums"]["match_guest_contact_status"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "match_guest_contacts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       app_role: "admin" | "court_owner" | "customer"
       booking_status: "pending" | "confirmed" | "cancelled" | "completed"
       court_status: "pending" | "approved" | "rejected"
+      match_guest_contact_status: "pending" | "accepted" | "rejected"
       match_participant_status: "joined" | "cancelled" | "attended" | "no_show"
       match_post_status: "open" | "full" | "cancelled" | "completed"
       payment_status: "pending" | "succeeded" | "failed" | "refunded"
@@ -1660,6 +1713,7 @@ export const Constants = {
       app_role: ["admin", "court_owner", "customer"],
       booking_status: ["pending", "confirmed", "cancelled", "completed"],
       court_status: ["pending", "approved", "rejected"],
+      match_guest_contact_status: ["pending", "accepted", "rejected"],
       match_participant_status: ["joined", "cancelled", "attended", "no_show"],
       match_post_status: ["open", "full", "cancelled", "completed"],
       payment_status: ["pending", "succeeded", "failed", "refunded"],
