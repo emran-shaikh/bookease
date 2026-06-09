@@ -476,19 +476,117 @@ export default function Dashboard() {
                           )}
 
                           {matchPost && (
-                            <div className="flex items-center justify-between">
-                              <p className="text-[11px] text-muted-foreground">
-                                Players can join from Match Finder instantly.
-                              </p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs"
-                                onClick={() => navigate('/matches')}
-                              >
-                                <Users className="h-3 w-3 mr-1" />
-                                View Feed
-                              </Button>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-[11px] text-muted-foreground">
+                                  Players can join from Match Finder instantly.
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-xs"
+                                  onClick={() => navigate('/matches')}
+                                >
+                                  <Users className="h-3 w-3 mr-1" />
+                                  View Feed
+                                </Button>
+                              </div>
+
+                              <div className="rounded-md border p-2 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-medium">Joined Players</p>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {(participantsByPost[matchPost.id] || []).filter((p) => p.status === 'joined').length} active
+                                  </Badge>
+                                </div>
+
+                                {(participantsByPost[matchPost.id] || []).length === 0 ? (
+                                  <p className="text-[11px] text-muted-foreground">No joined players yet.</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {(participantsByPost[matchPost.id] || []).map((participant) => (
+                                      <div key={participant.id} className="flex items-center justify-between text-[11px] border rounded px-2 py-1">
+                                        <div>
+                                          <p className="font-medium">{participant.profiles?.full_name || 'Player'}</p>
+                                          <p className="text-muted-foreground">{participant.profiles?.phone || participant.profiles?.email || 'No contact'}</p>
+                                        </div>
+                                        <Badge variant={participant.status === 'joined' ? 'default' : 'secondary'}>
+                                          {participant.status}
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="rounded-md border p-2 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-medium">Guest Join Requests</p>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {(guestRequestsByPost[matchPost.id] || []).length} total
+                                  </Badge>
+                                </div>
+
+                                {(guestRequestsByPost[matchPost.id] || []).length === 0 ? (
+                                  <p className="text-[11px] text-muted-foreground">No guest requests yet.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {(guestRequestsByPost[matchPost.id] || []).map((request) => {
+                                      const canReview = request.status === 'pending';
+
+                                      return (
+                                        <div key={request.id} className="border rounded p-2 space-y-2">
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="text-[11px]">
+                                              <p className="font-medium">{request.guest_name || request.contact_profile?.full_name || 'Guest Player'}</p>
+                                              <p className="text-muted-foreground">{request.guest_phone}</p>
+                                              {request.guest_note ? <p className="text-muted-foreground">{request.guest_note}</p> : null}
+                                            </div>
+                                            <Badge
+                                              variant={
+                                                request.status === 'accepted'
+                                                  ? 'default'
+                                                  : request.status === 'rejected'
+                                                    ? 'secondary'
+                                                    : 'outline'
+                                              }
+                                            >
+                                              {request.status}
+                                            </Badge>
+                                          </div>
+
+                                          {canReview ? (
+                                            <div className="flex gap-2">
+                                              <Button
+                                                size="sm"
+                                                className="h-7 text-[11px]"
+                                                onClick={() => handleGuestRequestDecision(request.id, 'accepted')}
+                                                disabled={requestActionLoadingId === request.id}
+                                              >
+                                                {requestActionLoadingId === request.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                                Accept
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 text-[11px]"
+                                                onClick={() => handleGuestRequestDecision(request.id, 'rejected')}
+                                                disabled={requestActionLoadingId === request.id}
+                                              >
+                                                Reject
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <p className="text-[10px] text-muted-foreground">
+                                              Reviewed {request.decided_at ? format(new Date(request.decided_at), 'MMM d, yyyy p') : ''}
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
