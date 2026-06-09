@@ -114,7 +114,7 @@ export default function Dashboard() {
         const [participantsData, guestRequestsData] = await Promise.all([
           supabase
             .from('match_participants')
-            .select('id, post_id, user_id, status, joined_at, profiles(full_name, email, phone)')
+            .select('id, post_id, user_id, status, joined_at, participant_profile:profiles!match_participants_user_id_fkey(full_name, email, phone)')
             .in('post_id', postIds)
             .order('joined_at', { ascending: true }),
           supabase
@@ -507,8 +507,8 @@ export default function Dashboard() {
                                     {(participantsByPost[matchPost.id] || []).map((participant) => (
                                       <div key={participant.id} className="flex items-center justify-between text-[11px] border rounded px-2 py-1">
                                         <div>
-                                          <p className="font-medium">{participant.profiles?.full_name || 'Player'}</p>
-                                          <p className="text-muted-foreground">{participant.profiles?.phone || participant.profiles?.email || 'No contact'}</p>
+                                          <p className="font-medium">{participant.participant_profile?.full_name || 'Player'}</p>
+                                          <p className="text-muted-foreground">{participant.participant_profile?.phone || participant.participant_profile?.email || 'No contact'}</p>
                                         </div>
                                         <Badge variant={participant.status === 'joined' ? 'default' : 'secondary'}>
                                           {participant.status}
