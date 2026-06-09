@@ -29,12 +29,51 @@ export default function Dashboard() {
   const [openingMatchBookingId, setOpeningMatchBookingId] = useState<string | null>(null);
   const [neededPlayersByBooking, setNeededPlayersByBooking] = useState<Record<string, string>>({});
   const [matchPostsByBooking, setMatchPostsByBooking] = useState<Record<string, any>>({});
+  const [participantsByPost, setParticipantsByPost] = useState<Record<string, any[]>>({});
+  const [guestRequestsByPost, setGuestRequestsByPost] = useState<Record<string, any[]>>({});
+  const [requestActionLoadingId, setRequestActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`dashboard-match-host:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'match_posts',
+          filter: `host_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'match_guest_contacts',
+          filter: `host_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   async function fetchDashboardData() {
     try {
@@ -68,6 +107,54 @@ export default function Dashboard() {
           return acc;
         }, {} as Record<string, any>)
       );
+
+      if (posts.length > 0) {
+        const postIds = posts.map((post) => post.id);
+
+        const [participantsData, guestRequestsData] = await Promise.all([
+          supabase
+            .from('match_participants')
+            .select('id, post_id, user_id, status, joined_at, participant_profile:profiles!match_participants_user_id_fkey(full_name, email, phone)')
+            .in('post_id', postIds)
+            .order('joined_at', { ascending: true }),
+          supabase
+            .from('match_guest_contacts')
+            .select(`
+              id,
+              post_id,
+              guest_name,
+              guest_phone,
+              guest_note,
+              created_at,
+              status,
+              decided_at,
+              contact_user_id,
+              contact_profile:profiles!match_guest_contacts_contact_user_id_fkey(full_name, email, phone)
+            `)
+            .in('post_id', postIds)
+            .order('created_at', { ascending: false }),
+        ]);
+
+        if (participantsData.error) throw participantsData.error;
+        if (guestRequestsData.error) throw guestRequestsData.error;
+
+        setParticipantsByPost(
+          (participantsData.data || []).reduce((acc: Record<string, any[]>, participant: any) => {
+            acc[participant.post_id] = [...(acc[participant.post_id] || []), participant];
+            return acc;
+          }, {})
+        );
+
+        setGuestRequestsByPost(
+          (guestRequestsData.data || []).reduce((acc: Record<string, any[]>, request: any) => {
+            acc[request.post_id] = [...(acc[request.post_id] || []), request];
+            return acc;
+          }, {})
+        );
+      } else {
+        setParticipantsByPost({});
+        setGuestRequestsByPost({});
+      }
     } catch (error: any) {
       toast({
         title: 'Error loading dashboard',
@@ -76,6 +163,36 @@ export default function Dashboard() {
       });
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGuestRequestDecision(contactId: string, nextStatus: 'accepted' | 'rejected') {
+    if (!user?.id) return;
+
+    try {
+      setRequestActionLoadingId(contactId);
+      const { error } = await supabase.rpc('update_guest_match_contact_status', {
+        _contact_id: contactId,
+        _status: nextStatus,
+        _actor_user_id: user.id,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: nextStatus === 'accepted' ? 'Request accepted' : 'Request rejected',
+        description: 'Guest request status has been updated.',
+      });
+
+      fetchDashboardData();
+    } catch (error: any) {
+      toast({
+        title: 'Could not update request',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRequestActionLoadingId(null);
     }
   }
 
@@ -359,19 +476,117 @@ export default function Dashboard() {
                           )}
 
                           {matchPost && (
-                            <div className="flex items-center justify-between">
-                              <p className="text-[11px] text-muted-foreground">
-                                Players can join from Match Finder instantly.
-                              </p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 text-xs"
-                                onClick={() => navigate('/matches')}
-                              >
-                                <Users className="h-3 w-3 mr-1" />
-                                View Feed
-                              </Button>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-[11px] text-muted-foreground">
+                                  Players can join from Match Finder instantly.
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-xs"
+                                  onClick={() => navigate('/matches')}
+                                >
+                                  <Users className="h-3 w-3 mr-1" />
+                                  View Feed
+                                </Button>
+                              </div>
+
+                              <div className="rounded-md border p-2 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-medium">Joined Players</p>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {(participantsByPost[matchPost.id] || []).filter((p) => p.status === 'joined').length} active
+                                  </Badge>
+                                </div>
+
+                                {(participantsByPost[matchPost.id] || []).length === 0 ? (
+                                  <p className="text-[11px] text-muted-foreground">No joined players yet.</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {(participantsByPost[matchPost.id] || []).map((participant) => (
+                                      <div key={participant.id} className="flex items-center justify-between text-[11px] border rounded px-2 py-1">
+                                        <div>
+                                          <p className="font-medium">{participant.participant_profile?.full_name || 'Player'}</p>
+                                          <p className="text-muted-foreground">{participant.participant_profile?.phone || participant.participant_profile?.email || 'No contact'}</p>
+                                        </div>
+                                        <Badge variant={participant.status === 'joined' ? 'default' : 'secondary'}>
+                                          {participant.status}
+                                        </Badge>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="rounded-md border p-2 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs font-medium">Guest Join Requests</p>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {(guestRequestsByPost[matchPost.id] || []).length} total
+                                  </Badge>
+                                </div>
+
+                                {(guestRequestsByPost[matchPost.id] || []).length === 0 ? (
+                                  <p className="text-[11px] text-muted-foreground">No guest requests yet.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {(guestRequestsByPost[matchPost.id] || []).map((request) => {
+                                      const canReview = request.status === 'pending';
+
+                                      return (
+                                        <div key={request.id} className="border rounded p-2 space-y-2">
+                                          <div className="flex items-start justify-between gap-2">
+                                            <div className="text-[11px]">
+                                              <p className="font-medium">{request.guest_name || request.contact_profile?.full_name || 'Guest Player'}</p>
+                                              <p className="text-muted-foreground">{request.guest_phone}</p>
+                                              {request.guest_note ? <p className="text-muted-foreground">{request.guest_note}</p> : null}
+                                            </div>
+                                            <Badge
+                                              variant={
+                                                request.status === 'accepted'
+                                                  ? 'default'
+                                                  : request.status === 'rejected'
+                                                    ? 'secondary'
+                                                    : 'outline'
+                                              }
+                                            >
+                                              {request.status}
+                                            </Badge>
+                                          </div>
+
+                                          {canReview ? (
+                                            <div className="flex gap-2">
+                                              <Button
+                                                size="sm"
+                                                className="h-7 text-[11px]"
+                                                onClick={() => handleGuestRequestDecision(request.id, 'accepted')}
+                                                disabled={requestActionLoadingId === request.id}
+                                              >
+                                                {requestActionLoadingId === request.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                                Accept
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 text-[11px]"
+                                                onClick={() => handleGuestRequestDecision(request.id, 'rejected')}
+                                                disabled={requestActionLoadingId === request.id}
+                                              >
+                                                Reject
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <p className="text-[10px] text-muted-foreground">
+                                              Reviewed {request.decided_at ? format(new Date(request.decided_at), 'MMM d, yyyy p') : ''}
+                                            </p>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
