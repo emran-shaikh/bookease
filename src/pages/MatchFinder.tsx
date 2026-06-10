@@ -19,6 +19,9 @@ export default function MatchFinder() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [joinedPostIds, setJoinedPostIds] = useState<Set<string>>(new Set());
+  const [guestRequestsByPost, setGuestRequestsByPost] = useState<Record<string, any[]>>({});
+  const [requestActionLoadingId, setRequestActionLoadingId] = useState<string | null>(null);
+  const [expandedHostCardId, setExpandedHostCardId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [sportFilter, setSportFilter] = useState('all');
@@ -27,6 +30,42 @@ export default function MatchFinder() {
 
   useEffect(() => {
     fetchMatchData();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`match-finder-host:${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'match_guest_contacts',
+          filter: `host_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchMatchData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'match_posts',
+          filter: `host_user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchMatchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user?.id]);
 
   async function fetchMatchData() {
@@ -63,8 +102,46 @@ export default function MatchFinder() {
       if (postsResponse.error) throw postsResponse.error;
       if (participantsResponse?.error) throw participantsResponse.error;
 
-      setPosts(postsResponse.data || []);
+      const nextPosts = postsResponse.data || [];
+      setPosts(nextPosts);
       setJoinedPostIds(new Set((participantsResponse?.data || []).map((row: any) => row.post_id)));
+
+      if (user?.id) {
+        const hostedPostIds = nextPosts
+          .filter((post: any) => post.host_user_id === user.id)
+          .map((post: any) => post.id);
+
+        if (hostedPostIds.length > 0) {
+          const { data: guestRequests, error: guestRequestsError } = await supabase
+            .from('match_guest_contacts')
+            .select(`
+              id,
+              post_id,
+              guest_name,
+              guest_phone,
+              guest_note,
+              created_at,
+              status,
+              decided_at,
+              contact_profile:profiles!match_guest_contacts_contact_user_id_fkey(full_name, email, phone)
+            `)
+            .in('post_id', hostedPostIds)
+            .order('created_at', { ascending: false });
+
+          if (guestRequestsError) throw guestRequestsError;
+
+          setGuestRequestsByPost(
+            (guestRequests || []).reduce((acc: Record<string, any[]>, request: any) => {
+              acc[request.post_id] = [...(acc[request.post_id] || []), request];
+              return acc;
+            }, {})
+          );
+        } else {
+          setGuestRequestsByPost({});
+        }
+      } else {
+        setGuestRequestsByPost({});
+      }
     } catch (error: any) {
       toast({
         title: 'Unable to load match finder',
@@ -104,6 +181,36 @@ export default function MatchFinder() {
       });
     } finally {
       setActionLoadingId(null);
+    }
+  }
+
+  async function handleGuestRequestDecision(contactId: string, nextStatus: 'accepted' | 'rejected') {
+    if (!user?.id) return;
+
+    try {
+      setRequestActionLoadingId(contactId);
+      const { error } = await supabase.rpc('update_guest_match_contact_status', {
+        _contact_id: contactId,
+        _status: nextStatus,
+        _actor_user_id: user.id,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: nextStatus === 'accepted' ? 'Request accepted' : 'Request rejected',
+        description: 'Join request status updated successfully.',
+      });
+
+      fetchMatchData();
+    } catch (error: any) {
+      toast({
+        title: 'Could not update request',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setRequestActionLoadingId(null);
     }
   }
 
@@ -283,6 +390,11 @@ export default function MatchFinder() {
               const joined = joinedPostIds.has(post.id);
               const isHost = user?.id === post.host_user_id;
               const locationLabel = post.courts?.location || post.city || post.courts?.city || 'N/A';
+              const hostRequests = guestRequestsByPost[post.id] || [];
+              const pendingRequests = hostRequests.filter((request) => request.status === 'pending');
+              const hasReviewedRequests = hostRequests.some((request) => request.status !== 'pending');
+              const isExpanded = expandedHostCardId === post.id;
+              const visibleRequests = isExpanded ? hostRequests : pendingRequests.slice(0, 2);
 
               return (
                 <Card key={post.id}>
@@ -309,9 +421,89 @@ export default function MatchFinder() {
                     {post.notes && <p className="text-xs text-muted-foreground">{post.notes}</p>}
 
                     {isHost ? (
-                      <Button variant="outline" className="w-full" disabled>
-                        You are the host
-                      </Button>
+                      <div className="space-y-2 rounded-md border p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium">Join Requests</p>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-[10px]">{pendingRequests.length} pending</Badge>
+                            <Badge variant="secondary" className="text-[10px]">{hostRequests.length} total</Badge>
+                          </div>
+                        </div>
+
+                        {visibleRequests.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No guest requests yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {visibleRequests.map((request) => {
+                              const canReview = request.status === 'pending';
+
+                              return (
+                                <div key={request.id} className="rounded-md border p-2 space-y-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="text-xs min-w-0">
+                                      <p className="font-medium truncate">{request.guest_name || request.contact_profile?.full_name || 'Guest Player'}</p>
+                                      <p className="text-muted-foreground truncate">{request.guest_phone}</p>
+                                      {request.guest_note ? <p className="text-muted-foreground line-clamp-2">{request.guest_note}</p> : null}
+                                    </div>
+                                    <Badge
+                                      variant={
+                                        request.status === 'accepted'
+                                          ? 'default'
+                                          : request.status === 'rejected'
+                                            ? 'secondary'
+                                            : 'outline'
+                                      }
+                                      className="text-[10px]"
+                                    >
+                                      {request.status}
+                                    </Badge>
+                                  </div>
+
+                                  {canReview ? (
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Button
+                                        size="sm"
+                                        className="h-7 text-[11px]"
+                                        onClick={() => handleGuestRequestDecision(request.id, 'accepted')}
+                                        disabled={requestActionLoadingId === request.id}
+                                      >
+                                        {requestActionLoadingId === request.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                                        Accept
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 text-[11px]"
+                                        onClick={() => handleGuestRequestDecision(request.id, 'rejected')}
+                                        disabled={requestActionLoadingId === request.id}
+                                      >
+                                        Reject
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <p className="text-[10px] text-muted-foreground">
+                                      Reviewed {request.decided_at ? format(new Date(request.decided_at), 'MMM d, p') : ''}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {(pendingRequests.length > 2 || hasReviewedRequests) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full h-7 text-[11px]"
+                            onClick={() => setExpandedHostCardId(isExpanded ? null : post.id)}
+                          >
+                            {isExpanded
+                              ? 'Show pending only'
+                              : `Show all requests (${hostRequests.length})`}
+                          </Button>
+                        )}
+                      </div>
                     ) : joined ? (
                       <Button
                         variant="outline"
