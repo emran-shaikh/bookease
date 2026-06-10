@@ -443,7 +443,7 @@ export default function MatchFinder() {
                                     <div className="text-xs min-w-0">
                                       <p className="font-medium truncate">{request.guest_name || request.contact_profile?.full_name || 'Guest Player'}</p>
                                       <p className="text-muted-foreground truncate">{request.guest_phone}</p>
-                                      {request.guest_note ? <p className="text-muted-foreground line-clamp-2">{request.guest_note}</p> : null}
+                                      {request.guest_note ? <p className="text-muted-foreground break-words">{request.guest_note}</p> : null}
                                     </div>
                                     <Badge
                                       variant={
