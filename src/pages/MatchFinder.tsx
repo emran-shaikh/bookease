@@ -19,6 +19,7 @@ export default function MatchFinder() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [joinedPostIds, setJoinedPostIds] = useState<Set<string>>(new Set());
+  const [participantsByPost, setParticipantsByPost] = useState<Record<string, any[]>>({});
   const [guestRequestsByPost, setGuestRequestsByPost] = useState<Record<string, any[]>>({});
   const [requestActionLoadingId, setRequestActionLoadingId] = useState<string | null>(null);
   const [expandedHostCardId, setExpandedHostCardId] = useState<string | null>(null);
@@ -112,23 +113,38 @@ export default function MatchFinder() {
           .map((post: any) => post.id);
 
         if (hostedPostIds.length > 0) {
-          const { data: guestRequests, error: guestRequestsError } = await supabase
-            .from('match_guest_contacts')
-            .select(`
-              id,
-              post_id,
-              guest_name,
-              guest_phone,
-              guest_note,
-              created_at,
-              status,
-              decided_at,
-              contact_profile:profiles!match_guest_contacts_contact_user_id_fkey(full_name, email, phone)
-            `)
-            .in('post_id', hostedPostIds)
-            .order('created_at', { ascending: false });
+          const [{ data: participants, error: participantsError }, { data: guestRequests, error: guestRequestsError }] = await Promise.all([
+            supabase
+              .from('match_participants')
+              .select('id, post_id, status, joined_at, participant_profile:profiles!match_participants_user_id_fkey(full_name, email, phone)')
+              .in('post_id', hostedPostIds)
+              .order('joined_at', { ascending: true }),
+            supabase
+              .from('match_guest_contacts')
+              .select(`
+                id,
+                post_id,
+                guest_name,
+                guest_phone,
+                guest_note,
+                created_at,
+                status,
+                decided_at,
+                contact_profile:profiles!match_guest_contacts_contact_user_id_fkey(full_name, email, phone)
+              `)
+              .in('post_id', hostedPostIds)
+              .order('created_at', { ascending: false }),
+          ]);
 
+          if (participantsError) throw participantsError;
           if (guestRequestsError) throw guestRequestsError;
+
+          setParticipantsByPost(
+            (participants || []).reduce((acc: Record<string, any[]>, participant: any) => {
+              acc[participant.post_id] = [...(acc[participant.post_id] || []), participant];
+              return acc;
+            }, {})
+          );
 
           setGuestRequestsByPost(
             (guestRequests || []).reduce((acc: Record<string, any[]>, request: any) => {
@@ -137,9 +153,11 @@ export default function MatchFinder() {
             }, {})
           );
         } else {
+          setParticipantsByPost({});
           setGuestRequestsByPost({});
         }
       } else {
+        setParticipantsByPost({});
         setGuestRequestsByPost({});
       }
     } catch (error: any) {
@@ -390,6 +408,7 @@ export default function MatchFinder() {
               const joined = joinedPostIds.has(post.id);
               const isHost = user?.id === post.host_user_id;
               const locationLabel = post.courts?.location || post.city || post.courts?.city || 'N/A';
+              const joinedParticipants = (participantsByPost[post.id] || []).filter((participant) => participant.status === 'joined');
               const hostRequests = guestRequestsByPost[post.id] || [];
               const pendingRequests = hostRequests.filter((request) => request.status === 'pending');
               const hasReviewedRequests = hostRequests.some((request) => request.status !== 'pending');
@@ -423,7 +442,29 @@ export default function MatchFinder() {
                     {isHost ? (
                       <div className="space-y-2 rounded-md border p-3">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-medium">Join Requests</p>
+                          <p className="text-xs font-medium">Joined Players</p>
+                          <Badge variant="outline" className="text-[10px]">{joinedParticipants.length} active</Badge>
+                        </div>
+
+                        {joinedParticipants.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">No joined players yet.</p>
+                        ) : (
+                          <div className="space-y-1">
+                            {joinedParticipants.map((participant) => (
+                              <div key={participant.id} className="rounded-md border px-2 py-1.5">
+                                <p className="text-xs font-medium truncate">{participant.participant_profile?.full_name || 'Player'}</p>
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                  {participant.participant_profile?.phone || participant.participant_profile?.email || 'No contact'}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="h-px bg-border" />
+
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-medium">Guest Join Requests</p>
                           <div className="flex items-center gap-1">
                             <Badge variant="outline" className="text-[10px]">{pendingRequests.length} pending</Badge>
                             <Badge variant="secondary" className="text-[10px]">{hostRequests.length} total</Badge>
