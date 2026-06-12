@@ -92,7 +92,7 @@ export default function MatchFinder() {
         .order('match_date', { ascending: true })
         .order('start_time', { ascending: true });
 
-      const [postsResponse, participantsResponse] = await Promise.all([
+      const [postsResponse, participantsResponse, profileResponse] = await Promise.all([
         postsQuery,
         user?.id
           ? supabase
@@ -112,12 +112,11 @@ export default function MatchFinder() {
 
       if (postsResponse.error) throw postsResponse.error;
       if (participantsResponse?.error) throw participantsResponse.error;
-      if (user?.id && postsResponse?.error) throw postsResponse.error;
+      if (profileResponse?.error) throw profileResponse.error;
 
       const nextPosts = postsResponse.data || [];
       setPosts(nextPosts);
       setJoinedPostIds(new Set((participantsResponse?.data || []).map((row: any) => row.post_id)));
-      const profileResponse = arguments[0]?.[2];
       setCurrentUserPhone(profileResponse?.data?.phone?.trim() ? profileResponse.data.phone.trim() : null);
 
       if (user?.id) {
