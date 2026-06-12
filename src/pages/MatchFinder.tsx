@@ -585,7 +585,7 @@ export default function MatchFinder() {
                         )}
                         <Button
                           className="w-full"
-                          disabled={post.status !== 'open' || seatsLeft <= 0 || actionLoadingId === post.id || (Boolean(user?.id) && !currentUserPhone)}
+                          disabled={post.status !== 'open' || seatsLeft <= 0 || actionLoadingId === post.id}
                           onClick={() => handleJoin(post.id)}
                         >
                           {actionLoadingId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
