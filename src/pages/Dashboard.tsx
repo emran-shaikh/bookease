@@ -16,13 +16,13 @@ import { formatPrice } from '@/lib/currency';
 import { formatTimeSlot12h } from '@/lib/utils';
 import { PaymentScreenshotUpload } from '@/components/PaymentScreenshotUpload';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ProfileSettingsCard } from '@/components/ProfileSettingsCard';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [bookings, setBookings] = useState<any[]>([]);
-  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState<any[]>([]);
   const [expandedBooking, setExpandedBooking] = useState<string | null>(null);
@@ -77,8 +77,7 @@ export default function Dashboard() {
 
   async function fetchDashboardData() {
     try {
-      const [profileData, bookingsData, reviewsData, matchPostsData] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', user?.id).maybeSingle(),
+      const [bookingsData, reviewsData, matchPostsData] = await Promise.all([
         supabase.from('bookings').select(`
           *,
           courts (name, location, city, images)
@@ -90,14 +89,9 @@ export default function Dashboard() {
           .eq('host_user_id', user?.id),
       ]);
 
-      // Profile can be null for new users
-      if (profileData.error && profileData.error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', profileData.error);
-      }
       if (bookingsData.error) throw bookingsData.error;
       if (matchPostsData.error) throw matchPostsData.error;
 
-      setProfile(profileData.data);
       setBookings(bookingsData.data || []);
       setReviews(reviewsData.data || []);
       const posts = (matchPostsData.data || []) as any[];
@@ -678,26 +672,7 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="profile">
-            <Card>
-              <CardHeader className="p-3 sm:p-4 md:p-6">
-                <CardTitle className="text-base sm:text-lg">Profile Information</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">Manage your account details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-4 md:p-6 pt-0">
-                <div>
-                  <label className="text-xs sm:text-sm font-medium">Full Name</label>
-                  <p className="text-xs sm:text-sm text-muted-foreground">{profile?.full_name || 'Not set'}</p>
-                </div>
-                <div>
-                  <label className="text-xs sm:text-sm font-medium">Email</label>
-                  <p className="text-xs sm:text-sm text-muted-foreground break-all">{profile?.email}</p>
-                </div>
-                <div>
-                  <label className="text-xs sm:text-sm font-medium">Phone</label>
-                  <p className="text-xs sm:text-sm text-muted-foreground">{profile?.phone || 'Not set'}</p>
-                </div>
-              </CardContent>
-            </Card>
+            <ProfileSettingsCard />
           </TabsContent>
         </Tabs>
       </main>

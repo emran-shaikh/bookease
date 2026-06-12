@@ -20,6 +20,7 @@ import { CourtEditForm } from '@/components/CourtEditForm';
 import { VenueEditForm } from '@/components/VenueEditForm';
 import { formatTimeSlot12h } from '@/lib/utils';
 import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
+import { ProfileSettingsCard } from '@/components/ProfileSettingsCard';
 
 type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'amount-desc' | 'amount-asc' | 'status';
 
@@ -521,6 +522,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="match-contacts">Match Contacts</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
 
           <TabsContent value="venues">
@@ -1271,6 +1273,10 @@ export default function AdminDashboard() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="profile">
+            <ProfileSettingsCard />
           </TabsContent>
         </Tabs>
       </main>
