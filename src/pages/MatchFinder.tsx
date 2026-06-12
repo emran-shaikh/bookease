@@ -194,6 +194,16 @@ export default function MatchFinder() {
       return;
     }
 
+    if (!currentUserPhone) {
+      toast({
+        title: 'Phone number required',
+        description: 'Please update your phone number in your account before joining a match.',
+        variant: 'destructive',
+      });
+      navigate('/complete-profile?return=/matches');
+      return;
+    }
+
     try {
       setActionLoadingId(postId);
       const { error } = await supabase.rpc('join_match_post', {
@@ -560,23 +570,28 @@ export default function MatchFinder() {
                       </div>
                     ) : joined ? (
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         className="w-full"
-                        disabled={actionLoadingId === post.id}
-                        onClick={() => handleLeave(post.id)}
+                        disabled
                       >
-                        {actionLoadingId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Leave Match
+                        Already Joined
                       </Button>
                     ) : (
-                      <Button
-                        className="w-full"
-                        disabled={post.status !== 'open' || seatsLeft <= 0 || actionLoadingId === post.id}
-                        onClick={() => handleJoin(post.id)}
-                      >
-                        {actionLoadingId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Join Instantly
-                      </Button>
+                      <div className="space-y-2">
+                        {user?.id && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Contact: {currentUserPhone || 'Add phone number in account to join'}
+                          </p>
+                        )}
+                        <Button
+                          className="w-full"
+                          disabled={post.status !== 'open' || seatsLeft <= 0 || actionLoadingId === post.id || (Boolean(user?.id) && !currentUserPhone)}
+                          onClick={() => handleJoin(post.id)}
+                        >
+                          {actionLoadingId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          {user?.id && !currentUserPhone ? 'Add Phone to Join' : 'Join Instantly'}
+                        </Button>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
