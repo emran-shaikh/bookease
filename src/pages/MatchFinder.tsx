@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { Loader2, Users, MapPin, Calendar, Clock, Search } from 'lucide-react';
 
 export default function MatchFinder() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export default function MatchFinder() {
   const [guestRequestsByPost, setGuestRequestsByPost] = useState<Record<string, any[]>>({});
   const [requestActionLoadingId, setRequestActionLoadingId] = useState<string | null>(null);
   const [expandedHostCardId, setExpandedHostCardId] = useState<string | null>(null);
+  const [currentUserPhone, setCurrentUserPhone] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [sportFilter, setSportFilter] = useState('all');
@@ -89,7 +92,7 @@ export default function MatchFinder() {
         .order('match_date', { ascending: true })
         .order('start_time', { ascending: true });
 
-      const [postsResponse, participantsResponse] = await Promise.all([
+      const [postsResponse, participantsResponse, profileResponse] = await Promise.all([
         postsQuery,
         user?.id
           ? supabase
@@ -98,14 +101,23 @@ export default function MatchFinder() {
               .eq('user_id', user.id)
               .eq('status', 'joined')
           : Promise.resolve({ data: [], error: null } as any),
+        user?.id
+          ? supabase
+              .from('profiles')
+              .select('phone')
+              .eq('id', user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null } as any),
       ]);
 
       if (postsResponse.error) throw postsResponse.error;
       if (participantsResponse?.error) throw participantsResponse.error;
+      if (profileResponse?.error) throw profileResponse.error;
 
       const nextPosts = postsResponse.data || [];
       setPosts(nextPosts);
       setJoinedPostIds(new Set((participantsResponse?.data || []).map((row: any) => row.post_id)));
+      setCurrentUserPhone(profileResponse?.data?.phone?.trim() ? profileResponse.data.phone.trim() : null);
 
       if (user?.id) {
         const hostedPostIds = nextPosts
@@ -159,6 +171,7 @@ export default function MatchFinder() {
       } else {
         setParticipantsByPost({});
         setGuestRequestsByPost({});
+        setCurrentUserPhone(null);
       }
     } catch (error: any) {
       toast({
@@ -178,6 +191,16 @@ export default function MatchFinder() {
         description: 'Please sign in to join matches.',
         variant: 'destructive',
       });
+      return;
+    }
+
+    if (!currentUserPhone) {
+      toast({
+        title: 'Phone number required',
+        description: 'Please update your phone number in your account before joining a match.',
+        variant: 'destructive',
+      });
+      navigate('/complete-profile?return=/matches');
       return;
     }
 
@@ -547,23 +570,28 @@ export default function MatchFinder() {
                       </div>
                     ) : joined ? (
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         className="w-full"
-                        disabled={actionLoadingId === post.id}
-                        onClick={() => handleLeave(post.id)}
+                        disabled
                       >
-                        {actionLoadingId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Leave Match
+                        Already Joined
                       </Button>
                     ) : (
-                      <Button
-                        className="w-full"
-                        disabled={post.status !== 'open' || seatsLeft <= 0 || actionLoadingId === post.id}
-                        onClick={() => handleJoin(post.id)}
-                      >
-                        {actionLoadingId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        Join Instantly
-                      </Button>
+                      <div className="space-y-2">
+                        {user?.id && (
+                          <p className="text-[11px] text-muted-foreground">
+                            Contact: {currentUserPhone || 'Add phone number in account to join'}
+                          </p>
+                        )}
+                        <Button
+                          className="w-full"
+                          disabled={post.status !== 'open' || seatsLeft <= 0 || actionLoadingId === post.id}
+                          onClick={() => handleJoin(post.id)}
+                        >
+                          {actionLoadingId === post.id && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          {user?.id && !currentUserPhone ? 'Add Phone to Join' : 'Join Instantly'}
+                        </Button>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
