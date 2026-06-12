@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import { Loader2, Users, MapPin, Calendar, Clock, Search } from 'lucide-react';
 
 export default function MatchFinder() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export default function MatchFinder() {
   const [guestRequestsByPost, setGuestRequestsByPost] = useState<Record<string, any[]>>({});
   const [requestActionLoadingId, setRequestActionLoadingId] = useState<string | null>(null);
   const [expandedHostCardId, setExpandedHostCardId] = useState<string | null>(null);
+  const [currentUserPhone, setCurrentUserPhone] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState('all');
   const [sportFilter, setSportFilter] = useState('all');
@@ -98,14 +101,24 @@ export default function MatchFinder() {
               .eq('user_id', user.id)
               .eq('status', 'joined')
           : Promise.resolve({ data: [], error: null } as any),
+        user?.id
+          ? supabase
+              .from('profiles')
+              .select('phone')
+              .eq('id', user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null } as any),
       ]);
 
       if (postsResponse.error) throw postsResponse.error;
       if (participantsResponse?.error) throw participantsResponse.error;
+      if (user?.id && postsResponse?.error) throw postsResponse.error;
 
       const nextPosts = postsResponse.data || [];
       setPosts(nextPosts);
       setJoinedPostIds(new Set((participantsResponse?.data || []).map((row: any) => row.post_id)));
+      const profileResponse = arguments[0]?.[2];
+      setCurrentUserPhone(profileResponse?.data?.phone?.trim() ? profileResponse.data.phone.trim() : null);
 
       if (user?.id) {
         const hostedPostIds = nextPosts
@@ -159,6 +172,7 @@ export default function MatchFinder() {
       } else {
         setParticipantsByPost({});
         setGuestRequestsByPost({});
+        setCurrentUserPhone(null);
       }
     } catch (error: any) {
       toast({
