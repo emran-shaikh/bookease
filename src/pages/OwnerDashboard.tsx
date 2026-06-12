@@ -27,6 +27,7 @@ import { formatPrice } from '@/lib/currency';
 import { formatTimeSlot12h } from '@/lib/utils';
 import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
 import { formatCourtCount } from '@/lib/venue-utils';
+import { ProfileSettingsCard } from '@/components/ProfileSettingsCard';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -645,6 +646,7 @@ export default function OwnerDashboard() {
               <FileSpreadsheet className="h-3 w-3" />
               Sheets
             </TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
           </TabsList>
 
           {/* Venues Tab */}
@@ -1636,6 +1638,10 @@ export default function OwnerDashboard() {
           {/* Sheets Integration Tab */}
           <TabsContent value="sheets" className="space-y-4">
             <SheetIntegrationPanel />
+          </TabsContent>
+
+          <TabsContent value="profile" className="space-y-4">
+            <ProfileSettingsCard />
           </TabsContent>
         </Tabs>
       </main>
