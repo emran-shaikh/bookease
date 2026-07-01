@@ -86,9 +86,11 @@ export function ProfileSettingsCard() {
       }
     }
 
+    let savingToastId: string | number | undefined;
+
     try {
       setSaving(true);
-      const savingToastId = toast.loading('Saving profile changes...');
+      savingToastId = toast.loading('Saving profile changes...');
 
       if (email !== user.email) {
         const { error: emailError } = await supabase.auth.updateUser({ email });
