@@ -8,15 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Loader2, Users, MapPin, Calendar, Clock, Search } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function MatchFinder() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -174,10 +173,8 @@ export default function MatchFinder() {
         setCurrentUserPhone(null);
       }
     } catch (error: any) {
-      toast({
-        title: 'Unable to load match finder',
+      toast.error('Unable to load match finder', {
         description: error.message,
-        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -186,39 +183,40 @@ export default function MatchFinder() {
 
   async function handleJoin(postId: string) {
     if (!user?.id) {
-      toast({
-        title: 'Sign in required',
+      toast.error('Sign in required', {
         description: 'Please sign in to join matches.',
-        variant: 'destructive',
       });
       return;
     }
 
     if (!currentUserPhone) {
-      toast({
-        title: 'Phone number required',
+      toast.error('Phone number required', {
         description: 'Please update your phone number in your account before joining a match.',
-        variant: 'destructive',
       });
       navigate('/complete-profile?return=/matches');
       return;
     }
 
+    let joiningToastId: string | number | undefined;
+
     try {
       setActionLoadingId(postId);
+      joiningToastId = toast.loading('Joining match...');
       const { error } = await supabase.rpc('join_match_post', {
         _post_id: postId,
         _user_id: user.id,
       });
       if (error) throw error;
 
-      toast({ title: 'Joined match', description: 'Your slot is confirmed instantly.' });
+      toast.success('Joined match', {
+        description: 'Your slot is confirmed instantly.',
+        id: joiningToastId,
+      });
       fetchMatchData();
     } catch (error: any) {
-      toast({
-        title: 'Could not join',
+      toast.error('Could not join', {
         description: error.message,
-        variant: 'destructive',
+        id: joiningToastId,
       });
     } finally {
       setActionLoadingId(null);
@@ -228,8 +226,11 @@ export default function MatchFinder() {
   async function handleGuestRequestDecision(contactId: string, nextStatus: 'accepted' | 'rejected') {
     if (!user?.id) return;
 
+    let requestToastId: string | number | undefined;
+
     try {
       setRequestActionLoadingId(contactId);
+      requestToastId = toast.loading(nextStatus === 'accepted' ? 'Accepting request...' : 'Rejecting request...');
       const { error } = await supabase.rpc('update_guest_match_contact_status', {
         _contact_id: contactId,
         _status: nextStatus,
@@ -238,17 +239,16 @@ export default function MatchFinder() {
 
       if (error) throw error;
 
-      toast({
-        title: nextStatus === 'accepted' ? 'Request accepted' : 'Request rejected',
+      toast.success(nextStatus === 'accepted' ? 'Request accepted' : 'Request rejected', {
         description: 'Join request status updated successfully.',
+        id: requestToastId,
       });
 
       fetchMatchData();
     } catch (error: any) {
-      toast({
-        title: 'Could not update request',
+      toast.error('Could not update request', {
         description: error.message,
-        variant: 'destructive',
+        id: requestToastId,
       });
     } finally {
       setRequestActionLoadingId(null);
@@ -258,21 +258,26 @@ export default function MatchFinder() {
   async function handleLeave(postId: string) {
     if (!user?.id) return;
 
+    let leaveToastId: string | number | undefined;
+
     try {
       setActionLoadingId(postId);
+      leaveToastId = toast.loading('Leaving match...');
       const { error } = await supabase.rpc('leave_match_post', {
         _post_id: postId,
         _user_id: user.id,
       });
       if (error) throw error;
 
-      toast({ title: 'Left match', description: 'You have left this match request.' });
+      toast.success('Left match', {
+        description: 'You have left this match request.',
+        id: leaveToastId,
+      });
       fetchMatchData();
     } catch (error: any) {
-      toast({
-        title: 'Could not leave',
+      toast.error('Could not leave', {
         description: error.message,
-        variant: 'destructive',
+        id: leaveToastId,
       });
     } finally {
       setActionLoadingId(null);
