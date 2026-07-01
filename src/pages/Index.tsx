@@ -479,7 +479,7 @@ export default function Index() {
             <span className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">BookedHours</span>
           </div>
           <Button size="default" asChild className="shadow-lg hover:shadow-xl transition-all duration-300 text-sm sm:text-base">
-            <a href="/auth">Get Started</a>
+            <a href={user ? '/dashboard' : '/auth'}>{user ? (user.user_metadata?.full_name || user.email?.split('@')[0] || 'Account') : 'Get Started'}</a>
           </Button>
         </header>
 
