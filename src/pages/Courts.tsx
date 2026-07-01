@@ -103,7 +103,7 @@ export default function Courts() {
         .select(`
           *,
           reviews (rating),
-          venues (images)
+          venues (images, city, location)
         `)
         .eq('status', 'approved')
         .eq('is_active', true);
@@ -111,6 +111,8 @@ export default function Courts() {
       if (error) throw error;
 
       const courtsWithRatings = data.map((court: any) => {
+        const resolvedCity = court.city || court.venues?.city || '';
+        const resolvedLocation = court.location || court.venues?.location || '';
         const courtImages = [
           ...(court.court_specific_images || []),
           ...(court.images || []),
@@ -134,6 +136,8 @@ export default function Courts() {
         
         return {
           ...court,
+          city: resolvedCity,
+          location: resolvedLocation,
           images: courtImages.length > 0 ? courtImages : venueImages,
           rating: avgRating,
           reviews_count: ratings.length,
@@ -327,7 +331,9 @@ export default function Courts() {
                   <Badge variant="secondary" className="text-xs">{court.sport_type}</Badge>
                   <div className="flex items-center text-xs sm:text-sm text-muted-foreground flex-wrap">
                     <MapPin className="mr-1 h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                    <span className="truncate">{court.city}, {court.location}</span>
+                    <span className="truncate">
+                      {[court.city, court.location].filter(Boolean).join(', ') || 'Location not set'}
+                    </span>
                     {court.distance && (
                       <span className="ml-2 text-primary">• {court.distance.toFixed(1)}km</span>
                     )}
