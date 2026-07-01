@@ -6,11 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export function ProfileSettingsCard() {
   const { user } = useAuth();
-  const { toast } = useToast();
 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,10 +36,8 @@ export function ProfileSettingsCard() {
         .maybeSingle();
 
       if (error) {
-        toast({
-          title: 'Could not load profile',
+        toast.error('Could not load profile', {
           description: error.message,
-          variant: 'destructive',
         });
       }
 
@@ -67,29 +64,23 @@ export function ProfileSettingsCard() {
     const confirmPassword = formData.confirm_password.trim();
 
     if (!fullName || !email) {
-      toast({
-        title: 'Missing information',
+      toast.error('Missing information', {
         description: 'Name and email are required.',
-        variant: 'destructive',
       });
       return;
     }
 
     if (newPassword) {
       if (newPassword.length < 6) {
-        toast({
-          title: 'Invalid password',
+        toast.error('Invalid password', {
           description: 'Password must be at least 6 characters.',
-          variant: 'destructive',
         });
         return;
       }
 
       if (newPassword !== confirmPassword) {
-        toast({
-          title: 'Password mismatch',
+        toast.error('Password mismatch', {
           description: 'New password and confirm password must match.',
-          variant: 'destructive',
         });
         return;
       }
@@ -97,6 +88,7 @@ export function ProfileSettingsCard() {
 
     try {
       setSaving(true);
+      const savingToastId = toast.loading('Saving profile changes...');
 
       if (email !== user.email) {
         const { error: emailError } = await supabase.auth.updateUser({ email });
@@ -125,17 +117,16 @@ export function ProfileSettingsCard() {
         confirm_password: '',
       }));
 
-      toast({
-        title: 'Profile updated',
+      toast.success('Profile updated', {
         description: email !== user.email
           ? 'Your profile is updated. Check your inbox to confirm the new email if required.'
           : 'Your account information has been saved.',
+        id: savingToastId,
       });
     } catch (error: any) {
-      toast({
-        title: 'Update failed',
+      toast.error('Update failed', {
         description: error.message,
-        variant: 'destructive',
+        id: savingToastId,
       });
     } finally {
       setSaving(false);
