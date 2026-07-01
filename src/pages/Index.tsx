@@ -12,7 +12,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Calendar, MapPin, Clock, Shield, Search, Star, TrendingUp, Building2, LayoutGrid, Map, Users, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { formatPrice } from '@/lib/currency';
 import { formatCourtCount, getUniqueSportTypes, getLowestPrice } from '@/lib/venue-utils';
 import { formatSportWithIcon } from '@/lib/sport-icons';
@@ -90,7 +90,6 @@ const sportImages: { [key: string]: string } = {
 export default function Index() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   
   const [venues, setVenues] = useState<Venue[]>([]);
   const [standaloneCourts, setStandaloneCourts] = useState<Court[]>([]);
@@ -241,10 +240,8 @@ export default function Index() {
       await fetchPopularItems(processedVenues, processedStandalone);
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast({
-        title: "Error",
+      toast.error('Error', {
         description: "Failed to load venues and courts",
-        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -415,16 +412,17 @@ export default function Index() {
     const digitCount = normalizedPhone.replace(/\+/g, '').length;
 
     if (digitCount < 10 || digitCount > 15) {
-      toast({
-        title: 'Invalid contact number',
+      toast.error('Invalid contact number', {
         description: 'Enter a valid phone number to join this match.',
-        variant: 'destructive',
       });
       return;
     }
 
+    let shareToastId: string | number | undefined;
+
     try {
       setContactLoadingPostId(postId);
+      shareToastId = toast.loading('Sharing your contact...');
       const { error } = await supabase.rpc('request_guest_match_contact', {
         _post_id: postId,
         _guest_name: entry.name.trim() || (user?.email?.split('@')[0] ?? 'Guest'),
@@ -434,9 +432,9 @@ export default function Index() {
 
       if (error) throw error;
 
-      toast({
-        title: 'Contact shared',
+      toast.success('Contact shared', {
         description: 'Your number was shared with the host. They can contact you directly.',
+        id: shareToastId,
       });
 
       setGuestContactByPost((prev) => ({
@@ -444,10 +442,9 @@ export default function Index() {
         [postId]: { name: '', phone: '' },
       }));
     } catch (error: any) {
-      toast({
-        title: 'Could not share contact',
+      toast.error('Could not share contact', {
         description: error.message,
-        variant: 'destructive',
+        id: shareToastId,
       });
     } finally {
       setContactLoadingPostId(null);
