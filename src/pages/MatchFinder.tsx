@@ -85,7 +85,7 @@ export default function MatchFinder() {
         .select(`
           *,
           courts (name, location, city),
-          venues (name)
+          venues (name, location, city)
         `)
         .in('status', ['open', 'full'])
         .order('match_date', { ascending: true })
@@ -435,7 +435,9 @@ export default function MatchFinder() {
               const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
               const joined = joinedPostIds.has(post.id);
               const isHost = user?.id === post.host_user_id;
-              const locationLabel = post.courts?.location || post.city || post.courts?.city || 'N/A';
+              const resolvedCity = post.city || post.courts?.city || post.venues?.city || '';
+              const resolvedLocation = post.courts?.location || post.venues?.location || '';
+              const locationLabel = [resolvedCity, resolvedLocation].filter(Boolean).join(', ') || 'Location not set';
               const joinedParticipants = (participantsByPost[post.id] || []).filter((participant) => participant.status === 'joined');
               const hostRequests = guestRequestsByPost[post.id] || [];
               const pendingRequests = hostRequests.filter((request) => request.status === 'pending');
