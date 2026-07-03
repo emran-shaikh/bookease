@@ -620,19 +620,19 @@ export default function OwnerDashboard() {
         </div>
 
         <Tabs defaultValue="courts" className="space-y-4">
-          <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="venues" className="gap-1">
+          <TabsList className="h-auto gap-1">
+            <TabsTrigger value="venues" className="basis-[calc(50%-0.125rem)] gap-1 sm:basis-auto">
               <Home className="h-3 w-3" />
               Venues
             </TabsTrigger>
-            <TabsTrigger value="courts">My Courts</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings</TabsTrigger>
-            <TabsTrigger value="match-contacts">Match Contacts</TabsTrigger>
-            <TabsTrigger value="settings" className="gap-1">
+            <TabsTrigger value="courts" className="basis-[calc(50%-0.125rem)] sm:basis-auto">My Courts</TabsTrigger>
+            <TabsTrigger value="bookings" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Bookings</TabsTrigger>
+            <TabsTrigger value="match-contacts" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Match Contacts</TabsTrigger>
+            <TabsTrigger value="settings" className="basis-[calc(50%-0.125rem)] gap-1 sm:basis-auto">
               <CreditCard className="h-3 w-3" />
               Payment
             </TabsTrigger>
-            <TabsTrigger value="notifications">
+            <TabsTrigger value="notifications" className="basis-[calc(50%-0.125rem)] sm:basis-auto">
               Notifications
               {notifications.filter(n => !n.read).length > 0 && (
                 <Badge variant="destructive" className="ml-2 h-5 w-5 flex items-center justify-center p-0 text-xs">
@@ -640,13 +640,13 @@ export default function OwnerDashboard() {
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="blocked">Blocked Slots</TabsTrigger>
-            <TabsTrigger value="pricing">Pricing Rules</TabsTrigger>
-            <TabsTrigger value="sheets" className="gap-1">
+            <TabsTrigger value="blocked" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Blocked Slots</TabsTrigger>
+            <TabsTrigger value="pricing" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Pricing Rules</TabsTrigger>
+            <TabsTrigger value="sheets" className="basis-[calc(50%-0.125rem)] gap-1 sm:basis-auto">
               <FileSpreadsheet className="h-3 w-3" />
               Sheets
             </TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="profile" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Profile</TabsTrigger>
           </TabsList>
 
           {/* Venues Tab */}
@@ -1266,7 +1266,7 @@ export default function OwnerDashboard() {
                       <Label>Date</Label>
                       <Input type="date" value={blockSlotData.date} onChange={(e) => setBlockSlotData({...blockSlotData, date: e.target.value})} required />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <Label>Start Time</Label>
                         <Select 
@@ -1474,7 +1474,7 @@ export default function OwnerDashboard() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <Label>Start Time</Label>
                         <Select 
