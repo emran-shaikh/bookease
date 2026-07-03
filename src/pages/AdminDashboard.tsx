@@ -513,16 +513,16 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="venues" className="space-y-4">
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="venues">Pending Venues</TabsTrigger>
-            <TabsTrigger value="courts">Pending Courts</TabsTrigger>
-            <TabsTrigger value="all-venues">All Venues</TabsTrigger>
-            <TabsTrigger value="all-courts">All Courts</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings</TabsTrigger>
-            <TabsTrigger value="match-contacts">Match Contacts</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsList className="gap-1">
+            <TabsTrigger value="venues" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Pending Venues</TabsTrigger>
+            <TabsTrigger value="courts" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Pending Courts</TabsTrigger>
+            <TabsTrigger value="all-venues" className="basis-[calc(50%-0.125rem)] sm:basis-auto">All Venues</TabsTrigger>
+            <TabsTrigger value="all-courts" className="basis-[calc(50%-0.125rem)] sm:basis-auto">All Courts</TabsTrigger>
+            <TabsTrigger value="bookings" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Bookings</TabsTrigger>
+            <TabsTrigger value="match-contacts" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Match Contacts</TabsTrigger>
+            <TabsTrigger value="users" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Users</TabsTrigger>
+            <TabsTrigger value="payments" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Payments</TabsTrigger>
+            <TabsTrigger value="profile" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Profile</TabsTrigger>
           </TabsList>
 
           <TabsContent value="venues">
@@ -656,14 +656,14 @@ export default function AdminDashboard() {
                   placeholder="Search by venue name, city..."
                 />
                 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm text-muted-foreground">
                     Showing {sortedVenues.length} of {allVenues.length} venues
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                     <Select value={venueSort} onValueChange={(v) => setVenueSort(v as SortOption)}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -791,14 +791,14 @@ export default function AdminDashboard() {
                   placeholder="Search by customer, court..."
                 />
                 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm text-muted-foreground">
                     Showing {sortedBookings.length} of {bookings.length} bookings
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                     <Select value={bookingSort} onValueChange={(v) => setBookingSort(v as SortOption)}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1033,14 +1033,14 @@ export default function AdminDashboard() {
                   placeholder="Search by court, owner, city..."
                 />
                 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm text-muted-foreground">
                     Showing {sortedCourts.length} of {allCourts.length} courts
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                     <Select value={courtSort} onValueChange={(v) => setCourtSort(v as SortOption)}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1154,14 +1154,14 @@ export default function AdminDashboard() {
                   placeholder="Search by name, email, phone..."
                 />
                 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm text-muted-foreground">
                     Showing {sortedUsers.length} of {users.length} users
                   </span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full items-center gap-2 sm:w-auto">
                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                     <Select value={userSort} onValueChange={(v) => setUserSort(v as SortOption)}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger className="w-full sm:w-[180px]">
                         <SelectValue placeholder="Sort by" />
                       </SelectTrigger>
                       <SelectContent>
