@@ -1424,33 +1424,44 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      throw new Error("Unauthorized");
-    }
+    const internalSecret = Deno.env.get("SYNC_SHEET_INTERNAL_SECRET");
+    const providedInternalSecret = req.headers.get("x-sync-internal-secret");
+    const isInternalCall = !!internalSecret && providedInternalSecret === internalSecret;
 
-    const supabaseAuth = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
-      global: { headers: { Authorization: authHeader } },
-    });
+    let user: { id: string } | null = null;
+    let isAdmin = false;
 
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseAuth.auth.getUser();
+    if (!isInternalCall) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        throw new Error("Unauthorized");
+      }
 
-    if (userError || !user) {
-      throw new Error("Unauthorized");
-    }
+      const supabaseAuth = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        global: { headers: { Authorization: authHeader } },
+      });
 
-    const { data: callerRoles } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
+      const {
+        data: { user: authUser },
+        error: userError,
+      } = await supabaseAuth.auth.getUser();
 
-    const isAdmin = (callerRoles || []).some((row: any) => row.role === "admin");
+      if (userError || !authUser) {
+        throw new Error("Unauthorized");
+      }
 
-    if (ownerId && ownerId !== user.id && !isAdmin) {
-      throw new Error("Forbidden: owner_id does not match authenticated user");
+      user = { id: authUser.id };
+
+      const { data: callerRoles } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      isAdmin = (callerRoles || []).some((row: any) => row.role === "admin");
+
+      if (ownerId && ownerId !== user.id && !isAdmin) {
+        throw new Error("Forbidden: owner_id does not match authenticated user");
+      }
     }
 
     if (integrationId) {
@@ -1464,7 +1475,7 @@ Deno.serve(async (req) => {
         throw new Error("Integration not found");
       }
 
-      if (integrationOwner.owner_id !== user.id && !isAdmin) {
+      if (!isInternalCall && user && integrationOwner.owner_id !== user.id && !isAdmin) {
         throw new Error("Forbidden: integration does not belong to authenticated user");
       }
     }
@@ -1493,9 +1504,9 @@ Deno.serve(async (req) => {
     if (action === "sync_recent") {
       const resolvedOwnerId = bookingId
         ? await resolveOwnerIdForBooking(supabaseAdmin, bookingId)
-        : ownerId || user.id;
+        : ownerId || user?.id;
 
-      if (resolvedOwnerId !== user.id && !isAdmin) {
+      if (!isInternalCall && user && resolvedOwnerId !== user.id && !isAdmin) {
         throw new Error("Forbidden: cannot sync another owner's data");
       }
 
@@ -1509,9 +1520,9 @@ Deno.serve(async (req) => {
 
     if (!integrationId) throw new Error("integration_id is required");
 
-    const integration = await getIntegration(supabaseAdmin, integrationId, ownerId || user.id);
+    const integration = await getIntegration(supabaseAdmin, integrationId, ownerId || user?.id);
 
-    if (integration.owner_id !== user.id && !isAdmin) {
+    if (!isInternalCall && user && integration.owner_id !== user.id && !isAdmin) {
       throw new Error("Forbidden: integration does not belong to authenticated user");
     }
 
