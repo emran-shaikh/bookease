@@ -156,7 +156,9 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    if (!bookingId || !/^[0-9a-fA-F-]{36}$/.test(String(bookingId))) {
+    const requiresBookingVerification = isManualBooking !== true;
+
+    if (requiresBookingVerification && (!bookingId || !/^[0-9a-fA-F-]{36}$/.test(String(bookingId)))) {
       return new Response(
         JSON.stringify({ success: false, error: "bookingId is required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -176,7 +178,7 @@ const handler = async (req: Request): Promise<Response> => {
       .eq("id", bookingId)
       .maybeSingle();
 
-    if (bookingError || !booking) {
+    if (requiresBookingVerification && (bookingError || !booking)) {
       return new Response(
         JSON.stringify({ success: false, error: "Booking not found" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
@@ -184,7 +186,9 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const bookingOwnerId = (booking as any)?.courts?.owner_id as string | undefined;
-    const canSend = isAdmin || booking.user_id === user.id || (bookingOwnerId && bookingOwnerId === user.id);
+    const canSend = requiresBookingVerification
+      ? (isAdmin || booking?.user_id === user.id || (bookingOwnerId && bookingOwnerId === user.id))
+      : isAdmin;
 
     if (!canSend) {
       return new Response(
@@ -193,36 +197,38 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const bookingDateIso = new Date(String(booking.booking_date)).toISOString().slice(0, 10);
-    const bookingStart = String(booking.start_time).slice(0, 5);
-    const bookingEnd = String(booking.end_time).slice(0, 5);
-    const bookingCourtName = toSafeString((booking as any)?.courts?.name || "", 255);
-    const bookingTotalPrice = Number.parseFloat(String(booking.total_price ?? 0));
+    if (requiresBookingVerification) {
+      const bookingDateIso = new Date(String(booking.booking_date)).toISOString().slice(0, 10);
+      const bookingStart = String(booking.start_time).slice(0, 5);
+      const bookingEnd = String(booking.end_time).slice(0, 5);
+      const bookingCourtName = toSafeString((booking as any)?.courts?.name || "", 255);
+      const bookingTotalPrice = Number.parseFloat(String(booking.total_price ?? 0));
 
-    if (
-      bookingDateIso !== normalizedDateFromPayload ||
-      bookingStart !== normalizedStartTime.slice(0, 5) ||
-      bookingEnd !== normalizedEndTime.slice(0, 5) ||
-      bookingCourtName.toLowerCase() !== normalizedCourtName.toLowerCase() ||
-      Math.abs(bookingTotalPrice - numericPrice) > 0.01
-    ) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Booking payload mismatch" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
+      if (
+        bookingDateIso !== normalizedDateFromPayload ||
+        bookingStart !== normalizedStartTime.slice(0, 5) ||
+        bookingEnd !== normalizedEndTime.slice(0, 5) ||
+        bookingCourtName.toLowerCase() !== normalizedCourtName.toLowerCase() ||
+        Math.abs(bookingTotalPrice - numericPrice) > 0.01
+      ) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Booking payload mismatch" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
 
-    const { data: bookingUserProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("email")
-      .eq("id", booking.user_id)
-      .maybeSingle();
+      const { data: bookingUserProfile } = await supabaseAdmin
+        .from("profiles")
+        .select("email")
+        .eq("id", booking.user_id)
+        .maybeSingle();
 
-    if (sanitizeEmail(bookingUserProfile?.email) !== normalizedUserEmail) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Recipient email does not match booking user" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      if (sanitizeEmail(bookingUserProfile?.email) !== normalizedUserEmail) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Recipient email does not match booking user" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
     }
 
     // Validate required fields
