@@ -484,6 +484,7 @@ async function writeSheetFeedback(
 }
 
 async function sendSheetBookingConfirmationEmail(payload: {
+  bookingId: string;
   customerEmail: string;
   customerName: string;
   courtName: string;
@@ -502,6 +503,7 @@ async function sendSheetBookingConfirmationEmail(payload: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
     },
     body: JSON.stringify({
+      bookingId: payload.bookingId,
       userEmail: payload.customerEmail,
       userName: payload.customerName || "Customer",
       courtName: payload.courtName,
@@ -1052,6 +1054,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           if (incomingStatus === "confirmed" && parsed.customer_email) {
             try {
               await sendSheetBookingConfirmationEmail({
+                bookingId: newBooking.id,
                 customerEmail: parsed.customer_email,
                 customerName: parsed.customer_name,
                 courtName: parsed.court_name,
@@ -1177,6 +1180,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         if (incomingStatus === "confirmed" && parsed.customer_email) {
           try {
             await sendSheetBookingConfirmationEmail({
+              bookingId: booking.id,
               customerEmail: parsed.customer_email,
               customerName: parsed.customer_name,
               courtName: parsed.court_name,
@@ -1420,6 +1424,62 @@ Deno.serve(async (req) => {
 
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    const internalSecret = Deno.env.get("SYNC_SHEET_INTERNAL_SECRET");
+    const providedInternalSecret = req.headers.get("x-sync-internal-secret");
+    const isInternalCall = !!internalSecret && providedInternalSecret === internalSecret;
+
+    let user: { id: string } | null = null;
+    let isAdmin = false;
+
+    if (!isInternalCall) {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        throw new Error("Unauthorized");
+      }
+
+      const supabaseAuth = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const {
+        data: { user: authUser },
+        error: userError,
+      } = await supabaseAuth.auth.getUser();
+
+      if (userError || !authUser) {
+        throw new Error("Unauthorized");
+      }
+
+      user = { id: authUser.id };
+
+      const { data: callerRoles } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      isAdmin = (callerRoles || []).some((row: any) => row.role === "admin");
+
+      if (ownerId && ownerId !== user.id && !isAdmin) {
+        throw new Error("Forbidden: owner_id does not match authenticated user");
+      }
+    }
+
+    if (integrationId) {
+      const { data: integrationOwner, error: integrationOwnerError } = await supabaseAdmin
+        .from("sheet_integrations")
+        .select("owner_id")
+        .eq("id", integrationId)
+        .maybeSingle();
+
+      if (integrationOwnerError || !integrationOwner) {
+        throw new Error("Integration not found");
+      }
+
+      if (!isInternalCall && user && integrationOwner.owner_id !== user.id && !isAdmin) {
+        throw new Error("Forbidden: integration does not belong to authenticated user");
+      }
+    }
+
     if (action === "get_capabilities") {
       const hasGoogle = !!Deno.env.get("GOOGLE_SERVICE_ACCOUNT_KEY");
       return new Response(JSON.stringify({
@@ -1444,7 +1504,29 @@ Deno.serve(async (req) => {
     if (action === "sync_recent") {
       const resolvedOwnerId = bookingId
         ? await resolveOwnerIdForBooking(supabaseAdmin, bookingId)
-        : ownerId;
+        : ownerId || user?.id;
+
+      if (!isInternalCall && user && !isAdmin) {
+        if (bookingId) {
+          const { data: bookingForAuth, error: bookingForAuthError } = await supabaseAdmin
+            .from("bookings")
+            .select("user_id, courts(owner_id)")
+            .eq("id", bookingId)
+            .maybeSingle();
+
+          if (bookingForAuthError || !bookingForAuth) {
+            throw new Error("Booking not found");
+          }
+
+          const bookingOwnerId = (bookingForAuth as any)?.courts?.owner_id as string | undefined;
+          const canTrigger = bookingForAuth.user_id === user.id || bookingOwnerId === user.id;
+          if (!canTrigger) {
+            throw new Error("Forbidden: cannot sync another owner's data");
+          }
+        } else if (resolvedOwnerId !== user.id) {
+          throw new Error("Forbidden: cannot sync another owner's data");
+        }
+      }
 
       if (!resolvedOwnerId) throw new Error("owner_id or booking_id is required for sync_recent");
       const result = await syncRecentForOwner(supabaseAdmin, resolvedOwnerId, bookingId);
@@ -1456,7 +1538,11 @@ Deno.serve(async (req) => {
 
     if (!integrationId) throw new Error("integration_id is required");
 
-    const integration = await getIntegration(supabaseAdmin, integrationId, ownerId);
+    const integration = await getIntegration(supabaseAdmin, integrationId, ownerId || user?.id);
+
+    if (!isInternalCall && user && integration.owner_id !== user.id && !isAdmin) {
+      throw new Error("Forbidden: integration does not belong to authenticated user");
+    }
 
     let result: Record<string, unknown>;
 
@@ -1487,7 +1573,7 @@ Deno.serve(async (req) => {
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ success: false, error: error.message || "Sync failed" }), {
-      status: 200,
+      status: error?.message === "Unauthorized" ? 401 : 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

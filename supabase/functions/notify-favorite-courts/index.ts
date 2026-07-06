@@ -12,6 +12,32 @@ serve(async (req) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseAuthClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAuthClient.auth.getUser();
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -23,6 +49,56 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: courtId, type, message' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (typeof courtId !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(courtId)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid courtId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const normalizedType = String(type).trim().toLowerCase();
+    if (!['success', 'error', 'info'].includes(normalizedType)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid notification type' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const normalizedMessage = String(message).trim().slice(0, 500);
+    if (!normalizedMessage) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid message' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify caller is court owner or admin
+    const { data: court, error: courtLookupError } = await supabaseClient
+      .from('courts')
+      .select('id, name, owner_id')
+      .eq('id', courtId)
+      .maybeSingle();
+
+    if (courtLookupError || !court) {
+      return new Response(
+        JSON.stringify({ error: 'Court not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: roles } = await supabaseClient
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id);
+
+    const isAdmin = (roles || []).some((r: any) => r.role === 'admin');
+    if (!isAdmin && court.owner_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -41,21 +117,12 @@ serve(async (req) => {
       );
     }
 
-    // Get court name
-    const { data: court, error: courtError } = await supabaseClient
-      .from('courts')
-      .select('name')
-      .eq('id', courtId)
-      .single();
-
-    if (courtError) throw courtError;
-
     // Create notifications for all users
     const notifications = favorites.map(fav => ({
       user_id: fav.user_id,
       title: `Update on ${court.name}`,
-      message: message,
-      type: type,
+      message: normalizedMessage,
+      type: normalizedType,
       related_court_id: courtId,
     }));
 

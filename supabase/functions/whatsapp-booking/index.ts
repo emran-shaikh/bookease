@@ -43,6 +43,12 @@ serve(async (req) => {
   }
 
   try {
+    const webhookSecret = Deno.env.get("WHATSAPP_BOOKING_WEBHOOK_SECRET");
+    const providedSecret = req.headers.get("x-whatsapp-webhook-secret");
+    if (!webhookSecret || providedSecret !== webhookSecret) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
     const { phone, message, media_url } = await req.json();
 
     const incomingPhone = typeof phone === "string" ? phone.trim() : "";
@@ -584,7 +590,7 @@ async function handleCreateBooking(
   }
 
   // Create profile for guest users
-  if (!userId && args.guest_name && args.guest_email) {
+    if (!userId && args.guest_name && args.guest_email) {
     // Check if email already exists
     const { data: existingProfile } = await supabase
       .from("profiles")
@@ -594,11 +600,6 @@ async function handleCreateBooking(
 
     if (existingProfile) {
       userId = existingProfile.id;
-      // Update phone if missing
-      await supabase
-        .from("profiles")
-        .update({ phone })
-        .eq("id", userId);
     } else {
       // Create auth user first, then profile is auto-created by trigger
       // For WhatsApp guests, we create a profile directly with service role

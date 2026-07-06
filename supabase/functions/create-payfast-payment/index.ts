@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
-import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +10,9 @@ const logStep = (step: string, details?: any) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[PAYFAST-PAYMENT] ${step}${detailsStr}`);
 };
+
+const isValidDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+const isValidTime = (value: string) => /^\d{2}:\d{2}$/.test(value);
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -39,12 +41,24 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Get request body
-    const { courtId, courtName, date, startTime, endTime, totalPrice, basketId } = await req.json();
-    logStep("Request data", { courtId, courtName, date, startTime, endTime, totalPrice, basketId });
+    const { courtId, courtName, date, startTime, endTime, basketId } = await req.json();
+    logStep("Request data", { courtId, courtName, date, startTime, endTime, basketId });
 
     // Validate required fields
-    if (!courtId || !date || !startTime || !endTime || !totalPrice) {
-      throw new Error("Missing required fields: courtId, date, startTime, endTime, totalPrice");
+    if (!courtId || !date || !startTime || !endTime) {
+      throw new Error("Missing required fields: courtId, date, startTime, endTime");
+    }
+
+    if (typeof courtId !== "string" || typeof date !== "string" || typeof startTime !== "string" || typeof endTime !== "string") {
+      throw new Error("Invalid request payload");
+    }
+
+    if (!isValidDate(date) || !isValidTime(startTime) || !isValidTime(endTime)) {
+      throw new Error("Invalid date/time format");
+    }
+
+    if (endTime <= startTime) {
+      throw new Error("endTime must be greater than startTime");
     }
 
     // Get PayFast credentials from environment
@@ -63,6 +77,21 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
+    // Calculate amount server-side to prevent client-side price tampering
+    const { data: priceData, error: priceError } = await supabaseClient.functions.invoke("calculate-price", {
+      body: { courtId, date, startTime, endTime },
+      headers: { Authorization: authHeader },
+    });
+
+    if (priceError) {
+      throw new Error(`Failed to calculate price: ${priceError.message}`);
+    }
+
+    const calculatedTotalPrice = Number.parseFloat(String(priceData?.totalPrice ?? ""));
+    if (!Number.isFinite(calculatedTotalPrice) || calculatedTotalPrice <= 0) {
+      throw new Error("Invalid calculated price");
+    }
+
     // Generate unique order ID
     const orderId = `COURT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
@@ -74,7 +103,7 @@ serve(async (req) => {
       MERCHANT_NAME: "CourtConnect",
       TOKEN: securedKey,
       PROCCODE: "00", // Purchase transaction
-      TXNAMT: Math.round(totalPrice * 100).toString(), // Amount in paisa
+      TXNAMT: Math.round(calculatedTotalPrice * 100).toString(), // Amount in paisa
       CUSTOMER_MOBILE_NO: profile?.phone || "",
       CUSTOMER_EMAIL_ADDRESS: user.email,
       SIGNATURE: "", // Will be generated
@@ -97,7 +126,7 @@ serve(async (req) => {
     
     paymentData.SIGNATURE = signature.toUpperCase();
 
-    logStep("Payment data prepared", { orderId, amount: totalPrice });
+    logStep("Payment data prepared", { orderId, amount: calculatedTotalPrice });
 
     // Return PayFast form data for redirect
     return new Response(JSON.stringify({

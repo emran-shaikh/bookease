@@ -1046,6 +1046,7 @@ export default function OwnerDashboard() {
 
                                 await supabase.functions.invoke('send-booking-confirmation', {
                                   body: {
+                                    bookingId: booking.id,
                                     userEmail: booking.profiles?.email,
                                     userName: booking.profiles?.full_name || 'Customer',
                                     courtName: booking.courts?.name,

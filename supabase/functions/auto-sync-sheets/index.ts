@@ -7,6 +7,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SYNC_SHEET_INTERNAL_SECRET = Deno.env.get("SYNC_SHEET_INTERNAL_SECRET") ?? "";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -17,6 +18,9 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const { data, error } = await supabaseAdmin.functions.invoke("sync-sheet", {
+      headers: {
+        "x-sync-internal-secret": SYNC_SHEET_INTERNAL_SECRET,
+      },
       body: {
         action: "auto_pull_all",
       },

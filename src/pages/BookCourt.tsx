@@ -259,7 +259,6 @@ export default function BookCourt() {
         await supabase.functions.invoke('sync-sheet', {
           body: {
             action: 'sync_recent',
-            owner_id: court.owner_id,
             booking_id: createdBooking?.id,
           },
         });
@@ -285,6 +284,7 @@ export default function BookCourt() {
 
         await supabase.functions.invoke('send-booking-confirmation', {
           body: {
+            bookingId: createdBooking?.id,
             userEmail: userProfile?.email || user?.email,
             userName: userProfile?.full_name || 'Customer',
             courtName: court.name,
