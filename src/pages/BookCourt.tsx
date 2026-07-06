@@ -285,6 +285,7 @@ export default function BookCourt() {
 
         await supabase.functions.invoke('send-booking-confirmation', {
           body: {
+            bookingId: createdBooking?.id,
             userEmail: userProfile?.email || user?.email,
             userName: userProfile?.full_name || 'Customer',
             courtName: court.name,
