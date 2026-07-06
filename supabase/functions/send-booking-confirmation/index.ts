@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -25,6 +26,25 @@ interface BookingConfirmationRequest {
   isManualBooking?: boolean;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_REGEX = /^\d{2}:\d{2}(:\d{2})?$/;
+
+const toSafeString = (value: unknown, maxLength = 255) => {
+  if (typeof value !== "string") return "";
+  return value.trim().slice(0, maxLength);
+};
+
+const sanitizeEmail = (value: unknown) => toSafeString(value, 320).toLowerCase();
+
+const parseDisplayDate = (value: string) => {
+  const trimmed = value.trim();
+  if (DATE_REGEX.test(trimmed)) return trimmed;
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+};
+
 const handler = async (req: Request): Promise<Response> => {
   console.log("=== send-booking-confirmation function invoked ===");
   
@@ -34,10 +54,42 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseClient.auth.getUser();
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const body = await req.json();
     console.log("Request body:", JSON.stringify(body, null, 2));
 
     const {
+      bookingId,
       userEmail,
       userName,
       courtName,
@@ -52,8 +104,129 @@ const handler = async (req: Request): Promise<Response> => {
       isManualBooking,
     }: BookingConfirmationRequest = body;
 
+    const normalizedUserEmail = sanitizeEmail(userEmail);
+    const normalizedOwnerEmail = sanitizeEmail(ownerEmail);
+    const normalizedCourtName = toSafeString(courtName, 255);
+    const normalizedUserName = toSafeString(userName, 120) || "Customer";
+    const normalizedOwnerName = toSafeString(ownerName, 120) || "Court Owner";
+    const normalizedStartTime = toSafeString(startTime, 8);
+    const normalizedEndTime = toSafeString(endTime, 8);
+    const normalizedDateFromPayload = parseDisplayDate(toSafeString(bookingDate, 40));
+    const numericPrice = Number.parseFloat(String(totalPrice ?? 0));
+
+    if (!normalizedUserEmail || !EMAIL_REGEX.test(normalizedUserEmail)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid userEmail" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!normalizedCourtName) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid courtName" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!normalizedDateFromPayload) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid bookingDate" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!TIME_REGEX.test(normalizedStartTime) || !TIME_REGEX.test(normalizedEndTime)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid booking time" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid totalPrice" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (normalizedOwnerEmail && !EMAIL_REGEX.test(normalizedOwnerEmail)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid ownerEmail" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    if (!bookingId || !/^[0-9a-fA-F-]{36}$/.test(String(bookingId))) {
+      return new Response(
+        JSON.stringify({ success: false, error: "bookingId is required" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const { data: actorRoles } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    const isAdmin = (actorRoles || []).some((row: any) => row.role === "admin");
+
+    const { data: booking, error: bookingError } = await supabaseAdmin
+      .from("bookings")
+      .select("id, user_id, court_id, booking_date, start_time, end_time, total_price, courts(id, name, owner_id)")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+    if (bookingError || !booking) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Booking not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const bookingOwnerId = (booking as any)?.courts?.owner_id as string | undefined;
+    const canSend = isAdmin || booking.user_id === user.id || (bookingOwnerId && bookingOwnerId === user.id);
+
+    if (!canSend) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Forbidden" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const bookingDateIso = new Date(String(booking.booking_date)).toISOString().slice(0, 10);
+    const bookingStart = String(booking.start_time).slice(0, 5);
+    const bookingEnd = String(booking.end_time).slice(0, 5);
+    const bookingCourtName = toSafeString((booking as any)?.courts?.name || "", 255);
+    const bookingTotalPrice = Number.parseFloat(String(booking.total_price ?? 0));
+
+    if (
+      bookingDateIso !== normalizedDateFromPayload ||
+      bookingStart !== normalizedStartTime.slice(0, 5) ||
+      bookingEnd !== normalizedEndTime.slice(0, 5) ||
+      bookingCourtName.toLowerCase() !== normalizedCourtName.toLowerCase() ||
+      Math.abs(bookingTotalPrice - numericPrice) > 0.01
+    ) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Booking payload mismatch" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const { data: bookingUserProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .eq("id", booking.user_id)
+      .maybeSingle();
+
+    if (sanitizeEmail(bookingUserProfile?.email) !== normalizedUserEmail) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Recipient email does not match booking user" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     // Validate required fields
-    if (!userEmail) {
+    if (!normalizedUserEmail) {
       console.error("Missing userEmail");
       return new Response(
         JSON.stringify({ success: false, error: "Missing userEmail" }),
@@ -61,8 +234,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log("Sending booking confirmation email to:", userEmail);
-    console.log("Court:", courtName, "Date:", bookingDate, "Time:", startTime, "-", endTime);
+    console.log("Sending booking confirmation email to:", normalizedUserEmail);
+    console.log("Court:", normalizedCourtName, "Date:", normalizedDateFromPayload, "Time:", normalizedStartTime, "-", normalizedEndTime);
 
     // Check if RESEND_API_KEY is set
     const apiKey = Deno.env.get("RESEND_API_KEY");
@@ -83,7 +256,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send email using Resend
     const emailResponse = await resend.emails.send({
       from: "BookedHours <support@bookedhours.com>",
-      to: [userEmail],
+        to: [normalizedUserEmail],
       subject: emailSubject,
       html: isManual ? `
         <!DOCTYPE html>
@@ -147,21 +320,21 @@ const handler = async (req: Request): Promise<Response> => {
               <p style="margin: 10px 0 0 0;">A court slot has been reserved for you</p>
             </div>
             <div class="content">
-              <p>Hi ${userName || 'Guest'},</p>
+              <p>Hi ${normalizedUserName || 'Guest'},</p>
               <p>A court slot has been reserved for you by the court owner. Here are the details:</p>
               
               <div class="booking-details">
                 <div class="detail-row">
                   <span class="detail-label">Court:</span>
-                  <span class="detail-value">${courtName || 'N/A'}</span>
+                   <span class="detail-value">${normalizedCourtName || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Date:</span>
-                  <span class="detail-value">${bookingDate || 'N/A'}</span>
+                   <span class="detail-value">${normalizedDateFromPayload || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Time:</span>
-                  <span class="detail-value">${startTime || 'N/A'} - ${endTime || 'N/A'}</span>
+                   <span class="detail-value">${normalizedStartTime || 'N/A'} - ${normalizedEndTime || 'N/A'}</span>
                 </div>
               </div>
 
@@ -245,25 +418,25 @@ const handler = async (req: Request): Promise<Response> => {
               <p style="margin: 10px 0 0 0;">Your court reservation is all set</p>
             </div>
             <div class="content">
-              <p>Hi ${userName || 'Customer'},</p>
+              <p>Hi ${normalizedUserName || 'Customer'},</p>
               <p>Great news! Your booking has been confirmed. Here are the details:</p>
               
               <div class="booking-details">
                 <div class="detail-row">
                   <span class="detail-label">Court:</span>
-                  <span class="detail-value">${courtName || 'N/A'}</span>
+                   <span class="detail-value">${normalizedCourtName || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Date:</span>
-                  <span class="detail-value">${bookingDate || 'N/A'}</span>
+                   <span class="detail-value">${normalizedDateFromPayload || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Time:</span>
-                  <span class="detail-value">${startTime || 'N/A'} - ${endTime || 'N/A'}</span>
+                   <span class="detail-value">${normalizedStartTime || 'N/A'} - ${normalizedEndTime || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
                   <span class="detail-label">Total Amount:</span>
-                  <span class="detail-value total">Rs. ${(totalPrice || 0).toLocaleString()}</span>
+                   <span class="detail-value total">Rs. ${numericPrice.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -304,12 +477,34 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send notification email to court owner for pending or confirmed payments
     let ownerEmailId = null;
-    if (ownerEmail && typeof isPendingPayment === "boolean") {
-      console.log("Sending notification to court owner:", ownerEmail);
+    if (normalizedOwnerEmail && typeof isPendingPayment === "boolean") {
+      console.log("Sending notification to court owner:", normalizedOwnerEmail);
+
+      if (bookingOwnerId && user.id !== bookingOwnerId && !isAdmin) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Only booking owner/admin can send owner notification" }),
+          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+
+      const { data: verifiedOwnerProfile } = bookingOwnerId
+        ? await supabaseAdmin
+            .from("profiles")
+            .select("email")
+            .eq("id", bookingOwnerId)
+            .maybeSingle()
+        : { data: null };
+
+      if (sanitizeEmail(verifiedOwnerProfile?.email) !== normalizedOwnerEmail) {
+        return new Response(
+          JSON.stringify({ success: false, error: "ownerEmail mismatch" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
       
       const ownerEmailResponse = await resend.emails.send({
         from: "BookedHours <support@bookedhours.com>",
-        to: [ownerEmail],
+        to: [normalizedOwnerEmail],
         subject: isPendingPayment ? "🔔 New Booking - Payment Pending" : "✅ Booking Payment Confirmed",
         html: `
           <!DOCTYPE html>
@@ -396,32 +591,32 @@ const handler = async (req: Request): Promise<Response> => {
                 <p style="margin: 10px 0 0 0;">${isPendingPayment ? "Payment pending confirmation" : "Booking is now confirmed"}</p>
               </div>
               <div class="content">
-                <p>Hi ${ownerName || 'Court Owner'},</p>
-                <p>${isPendingPayment
-                  ? `You have a new booking request for <strong>${courtName || 'your court'}</strong>. The customer has submitted their booking and payment is pending.`
-                  : `Payment has been confirmed for booking at <strong>${courtName || 'your court'}</strong>.`}
+                 <p>Hi ${normalizedOwnerName || 'Court Owner'},</p>
+                 <p>${isPendingPayment
+                   ? `You have a new booking request for <strong>${normalizedCourtName || 'your court'}</strong>. The customer has submitted their booking and payment is pending.`
+                   : `Payment has been confirmed for booking at <strong>${normalizedCourtName || 'your court'}</strong>.`}
                 </p>
                 
                 <div class="booking-details">
                   <div class="detail-row">
                     <span class="detail-label">Customer:</span>
-                    <span class="detail-value">${userName || 'N/A'}</span>
+                    <span class="detail-value">${normalizedUserName || 'N/A'}</span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Email:</span>
-                    <span class="detail-value">${userEmail || 'N/A'}</span>
+                    <span class="detail-value">${normalizedUserEmail || 'N/A'}</span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Date:</span>
-                    <span class="detail-value">${bookingDate || 'N/A'}</span>
+                    <span class="detail-value">${normalizedDateFromPayload || 'N/A'}</span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Time:</span>
-                    <span class="detail-value">${startTime || 'N/A'} - ${endTime || 'N/A'}</span>
+                    <span class="detail-value">${normalizedStartTime || 'N/A'} - ${normalizedEndTime || 'N/A'}</span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Amount:</span>
-                    <span class="detail-value total">Rs. ${(totalPrice || 0).toLocaleString()}</span>
+                    <span class="detail-value total">Rs. ${numericPrice.toLocaleString()}</span>
                   </div>
                   <div class="detail-row">
                     <span class="detail-label">Status:</span>
