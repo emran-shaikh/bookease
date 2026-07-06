@@ -171,6 +171,7 @@ const handler = async (req: Request): Promise<Response> => {
       .eq("user_id", user.id);
 
     const isAdmin = (actorRoles || []).some((row: any) => row.role === "admin");
+    const isCourtOwnerRole = (actorRoles || []).some((row: any) => row.role === "court_owner");
 
     const { data: booking, error: bookingError } = await supabaseAdmin
       .from("bookings")
@@ -188,7 +189,7 @@ const handler = async (req: Request): Promise<Response> => {
     const bookingOwnerId = (booking as any)?.courts?.owner_id as string | undefined;
     const canSend = requiresBookingVerification
       ? (isAdmin || booking?.user_id === user.id || (bookingOwnerId && bookingOwnerId === user.id))
-      : isAdmin;
+      : (isAdmin || isCourtOwnerRole);
 
     if (!canSend) {
       return new Response(

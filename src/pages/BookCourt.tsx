@@ -259,7 +259,6 @@ export default function BookCourt() {
         await supabase.functions.invoke('sync-sheet', {
           body: {
             action: 'sync_recent',
-            owner_id: court.owner_id,
             booking_id: createdBooking?.id,
           },
         });

@@ -1506,8 +1506,26 @@ Deno.serve(async (req) => {
         ? await resolveOwnerIdForBooking(supabaseAdmin, bookingId)
         : ownerId || user?.id;
 
-      if (!isInternalCall && user && resolvedOwnerId !== user.id && !isAdmin) {
-        throw new Error("Forbidden: cannot sync another owner's data");
+      if (!isInternalCall && user && !isAdmin) {
+        if (bookingId) {
+          const { data: bookingForAuth, error: bookingForAuthError } = await supabaseAdmin
+            .from("bookings")
+            .select("user_id, courts(owner_id)")
+            .eq("id", bookingId)
+            .maybeSingle();
+
+          if (bookingForAuthError || !bookingForAuth) {
+            throw new Error("Booking not found");
+          }
+
+          const bookingOwnerId = (bookingForAuth as any)?.courts?.owner_id as string | undefined;
+          const canTrigger = bookingForAuth.user_id === user.id || bookingOwnerId === user.id;
+          if (!canTrigger) {
+            throw new Error("Forbidden: cannot sync another owner's data");
+          }
+        } else if (resolvedOwnerId !== user.id) {
+          throw new Error("Forbidden: cannot sync another owner's data");
+        }
       }
 
       if (!resolvedOwnerId) throw new Error("owner_id or booking_id is required for sync_recent");
