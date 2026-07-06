@@ -173,11 +173,13 @@ const handler = async (req: Request): Promise<Response> => {
     const isAdmin = (actorRoles || []).some((row: any) => row.role === "admin");
     const isCourtOwnerRole = (actorRoles || []).some((row: any) => row.role === "court_owner");
 
-    const { data: booking, error: bookingError } = await supabaseAdmin
-      .from("bookings")
-      .select("id, user_id, court_id, booking_date, start_time, end_time, total_price, courts(id, name, owner_id)")
-      .eq("id", bookingId)
-      .maybeSingle();
+    const { data: booking, error: bookingError } = requiresBookingVerification
+      ? await supabaseAdmin
+          .from("bookings")
+          .select("id, user_id, court_id, booking_date, start_time, end_time, total_price, courts(id, name, owner_id)")
+          .eq("id", bookingId)
+          .maybeSingle()
+      : { data: null, error: null };
 
     if (requiresBookingVerification && (bookingError || !booking)) {
       return new Response(
