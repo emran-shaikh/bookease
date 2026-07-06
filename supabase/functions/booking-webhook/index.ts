@@ -28,15 +28,7 @@ serve(async (req) => {
       booking_id,
       court_id,
       user_id,
-      booking_date,
-      start_time,
-      end_time,
-      total_price,
-      status,
       previous_status,
-      payment_status,
-      payment_screenshot,
-      notes,
     } = payload;
 
     if (!booking_id || !/^[0-9a-fA-F-]{36}$/.test(String(booking_id))) {
