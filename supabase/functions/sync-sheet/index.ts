@@ -1054,6 +1054,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
           if (incomingStatus === "confirmed" && parsed.customer_email) {
             try {
               await sendSheetBookingConfirmationEmail({
+                bookingId: newBooking.id,
                 customerEmail: parsed.customer_email,
                 customerName: parsed.customer_name,
                 courtName: parsed.court_name,
@@ -1179,6 +1180,7 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
         if (incomingStatus === "confirmed" && parsed.customer_email) {
           try {
             await sendSheetBookingConfirmationEmail({
+              bookingId: booking.id,
               customerEmail: parsed.customer_email,
               customerName: parsed.customer_name,
               courtName: parsed.court_name,
