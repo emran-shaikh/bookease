@@ -484,6 +484,7 @@ async function writeSheetFeedback(
 }
 
 async function sendSheetBookingConfirmationEmail(payload: {
+  bookingId: string;
   customerEmail: string;
   customerName: string;
   courtName: string;
@@ -502,6 +503,7 @@ async function sendSheetBookingConfirmationEmail(payload: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
     },
     body: JSON.stringify({
+      bookingId: payload.bookingId,
       userEmail: payload.customerEmail,
       userName: payload.customerName || "Customer",
       courtName: payload.courtName,
