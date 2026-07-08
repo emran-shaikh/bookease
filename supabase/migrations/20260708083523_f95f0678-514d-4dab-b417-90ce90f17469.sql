@@ -1,0 +1,2 @@
+GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.close_expired_match_posts() TO anon, authenticated, service_role;
