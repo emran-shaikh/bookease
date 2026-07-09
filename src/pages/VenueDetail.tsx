@@ -31,6 +31,8 @@ interface VenueData {
   owner_id: string;
   status: string;
   is_active: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface Court {
