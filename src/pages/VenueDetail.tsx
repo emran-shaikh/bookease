@@ -147,6 +147,13 @@ export default function VenueDetail() {
 
   const allImages = venue.images || [];
 
+  const venueDirectionsQuery = [venue.address, venue.city, venue.state, venue.zip_code]
+    .filter(Boolean)
+    .join(', ');
+  const venueDirectionsUrl = venue.latitude != null && venue.longitude != null
+    ? `https://www.google.com/maps/dir/?api=1&destination=${venue.latitude},${venue.longitude}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(venueDirectionsQuery)}`;
+
   return (
     <div className="min-h-screen bg-background">
       <SEO 
@@ -213,6 +220,12 @@ export default function VenueDetail() {
                 <MapPin className="h-4 w-4 mr-1" />
                 <span>{venue.address}, {venue.city}, {venue.state} {venue.zip_code}</span>
               </div>
+              <Button asChild variant="outline" size="sm" className="mb-4 w-full sm:w-auto">
+                <a href={venueDirectionsUrl} target="_blank" rel="noopener noreferrer">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Get Directions
+                </a>
+              </Button>
               {venue.description && (
                 <p className="text-muted-foreground">{venue.description}</p>
               )}
