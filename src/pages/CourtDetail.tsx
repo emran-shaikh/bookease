@@ -816,6 +816,17 @@ export default function CourtDetail() {
   ].filter(Boolean);
   const venueImages = (venue?.images || []).filter(Boolean);
   const displayImages = [...new Set(courtImages.length > 0 ? courtImages : venueImages)];
+  const courtDirectionsQuery = [
+    resolvedData?.address || court.address,
+    resolvedData?.city || court.city,
+    resolvedData?.state || court.state,
+    resolvedData?.zip_code || court.zip_code,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const courtDirectionsUrl = resolvedData?.latitude != null && resolvedData?.longitude != null
+    ? `https://www.google.com/maps/dir/?api=1&destination=${resolvedData.latitude},${resolvedData.longitude}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(courtDirectionsQuery)}`;
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -937,6 +948,13 @@ export default function CourtDetail() {
                 </div>
               )}
             </div>
+
+            <Button asChild variant="outline" size="sm" className="mb-4 sm:mb-6 w-full sm:w-auto">
+              <a href={courtDirectionsUrl} target="_blank" rel="noopener noreferrer">
+                <MapPin className="h-4 w-4 mr-2" />
+                Get Directions
+              </a>
+            </Button>
 
             <p className="mb-4 sm:mb-6 text-sm sm:text-base text-muted-foreground">{court.description}</p>
 
