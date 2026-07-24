@@ -75,11 +75,6 @@ export default function MatchFinder() {
     try {
       setLoading(true);
 
-      const { error: closeExpiredError } = await supabase.rpc('close_expired_match_posts');
-      if (closeExpiredError) {
-        console.warn('Unable to close expired match posts before fetch:', closeExpiredError.message);
-      }
-
       const postsQuery = supabase
         .from('match_posts')
         .select(`
@@ -113,7 +108,11 @@ export default function MatchFinder() {
       if (participantsResponse?.error) throw participantsResponse.error;
       if (profileResponse?.error) throw profileResponse.error;
 
-      const nextPosts = postsResponse.data || [];
+      const now = new Date();
+      const nextPosts = (postsResponse.data || []).filter((post: any) => {
+        const start = new Date(`${post.match_date}T${post.start_time}`);
+        return !Number.isNaN(start.getTime()) && start > now;
+      });
       setPosts(nextPosts);
       setJoinedPostIds(new Set((participantsResponse?.data || []).map((row: any) => row.post_id)));
       setCurrentUserPhone(profileResponse?.data?.phone?.trim() ? profileResponse.data.phone.trim() : null);
@@ -127,7 +126,7 @@ export default function MatchFinder() {
           const [{ data: participants, error: participantsError }, { data: guestRequests, error: guestRequestsError }] = await Promise.all([
             supabase
               .from('match_participants')
-              .select('id, post_id, status, joined_at, participant_profile:profiles!match_participants_user_id_fkey(full_name, email, phone)')
+              .select('id, post_id, status, joined_at, participant_profile:owner_customer_contacts!match_participants_user_id_fkey(full_name, email)')
               .in('post_id', hostedPostIds)
               .order('joined_at', { ascending: true }),
             supabase
@@ -141,7 +140,7 @@ export default function MatchFinder() {
                 created_at,
                 status,
                 decided_at,
-                contact_profile:profiles!match_guest_contacts_contact_user_id_fkey(full_name, email, phone)
+                contact_profile:owner_customer_contacts!match_guest_contacts_contact_user_id_fkey(full_name, email)
               `)
               .in('post_id', hostedPostIds)
               .order('created_at', { ascending: false }),

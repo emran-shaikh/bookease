@@ -108,7 +108,7 @@ export default function Dashboard() {
         const [participantsData, guestRequestsData] = await Promise.all([
           supabase
             .from('match_participants')
-            .select('id, post_id, user_id, status, joined_at, participant_profile:profiles!match_participants_user_id_fkey(full_name, email, phone)')
+            .select('id, post_id, user_id, status, joined_at, participant_profile:owner_customer_contacts!match_participants_user_id_fkey(full_name, email)')
             .in('post_id', postIds)
             .order('joined_at', { ascending: true }),
           supabase
@@ -123,7 +123,7 @@ export default function Dashboard() {
               status,
               decided_at,
               contact_user_id,
-              contact_profile:profiles!match_guest_contacts_contact_user_id_fkey(full_name, email, phone)
+              contact_profile:owner_customer_contacts!match_guest_contacts_contact_user_id_fkey(full_name, email)
             `)
             .in('post_id', postIds)
             .order('created_at', { ascending: false }),
