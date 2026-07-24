@@ -134,11 +134,6 @@ export default function Index() {
 
   const fetchData = async () => {
     try {
-      const { error: closeExpiredError } = await supabase.rpc('close_expired_match_posts');
-      if (closeExpiredError) {
-        console.warn('Unable to close expired match posts on homepage:', closeExpiredError.message);
-      }
-
       const [venuesResponse, courtsResponse, matchesResponse] = await Promise.all([
         supabase
           .from('venues')
