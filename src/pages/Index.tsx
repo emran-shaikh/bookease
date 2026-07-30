@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useAuth } from '@/lib/auth';
@@ -105,6 +105,7 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
   const [openMatches, setOpenMatches] = useState<OpenMatchPost[]>([]);
+  const [openMatchQuickFilter, setOpenMatchQuickFilter] = useState<'all' | 'tonight' | 'next2h'>('tonight');
   const [guestContactByPost, setGuestContactByPost] = useState<Record<string, { name: string; phone: string }>>({});
   const [contactLoadingPostId, setContactLoadingPostId] = useState<string | null>(null);
 
@@ -445,6 +446,27 @@ export default function Index() {
       setContactLoadingPostId(null);
     }
   };
+
+  const highlightedOpenMatches = useMemo(() => {
+    const now = new Date();
+    const today = format(now, 'yyyy-MM-dd');
+
+    return openMatches.filter((post) => {
+      const start = new Date(`${post.match_date}T${post.start_time}`);
+      if (Number.isNaN(start.getTime()) || start <= now) return false;
+
+      if (openMatchQuickFilter === 'tonight') {
+        return post.match_date === today;
+      }
+
+      if (openMatchQuickFilter === 'next2h') {
+        const diffMins = Math.floor((start.getTime() - now.getTime()) / 60000);
+        return diffMins >= 0 && diffMins <= 120;
+      }
+
+      return true;
+    });
+  }, [openMatches, openMatchQuickFilter]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background">
@@ -931,23 +953,54 @@ export default function Index() {
                 <Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               </div>
               <div>
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Join Open Matches</h2>
-                <p className="text-xs sm:text-sm text-muted-foreground">Guests can join by sharing a contact number.</p>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground">Tonight to Play</h2>
+                <p className="text-xs sm:text-sm text-muted-foreground">Live open matches with instant visibility and quick join contact flow.</p>
               </div>
             </div>
 
-            {openMatches.length === 0 ? (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <Button
+                variant={openMatchQuickFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setOpenMatchQuickFilter('all')}
+              >
+                All upcoming
+              </Button>
+              <Button
+                variant={openMatchQuickFilter === 'tonight' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setOpenMatchQuickFilter('tonight')}
+              >
+                Tonight
+              </Button>
+              <Button
+                variant={openMatchQuickFilter === 'next2h' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setOpenMatchQuickFilter('next2h')}
+              >
+                Next 2 hours
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/matches')}>
+                Open full Match Finder
+              </Button>
+            </div>
+
+            {highlightedOpenMatches.length === 0 ? (
               <Card>
                 <CardContent className="py-8 text-center space-y-3">
-                  <p className="text-sm text-muted-foreground">No open matches at the moment.</p>
+                  <p className="text-sm text-muted-foreground">No open matches in this time window.</p>
                   <Button variant="outline" onClick={() => navigate('/matches')}>Open Match Finder</Button>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {openMatches.map((post) => {
+                {highlightedOpenMatches.map((post) => {
                 const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
                 const guestInput = guestContactByPost[post.id] || { name: '', phone: '' };
+                const startAt = new Date(`${post.match_date}T${post.start_time}`);
+                const startsInMinutes = Math.floor((startAt.getTime() - Date.now()) / 60000);
+                const startsSoon = startsInMinutes >= 0 && startsInMinutes <= 120;
+                const fillingFast = seatsLeft > 0 && seatsLeft <= Math.max(1, Math.ceil(post.needed_players * 0.25));
 
                 return (
                   <Card key={post.id}>
@@ -963,6 +1016,11 @@ export default function Index() {
                         <p className="flex items-center gap-2"><Calendar className="h-4 w-4" />{format(new Date(post.match_date), 'MMM d, yyyy')}</p>
                         <p className="flex items-center gap-2"><Clock className="h-4 w-4" />{post.start_time.slice(0, 5)} - {post.end_time.slice(0, 5)}</p>
                         <p className="flex items-center gap-2"><Users className="h-4 w-4" />{post.joined_players}/{post.needed_players} joined ({seatsLeft} left)</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {startsSoon && <Badge variant="secondary">Starting soon</Badge>}
+                        {fillingFast && <Badge variant="outline">Filling fast</Badge>}
                       </div>
 
                       <div className="grid gap-2">
