@@ -30,6 +30,7 @@ export default function MatchFinder() {
   const [sportFilter, setSportFilter] = useState('all');
   const [skillFilter, setSkillFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
+  const [quickTimeFilter, setQuickTimeFilter] = useState<'all' | 'tonight' | 'next2h'>('all');
 
   useEffect(() => {
     fetchMatchData();
@@ -328,9 +329,15 @@ export default function MatchFinder() {
         (dateFilter === 'today' && post.match_date === today) ||
         (dateFilter === 'upcoming' && post.match_date >= today);
 
-      return matchesSearch && matchesCity && matchesSport && matchesSkill && matchesDate;
+      const startDiffMinutes = Math.floor((matchStart.getTime() - now.getTime()) / 60000);
+      const matchesQuickTime =
+        quickTimeFilter === 'all' ||
+        (quickTimeFilter === 'tonight' && post.match_date === today) ||
+        (quickTimeFilter === 'next2h' && startDiffMinutes >= 0 && startDiffMinutes <= 120);
+
+      return matchesSearch && matchesCity && matchesSport && matchesSkill && matchesDate && matchesQuickTime;
     });
-  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter]);
+  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter, quickTimeFilter]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -349,7 +356,35 @@ export default function MatchFinder() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Smart Filters</CardTitle>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <CardTitle className="text-base">Smart Filters</CardTitle>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickTimeFilter === 'all' ? 'default' : 'outline'}
+                  onClick={() => setQuickTimeFilter('all')}
+                >
+                  All
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickTimeFilter === 'tonight' ? 'default' : 'outline'}
+                  onClick={() => setQuickTimeFilter('tonight')}
+                >
+                  Tonight
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={quickTimeFilter === 'next2h' ? 'default' : 'outline'}
+                  onClick={() => setQuickTimeFilter('next2h')}
+                >
+                  Next 2 hours
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-5">
             <div className="md:col-span-2 space-y-1">
@@ -434,6 +469,10 @@ export default function MatchFinder() {
               const seatsLeft = Math.max(post.needed_players - post.joined_players, 0);
               const joined = joinedPostIds.has(post.id);
               const isHost = user?.id === post.host_user_id;
+              const matchStart = new Date(`${post.match_date}T${post.start_time}`);
+              const startsInMinutes = Math.floor((matchStart.getTime() - Date.now()) / 60000);
+              const startsSoon = startsInMinutes >= 0 && startsInMinutes <= 120;
+              const fillingFast = seatsLeft > 0 && seatsLeft <= Math.max(1, Math.ceil(post.needed_players * 0.25));
               const resolvedCity = post.city || post.courts?.city || post.venues?.city || '';
               const resolvedLocation = post.courts?.location || post.venues?.location || '';
               const locationLabel = [resolvedCity, resolvedLocation].filter(Boolean).join(', ') || 'Location not set';
@@ -463,6 +502,11 @@ export default function MatchFinder() {
                       <p className="flex items-center gap-2"><Calendar className="h-4 w-4" />{format(new Date(post.match_date), 'MMM d, yyyy')}</p>
                       <p className="flex items-center gap-2"><Clock className="h-4 w-4" />{post.start_time?.slice(0, 5)} - {post.end_time?.slice(0, 5)}</p>
                       <p className="flex items-center gap-2"><Users className="h-4 w-4" />{post.joined_players}/{post.needed_players} joined ({seatsLeft} left)</p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {startsSoon && <Badge variant="secondary">Starting soon</Badge>}
+                      {fillingFast && <Badge variant="outline">Filling fast</Badge>}
                     </div>
 
                     {post.skill_level && <Badge variant="outline">Skill: {post.skill_level}</Badge>}
