@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import { Calendar, Clock, Copy, MapPin, QrCode, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -108,7 +108,7 @@ export function MatchInviteDialog({
           </div>
 
           <div className="flex items-center justify-center rounded-md border bg-muted/30 p-3">
-            <QRCode value={inviteUrl} size={168} level="M" includeMargin />
+            <QRCodeSVG value={inviteUrl} size={168} level="M" includeMargin />
           </div>
 
           <div className="space-y-2">
