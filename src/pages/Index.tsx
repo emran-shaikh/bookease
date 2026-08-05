@@ -17,6 +17,7 @@ import { formatPrice } from '@/lib/currency';
 import { formatCourtCount, getUniqueSportTypes, getLowestPrice } from '@/lib/venue-utils';
 import { formatSportWithIcon } from '@/lib/sport-icons';
 import { SEO } from '@/components/SEO';
+import { MatchInviteDialog } from '@/components/MatchInviteDialog';
 import Footer from '@/components/Footer';
 import MapView from '@/components/MapView';
 import heroImage from '@/assets/hero-sports.jpg';
@@ -1024,6 +1025,17 @@ export default function Index() {
                       </div>
 
                       <div className="grid gap-2">
+                        <MatchInviteDialog
+                          matchId={post.id}
+                          courtName={post.courts?.name || 'Court'}
+                          venueName={post.venues?.name || 'Venue'}
+                          cityOrLocation={post.courts?.location || post.city || post.courts?.city || 'N/A'}
+                          matchDate={format(new Date(post.match_date), 'MMM d, yyyy')}
+                          startTime={post.start_time.slice(0, 5)}
+                          endTime={post.end_time.slice(0, 5)}
+                          sportType={post.sport_type}
+                          seatsLeft={seatsLeft}
+                        />
                         <Input
                           placeholder="Your name (optional)"
                           value={guestInput.name}
