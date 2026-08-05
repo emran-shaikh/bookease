@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { RoleBasedRedirect } from '@/components/RoleBasedRedirect';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ const passwordSchema = z.string().min(6, 'Password must be at least 6 characters
 const nameSchema = z.string().trim().min(2, 'Name must be at least 2 characters').max(100);
 
 export default function Auth() {
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isResetLoading, setIsResetLoading] = useState(false);
@@ -29,6 +31,15 @@ export default function Auth() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const { signIn, signUp, resetPassword, signInWithGoogle, user } = useAuth();
   const { toast } = useToast();
+  const returnPath = useMemo(() => {
+    const rawReturn = searchParams.get('return');
+    if (!rawReturn || !rawReturn.startsWith('/')) return null;
+    return rawReturn;
+  }, [searchParams]);
+
+  if (user && returnPath) {
+    return <Navigate to={returnPath} replace />;
+  }
 
   if (user) {
     return <RoleBasedRedirect />;
@@ -186,7 +197,7 @@ export default function Auth() {
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
-    const { error } = await signInWithGoogle();
+    const { error } = await signInWithGoogle(returnPath ?? undefined);
     setIsGoogleLoading(false);
 
     if (error) {
