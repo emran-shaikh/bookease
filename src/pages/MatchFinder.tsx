@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { MatchInviteDialog } from '@/components/MatchInviteDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Loader2, Users, MapPin, Calendar, Clock, Search } from 'lucide-react';
@@ -31,6 +32,7 @@ export default function MatchFinder() {
   const [skillFilter, setSkillFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [quickTimeFilter, setQuickTimeFilter] = useState<'all' | 'tonight' | 'next2h'>('all');
+  const invitePostId = useMemo(() => new URLSearchParams(window.location.search).get('invite'), []);
 
   useEffect(() => {
     fetchMatchData();
@@ -311,6 +313,10 @@ export default function MatchFinder() {
         return false;
       }
 
+      if (invitePostId && post.id === invitePostId) {
+        return true;
+      }
+
       const q = search.trim().toLowerCase();
       const matchesSearch =
         q.length === 0 ||
@@ -337,7 +343,7 @@ export default function MatchFinder() {
 
       return matchesSearch && matchesCity && matchesSport && matchesSkill && matchesDate && matchesQuickTime;
     });
-  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter, quickTimeFilter]);
+  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter, quickTimeFilter, invitePostId]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -507,10 +513,23 @@ export default function MatchFinder() {
                     <div className="flex flex-wrap gap-2">
                       {startsSoon && <Badge variant="secondary">Starting soon</Badge>}
                       {fillingFast && <Badge variant="outline">Filling fast</Badge>}
+                      {invitePostId === post.id && <Badge>Invited match</Badge>}
                     </div>
 
                     {post.skill_level && <Badge variant="outline">Skill: {post.skill_level}</Badge>}
                     {post.notes && <p className="text-xs text-muted-foreground">{post.notes}</p>}
+
+                    <MatchInviteDialog
+                      matchId={post.id}
+                      courtName={post.courts?.name || 'Court'}
+                      venueName={post.venues?.name || 'Venue'}
+                      cityOrLocation={locationLabel}
+                      matchDate={format(new Date(post.match_date), 'MMM d, yyyy')}
+                      startTime={post.start_time?.slice(0, 5)}
+                      endTime={post.end_time?.slice(0, 5)}
+                      sportType={post.sport_type}
+                      seatsLeft={seatsLeft}
+                    />
 
                     {isHost ? (
                       <div className="space-y-2 rounded-md border p-3">
