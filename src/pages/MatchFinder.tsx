@@ -224,9 +224,13 @@ export default function MatchFinder() {
 
   async function handleJoin(postId: string) {
     if (!user?.id) {
+      const returnPath = activeInvitePostId ? `/matches?invite=${activeInvitePostId}` : '/matches';
       toast.error('Sign in required', {
         description: 'Please sign in to join matches.',
       });
+      if (activeInvitePostId === postId) {
+        navigate(`/auth?return=${encodeURIComponent(returnPath)}`);
+      }
       return;
     }
 
