@@ -1,9 +1,16 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const returnPath = useMemo(() => {
+    const rawReturn = searchParams.get('return');
+    if (!rawReturn || !rawReturn.startsWith('/')) return '/';
+    return rawReturn;
+  }, [searchParams]);
 
   useEffect(() => {
     const handleAuthCallback = async () => {
@@ -18,20 +25,20 @@ const AuthCallback = () => {
         }
 
         if (session) {
-          // Successfully authenticated, redirect to home
-          navigate('/', { replace: true });
+          // Successfully authenticated, redirect to intended destination
+          navigate(returnPath, { replace: true });
         } else {
           // No session, redirect to auth page
-          navigate('/auth', { replace: true });
+          navigate(`/auth?return=${encodeURIComponent(returnPath)}`, { replace: true });
         }
       } catch (err) {
         console.error('Auth callback exception:', err);
-        navigate('/auth?error=callback_failed');
+        navigate(`/auth?error=callback_failed&return=${encodeURIComponent(returnPath)}`);
       }
     };
 
     handleAuthCallback();
-  }, [navigate]);
+  }, [navigate, returnPath]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
