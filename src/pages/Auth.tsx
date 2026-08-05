@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { RoleBasedRedirect } from '@/components/RoleBasedRedirect';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,10 @@ export default function Auth() {
     if (!rawReturn || !rawReturn.startsWith('/')) return null;
     return rawReturn;
   }, [searchParams]);
+
+  if (user && returnPath) {
+    return <Navigate to={returnPath} replace />;
+  }
 
   if (user) {
     return <RoleBasedRedirect />;
