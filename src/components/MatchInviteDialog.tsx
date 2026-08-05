@@ -40,7 +40,7 @@ export function MatchInviteDialog({
   const [open, setOpen] = useState(false);
 
   const inviteUrl = useMemo(() => {
-    const params = new URLSearchParams({ invite: matchId });
+    const params = new URLSearchParams({ invite: matchId, inviteCode: matchId });
     return `${window.location.origin}/matches?${params.toString()}`;
   }, [matchId]);
 
