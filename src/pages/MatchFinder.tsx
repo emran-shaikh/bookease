@@ -313,6 +313,10 @@ export default function MatchFinder() {
         return false;
       }
 
+      if (invitePostId && post.id === invitePostId) {
+        return true;
+      }
+
       const q = search.trim().toLowerCase();
       const matchesSearch =
         q.length === 0 ||
@@ -339,7 +343,7 @@ export default function MatchFinder() {
 
       return matchesSearch && matchesCity && matchesSport && matchesSkill && matchesDate && matchesQuickTime;
     });
-  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter, quickTimeFilter]);
+  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter, quickTimeFilter, invitePostId]);
 
   return (
     <div className="min-h-screen bg-background">
