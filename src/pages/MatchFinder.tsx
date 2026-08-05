@@ -231,10 +231,11 @@ export default function MatchFinder() {
     }
 
     if (!currentUserPhone) {
+      const returnPath = activeInvitePostId ? `/matches?invite=${activeInvitePostId}` : '/matches';
       toast.error('Phone number required', {
         description: 'Please update your phone number in your account before joining a match.',
       });
-      navigate('/complete-profile?return=/matches');
+      navigate(`/complete-profile?return=${encodeURIComponent(returnPath)}`);
       return;
     }
 
