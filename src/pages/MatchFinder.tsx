@@ -68,11 +68,14 @@ export default function MatchFinder() {
   useEffect(() => {
     if (!activeInvitePostId) return;
 
-    const targetElement = document.getElementById(`match-card-${activeInvitePostId}`);
-    if (!targetElement) return;
+    const frame = window.requestAnimationFrame(() => {
+      const targetElement = document.getElementById(`match-card-${activeInvitePostId}`);
+      if (!targetElement) return;
+      targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
 
-    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [activeInvitePostId, filteredPosts]);
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeInvitePostId, posts, loading]);
 
   useEffect(() => {
     if (!user?.id) return;
