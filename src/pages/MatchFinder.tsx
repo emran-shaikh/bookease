@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { SEO } from '@/components/SEO';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 export default function MatchFinder() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [posts, setPosts] = useState<any[]>([]);
@@ -32,11 +33,46 @@ export default function MatchFinder() {
   const [skillFilter, setSkillFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [quickTimeFilter, setQuickTimeFilter] = useState<'all' | 'tonight' | 'next2h'>('all');
-  const invitePostId = useMemo(() => new URLSearchParams(window.location.search).get('invite'), []);
+  const [activeInvitePostId, setActiveInvitePostId] = useState<string | null>(null);
+
+  const invitePostId = useMemo(() => {
+    const invite = searchParams.get('invite');
+    const inviteCode = searchParams.get('inviteCode');
+    return invite || inviteCode;
+  }, [searchParams]);
 
   useEffect(() => {
     fetchMatchData();
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!invitePostId) {
+      setActiveInvitePostId(null);
+      return;
+    }
+
+    const found = posts.some((post) => post.id === invitePostId);
+    if (found) {
+      setActiveInvitePostId(invitePostId);
+      return;
+    }
+
+    if (!loading) {
+      toast.error('Invite not available', {
+        description: 'This match invite is expired or no longer open.',
+      });
+      setActiveInvitePostId(null);
+    }
+  }, [invitePostId, posts, loading]);
+
+  useEffect(() => {
+    if (!activeInvitePostId) return;
+
+    const targetElement = document.getElementById(`match-card-${activeInvitePostId}`);
+    if (!targetElement) return;
+
+    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [activeInvitePostId, filteredPosts]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -313,7 +349,7 @@ export default function MatchFinder() {
         return false;
       }
 
-      if (invitePostId && post.id === invitePostId) {
+      if (activeInvitePostId && post.id === activeInvitePostId) {
         return true;
       }
 
@@ -343,7 +379,7 @@ export default function MatchFinder() {
 
       return matchesSearch && matchesCity && matchesSport && matchesSkill && matchesDate && matchesQuickTime;
     });
-  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter, quickTimeFilter, invitePostId]);
+  }, [posts, search, cityFilter, sportFilter, skillFilter, dateFilter, quickTimeFilter, activeInvitePostId]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -358,6 +394,9 @@ export default function MatchFinder() {
         <div className="space-y-2">
           <h1 className="text-2xl md:text-3xl font-bold">Match Finder</h1>
           <p className="text-sm text-muted-foreground">Public open matches with instant join confirmation.</p>
+          {activeInvitePostId && (
+            <Badge className="w-fit">Invite opened — target match highlighted below</Badge>
+          )}
         </div>
 
         <Card>
@@ -490,7 +529,11 @@ export default function MatchFinder() {
               const visibleRequests = isExpanded ? hostRequests : pendingRequests.slice(0, 2);
 
               return (
-                <Card key={post.id}>
+                <Card
+                  key={post.id}
+                  id={`match-card-${post.id}`}
+                  className={activeInvitePostId === post.id ? 'ring-2 ring-primary border-primary' : ''}
+                >
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -513,7 +556,7 @@ export default function MatchFinder() {
                     <div className="flex flex-wrap gap-2">
                       {startsSoon && <Badge variant="secondary">Starting soon</Badge>}
                       {fillingFast && <Badge variant="outline">Filling fast</Badge>}
-                      {invitePostId === post.id && <Badge>Invited match</Badge>}
+                      {activeInvitePostId === post.id && <Badge>Invited match</Badge>}
                     </div>
 
                     {post.skill_level && <Badge variant="outline">Skill: {post.skill_level}</Badge>}
@@ -647,6 +690,15 @@ export default function MatchFinder() {
                       </Button>
                     ) : (
                       <div className="space-y-2">
+                        {activeInvitePostId === post.id && !user?.id && (
+                          <Button
+                            variant="default"
+                            className="w-full"
+                            onClick={() => navigate(`/auth?return=/matches?invite=${post.id}`)}
+                          >
+                            Sign in to join this invite
+                          </Button>
+                        )}
                         {user?.id && (
                           <p className="text-[11px] text-muted-foreground">
                             Contact: {currentUserPhone || 'Add phone number in account to join'}
