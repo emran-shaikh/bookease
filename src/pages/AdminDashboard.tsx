@@ -85,7 +85,7 @@ export default function AdminDashboard() {
         supabase.from('venues').select('*').eq('status', 'pending'),
         supabase.from('venues').select('*'),
         supabase.from('profiles').select('*, user_roles(role)'),
-        supabase.from('bookings').select('*, courts(name, owner_id), profiles(full_name, email)'),
+        supabase.from('bookings').select('*, courts(name, owner_id, venues(name)), profiles(full_name, email)'),
         supabase
           .from('match_guest_contacts')
           .select(`
@@ -830,7 +830,7 @@ export default function AdminDashboard() {
                     {sortedBookings.map((booking) => (
                         <TableRow key={booking.id}>
                           <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
-                          <TableCell className="font-medium">{booking.courts?.name || 'N/A'}</TableCell>
+                          <TableCell><div className="font-medium">{booking.courts?.name || 'N/A'}</div>{booking.courts?.venues?.name && <div className="text-xs text-muted-foreground">{booking.courts.venues.name}</div>}</TableCell>
                           <TableCell>
                             <div>
                               <div className="font-medium">{booking.profiles?.full_name || 'N/A'}</div>
@@ -1260,7 +1260,7 @@ export default function AdminDashboard() {
                       <TableRow key={booking.id}>
                         <TableCell>{format(new Date(booking.booking_date), 'MMM d, yyyy')}</TableCell>
                         <TableCell>{booking.profiles?.full_name || booking.profiles?.email}</TableCell>
-                        <TableCell>{booking.courts?.name}</TableCell>
+                        <TableCell><div>{booking.courts?.name}</div>{booking.courts?.venues?.name && <div className="text-xs text-muted-foreground">{booking.courts.venues.name}</div>}</TableCell>
                         <TableCell>{formatPrice(booking.total_price)}</TableCell>
                         <TableCell>
                           <Badge variant={booking.payment_status === 'succeeded' ? 'default' : booking.payment_status === 'failed' ? 'destructive' : 'secondary'}>
