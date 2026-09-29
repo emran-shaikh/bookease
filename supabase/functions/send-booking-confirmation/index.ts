@@ -258,16 +258,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Determine email subject and content based on booking type
     const isManual = isManualBooking === true;
-    const emailSubject = isManual 
-      ? "Court Slot Reserved for You! 🎾"
-      : "Booking Confirmed! 🎉";
+    const isReserved = isManual || isPendingPayment === true;
+    const emailSubject = isReserved
+      ? "Slot Reserved – Complete Payment to Confirm ⏳"
+      : "Payment Received – Your Booking is Confirmed! 🎉";
 
     // Send email using Resend
     const emailResponse = await resend.emails.send({
       from: "BookedHours <support@bookedhours.com>",
         to: [normalizedUserEmail],
       subject: emailSubject,
-      html: isManual ? `
+      html: isReserved ? `
         <!DOCTYPE html>
         <html>
           <head>
@@ -326,11 +327,11 @@ const handler = async (req: Request): Promise<Response> => {
           <body>
             <div class="header">
               <h1 style="margin: 0;">🎾 Slot Reserved!</h1>
-              <p style="margin: 10px 0 0 0;">A court slot has been reserved for you</p>
+              <p style="margin: 10px 0 0 0;">Complete your payment to lock in this slot</p>
             </div>
             <div class="content">
               <p>Hi ${normalizedUserName || 'Guest'},</p>
-              <p>A court slot has been reserved for you by the court owner. Here are the details:</p>
+              <p>Your court slot has been reserved. To make sure it is <strong>confirmed</strong> for you, please complete your payment as soon as possible. Here are the details:</p>
               
               <div class="booking-details">
                 <div class="detail-row">
@@ -345,17 +346,30 @@ const handler = async (req: Request): Promise<Response> => {
                   <span class="detail-label">Time:</span>
                    <span class="detail-value">${normalizedStartTime || 'N/A'} - ${normalizedEndTime || 'N/A'}</span>
                 </div>
+                <div class="detail-row">
+                  <span class="detail-label">Amount Due:</span>
+                   <span class="detail-value"><strong>Rs. ${numericPrice.toLocaleString()}</strong></span>
+                </div>
               </div>
+
+              <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:15px;border-radius:6px;margin:20px 0;">
+                <strong>⏳ Action needed: complete your payment</strong><br/>
+                Your slot is only held temporarily. Pay now and share your payment screenshot so the court owner can confirm your booking. Unpaid reservations may be released to other players.
+              </div>
+
+              <center>
+                <a href="https://bookedhours.com/dashboard" style="display:inline-block;background:#10b981;color:#ffffff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Complete Payment</a>
+              </center>
 
               <p><strong>Please Note:</strong></p>
               <ul>
-                <li>Please arrive 10 minutes before your reserved time</li>
+                <li>You'll receive a confirmation email as soon as your payment is verified</li>
                 <li>Contact the court owner if you have any questions</li>
               </ul>
 
               <div class="footer">
                 <p>Thank you for choosing BookedHours!</p>
-                <p>This is an automated notification from the court owner.</p>
+                <p>This is an automated notification. Please do not reply.</p>
               </div>
             </div>
           </body>
@@ -424,11 +438,11 @@ const handler = async (req: Request): Promise<Response> => {
           <body>
             <div class="header">
               <h1 style="margin: 0;">🎾 Booking Confirmed!</h1>
-              <p style="margin: 10px 0 0 0;">Your court reservation is all set</p>
+              <p style="margin: 10px 0 0 0;">Thank you for your payment</p>
             </div>
             <div class="content">
               <p>Hi ${normalizedUserName || 'Customer'},</p>
-              <p>Great news! Your booking has been confirmed. Here are the details:</p>
+              <p>Thank you for your payment! 🙏 We've received it and your slot is now <strong>confirmed</strong>. We appreciate you choosing BookedHours. Here are your booking details:</p>
               
               <div class="booking-details">
                 <div class="detail-row">
@@ -444,7 +458,7 @@ const handler = async (req: Request): Promise<Response> => {
                    <span class="detail-value">${normalizedStartTime || 'N/A'} - ${normalizedEndTime || 'N/A'}</span>
                 </div>
                 <div class="detail-row">
-                  <span class="detail-label">Total Amount:</span>
+                  <span class="detail-label">Amount Paid:</span>
                    <span class="detail-value total">Rs. ${numericPrice.toLocaleString()}</span>
                 </div>
               </div>
@@ -486,35 +500,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send notification email to court owner for pending or confirmed payments
     let ownerEmailId = null;
-    if (normalizedOwnerEmail && typeof isPendingPayment === "boolean") {
-      console.log("Sending notification to court owner:", normalizedOwnerEmail);
-
-      if (bookingOwnerId && user.id !== bookingOwnerId && !isAdmin) {
-        return new Response(
-          JSON.stringify({ success: false, error: "Only booking owner/admin can send owner notification" }),
-          { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-
-      const { data: verifiedOwnerProfile } = bookingOwnerId
-        ? await supabaseAdmin
-            .from("profiles")
-            .select("email")
-            .eq("id", bookingOwnerId)
-            .maybeSingle()
-        : { data: null };
-
-      if (sanitizeEmail(verifiedOwnerProfile?.email) !== normalizedOwnerEmail) {
-        return new Response(
-          JSON.stringify({ success: false, error: "ownerEmail mismatch" }),
-          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
-      }
-      
+    const { data: verifiedOwnerProfile } = bookingOwnerId
+      ? await supabaseAdmin.from("profiles").select("email").eq("id", bookingOwnerId).maybeSingle()
+      : { data: null };
+    const resolvedOwnerEmail = sanitizeEmail(verifiedOwnerProfile?.email);
+    if (resolvedOwnerEmail && EMAIL_REGEX.test(resolvedOwnerEmail) && typeof isPendingPayment === "boolean") {
+      console.log("Sending notification to court owner");
       const ownerEmailResponse = await resend.emails.send({
         from: "BookedHours <support@bookedhours.com>",
-        to: [normalizedOwnerEmail],
-        subject: isPendingPayment ? "🔔 New Booking - Payment Pending" : "✅ Booking Payment Confirmed",
+        to: [resolvedOwnerEmail],
+        subject: isPendingPayment ? "🔔 New Booking - Payment Pending" : "✅ Payment Received - Booking Confirmed",
         html: `
           <!DOCTYPE html>
           <html>
@@ -664,6 +659,40 @@ const handler = async (req: Request): Promise<Response> => {
       } else {
         console.log("Owner email sent successfully! ID:", ownerEmailResponse.data?.id);
         ownerEmailId = ownerEmailResponse.data?.id;
+      }
+    }
+
+    // Admins: only confirmed bookings
+    if (isPendingPayment === false && requiresBookingVerification) {
+      const { data: adminRoles } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin");
+      const adminIds = [...new Set((adminRoles || []).map((r: any) => r.user_id))];
+      if (adminIds.length > 0) {
+        const { data: adminProfiles } = await supabaseAdmin.from("profiles").select("email").in("id", adminIds);
+        const adminEmails = [...new Set((adminProfiles || [])
+          .map((p: any) => sanitizeEmail(p.email))
+          .filter((e: string) => e && EMAIL_REGEX.test(e) && e !== resolvedOwnerEmail))];
+        const { data: courtInfo } = await supabaseAdmin
+          .from("courts").select("name, venues(name)").eq("id", (booking as any).court_id).maybeSingle();
+        const venueName = (courtInfo as any)?.venues?.name;
+        const place = venueName ? `${venueName} – ${normalizedCourtName}` : normalizedCourtName;
+        for (const adminEmail of adminEmails) {
+          const r = await resend.emails.send({
+            from: "BookedHours <support@bookedhours.com>",
+            to: [adminEmail],
+            subject: `✅ Confirmed Booking – ${place}`,
+            html: `<!DOCTYPE html><html><body style="font-family: Arial, sans-serif; line-height:1.6; color:#333; max-width:600px; margin:0 auto; padding:20px;">
+              <h2 style="color:#059669;">✅ Booking Confirmed</h2>
+              <p>A booking has been paid and confirmed.</p>
+              <p><strong>Venue / Court:</strong> ${place}<br/>
+              <strong>Customer:</strong> ${normalizedUserName} (${normalizedUserEmail})<br/>
+              <strong>Date:</strong> ${normalizedDateFromPayload}<br/>
+              <strong>Time:</strong> ${normalizedStartTime} - ${normalizedEndTime}<br/>
+              <strong>Amount:</strong> Rs. ${numericPrice.toLocaleString()}</p>
+              <p><a href="https://bookedhours.com/admin">Open Admin Dashboard</a></p>
+            </body></html>`,
+          });
+          if (r.error) console.error("Admin email failed:", r.error);
+        }
       }
     }
 
