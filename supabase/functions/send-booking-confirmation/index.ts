@@ -67,13 +67,7 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceKey);
 
     // Internal (server-to-server) calls from other functions use the service key
-    let isServiceCall = token === serviceKey;
-    if (!isServiceCall) {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-        isServiceCall = payload?.role === "service_role" && payload?.ref === Deno.env.get("SUPABASE_URL")?.split("//")[1]?.split(".")[0] && false;
-      } catch { /* ignore */ }
-    }
+    const isServiceCall = !!serviceKey && token === serviceKey;
 
     let userId: string | null = null;
     if (!isServiceCall) {
