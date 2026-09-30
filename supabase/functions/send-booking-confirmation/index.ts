@@ -209,7 +209,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Determine email subject and content based on booking type
     const isManual = isManualBooking === true;
-    const isReserved = isManual || isPendingPayment === true;
+    const isReserved = isPendingPayment === true || (isManual && isPendingPayment !== false);
     const emailSubject = isReserved
       ? "Slot Reserved – Complete Payment to Confirm ⏳"
       : "Payment Received – Your Booking is Confirmed! 🎉";

@@ -511,7 +511,7 @@ async function sendSheetBookingConfirmationEmail(payload: {
       startTime: payload.startTime,
       endTime: payload.endTime,
       totalPrice: payload.totalPrice,
-      isManualBooking: true,
+      isPendingPayment: false,
     }),
   });
 
