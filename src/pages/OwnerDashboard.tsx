@@ -90,6 +90,23 @@ export default function OwnerDashboard() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fetchOwnerData(), 300);
+    };
+    const channel = supabase
+      .channel(`owner-bookings:${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, refresh)
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   async function fetchOwnerData() {
     try {
       const [courtsData, venuesData, bookingsData, blockedData, pricingData, matchPostsData, matchGuestContactsData] = await Promise.all([

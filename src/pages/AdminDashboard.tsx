@@ -77,6 +77,23 @@ export default function AdminDashboard() {
     }
   }, [user, isAdmin]);
 
+  useEffect(() => {
+    if (!user?.id || !isAdmin) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fetchAdminData(), 300);
+    };
+    const channel = supabase
+      .channel(`admin-bookings:${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, refresh)
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, isAdmin]);
+
   async function fetchAdminData() {
     try {
       const [courtsData, allCourtsData, venuesData, allVenuesData, usersData, bookingsData, matchGuestContactsData] = await Promise.all([

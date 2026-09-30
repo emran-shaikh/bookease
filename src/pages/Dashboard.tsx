@@ -68,6 +68,18 @@ export default function Dashboard() {
           fetchDashboardData();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bookings',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchDashboardData();
+        }
+      )
       .subscribe();
 
     return () => {
