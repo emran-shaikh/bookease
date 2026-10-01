@@ -8,6 +8,13 @@
       "when": 1790691479997,
       "tag": "0000_notify_new_booking",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790863333166,
+      "tag": "0001_realtime_blocked_slots",
+      "breakpoints": true
     }
   ]
 }

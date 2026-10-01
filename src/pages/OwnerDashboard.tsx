@@ -28,6 +28,7 @@ import { formatTimeSlot12h } from '@/lib/utils';
 import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
 import { formatCourtCount } from '@/lib/venue-utils';
 import { ProfileSettingsCard } from '@/components/ProfileSettingsCard';
+import { CourtCalendarMatrix } from '@/components/CourtCalendarMatrix';
 
 export default function OwnerDashboard() {
   const { user } = useAuth();
@@ -636,8 +637,12 @@ export default function OwnerDashboard() {
           </Card>
         </div>
 
-        <Tabs defaultValue="courts" className="space-y-4">
+        <Tabs defaultValue="calendar" className="space-y-4">
           <TabsList className="h-auto gap-1">
+            <TabsTrigger value="calendar" className="basis-[calc(50%-0.125rem)] gap-1 sm:basis-auto">
+              <Calendar className="h-3 w-3" />
+              Calendar
+            </TabsTrigger>
             <TabsTrigger value="venues" className="basis-[calc(50%-0.125rem)] gap-1 sm:basis-auto">
               <Home className="h-3 w-3" />
               Venues
@@ -665,6 +670,10 @@ export default function OwnerDashboard() {
             </TabsTrigger>
             <TabsTrigger value="profile" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Profile</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="calendar">
+            <CourtCalendarMatrix ownerId={user?.id} />
+          </TabsContent>
 
           {/* Venues Tab */}
           <TabsContent value="venues" className="space-y-4">

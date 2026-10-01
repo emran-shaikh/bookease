@@ -21,6 +21,7 @@ import { VenueEditForm } from '@/components/VenueEditForm';
 import { formatTimeSlot12h } from '@/lib/utils';
 import { DashboardFilters, FilterState } from '@/components/DashboardFilters';
 import { ProfileSettingsCard } from '@/components/ProfileSettingsCard';
+import { CourtCalendarMatrix } from '@/components/CourtCalendarMatrix';
 
 type SortOption = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc' | 'amount-desc' | 'amount-asc' | 'status';
 
@@ -529,8 +530,9 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <Tabs defaultValue="venues" className="space-y-4">
+        <Tabs defaultValue="calendar" className="space-y-4">
           <TabsList className="gap-1">
+            <TabsTrigger value="calendar" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Calendar</TabsTrigger>
             <TabsTrigger value="venues" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Pending Venues</TabsTrigger>
             <TabsTrigger value="courts" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Pending Courts</TabsTrigger>
             <TabsTrigger value="all-venues" className="basis-[calc(50%-0.125rem)] sm:basis-auto">All Venues</TabsTrigger>
@@ -541,6 +543,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="payments" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Payments</TabsTrigger>
             <TabsTrigger value="profile" className="basis-[calc(50%-0.125rem)] sm:basis-auto">Profile</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="calendar">
+            <CourtCalendarMatrix />
+          </TabsContent>
 
           <TabsContent value="venues">
             <Card>
