@@ -1177,7 +1177,8 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
 
         let syncStatus = replacedCount > 0 ? "UPDATED_REPLACED" : "UPDATED";
         let syncError = "";
-        if (incomingStatus === "confirmed" && parsed.customer_email) {
+        // Only email when the booking newly becomes confirmed (avoid re-sending on every sync)
+        if (incomingStatus === "confirmed" && booking.status !== "confirmed" && parsed.customer_email) {
           try {
             await sendSheetBookingConfirmationEmail({
               bookingId: booking.id,
