@@ -84,11 +84,14 @@ netlify deploy --prod --dir=dist
 ```
 
 #### Vercel
-```bash
-# Install Vercel CLI
-npm install -g vercel
+`vercel.json` is included (Vite preset, SPA rewrites so deep links like `/courts/x`, `/auth/callback`, `/matches?invite=...` work on refresh, asset caching).
 
-# Deploy
+1. Import the repo in Vercel (framework auto-detected as Vite).
+2. Add Environment Variables (Production + Preview): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID` (values above).
+3. Deploy. Then add your Vercel URL(s) (e.g. `https://your-app.vercel.app/**` and custom domain) to the backend auth redirect allow-list so email links and Google sign-in return to the Vercel site.
+
+```bash
+npm install -g vercel
 vercel --prod
 ```
 
