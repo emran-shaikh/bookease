@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Loader2, Users, MapPin, Calendar, Clock, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function MatchFinder() {
   const { user } = useAuth();
@@ -34,6 +35,9 @@ export default function MatchFinder() {
   const [dateFilter, setDateFilter] = useState('all');
   const [quickTimeFilter, setQuickTimeFilter] = useState<'all' | 'tonight' | 'next2h'>('all');
   const [activeInvitePostId, setActiveInvitePostId] = useState<string | null>(null);
+  const [guestJoinPostId, setGuestJoinPostId] = useState<string | null>(null);
+  const [guestForm, setGuestForm] = useState({ name: '', phone: '', note: '' });
+  const [guestSubmitting, setGuestSubmitting] = useState(false);
 
   const invitePostId = useMemo(() => {
     const invite = searchParams.get('invite');
@@ -758,6 +762,38 @@ export default function MatchFinder() {
           </div>
         )}
       </main>
+
+      <Dialog open={!!guestJoinPostId} onOpenChange={(open) => !open && setGuestJoinPostId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Join this match</DialogTitle>
+            <DialogDescription>
+              Share your name and number. Only the host, court owner and admin can see them.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="guest-name">Your name</Label>
+              <Input id="guest-name" value={guestForm.name} onChange={(e) => setGuestForm({ ...guestForm, name: e.target.value })} placeholder="Ali Khan" maxLength={100} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="guest-phone">Phone number</Label>
+              <Input id="guest-phone" type="tel" value={guestForm.phone} onChange={(e) => setGuestForm({ ...guestForm, phone: e.target.value })} placeholder="+92 300 1234567" maxLength={20} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="guest-note">Note (optional)</Label>
+              <Input id="guest-note" value={guestForm.note} onChange={(e) => setGuestForm({ ...guestForm, note: e.target.value })} placeholder="Skill level, bringing a friend…" maxLength={200} />
+            </div>
+            <Button className="w-full" onClick={submitGuestJoin} disabled={guestSubmitting}>
+              {guestSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Send join request
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => navigate(`/auth?return=${encodeURIComponent(`/matches?invite=${guestJoinPostId}`)}`)}>
+              Or sign in to join instantly
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
