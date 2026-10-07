@@ -54,20 +54,30 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Unauthorized" }),
-        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
-    }
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const internalSecret = req.headers.get("x-internal-secret") ?? "";
     const token = authHeader.replace("Bearer ", "").trim();
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     const supabaseAdmin = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceKey);
 
+    // Database trigger calls carry a shared secret stored in internal_config
+    let isTriggerCall = false;
+    if (internalSecret) {
+      const { data: cfg } = await supabaseAdmin
+        .from("internal_config").select("value").eq("key", "booking_email_secret").maybeSingle();
+      isTriggerCall = !!cfg?.value && cfg.value === internalSecret;
+    }
+
+    if (!isTriggerCall && !token) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     // Internal (server-to-server) calls from other functions use the service key
-    const isServiceCall = !!serviceKey && token === serviceKey;
+    const isServiceCall = isTriggerCall || (!!serviceKey && token === serviceKey);
 
     let userId: string | null = null;
     if (!isServiceCall) {
@@ -128,6 +138,20 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ success: false, error: "Booking not found" }),
         { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
+    }
+
+    // Send each email type only once per booking (trigger + app may both call)
+    if (booking && typeof isPendingPayment === "boolean") {
+      const kind = isPendingPayment ? "reserved" : "confirmed";
+      const { error: logErr } = await supabaseAdmin
+        .from("booking_email_log").insert({ booking_id: booking.id, kind });
+      if (logErr) {
+        console.log(`Skipping duplicate ${kind} email for booking ${booking.id}`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: "already_sent" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
     }
 
     const bookingOwnerId = (booking as any)?.courts?.owner_id as string | undefined;
