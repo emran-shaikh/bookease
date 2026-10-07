@@ -61,6 +61,24 @@ export type Database = {
           },
         ]
       }
+      booking_email_log: {
+        Row: {
+          booking_id: string
+          created_at: string
+          kind: string
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string
+          kind: string
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string
+          kind?: string
+        }
+        Relationships: []
+      }
       bookings: {
         Row: {
           booking_date: string
@@ -305,6 +323,21 @@ export type Database = {
           is_active?: boolean
           name?: string
           price_multiplier?: number
+        }
+        Relationships: []
+      }
+      internal_config: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
         }
         Relationships: []
       }
