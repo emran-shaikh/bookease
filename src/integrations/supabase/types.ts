@@ -1501,6 +1501,18 @@ export type Database = {
         Returns: string
       }
       get_court_booking_count: { Args: { court_uuid: string }; Returns: number }
+      get_hosted_match_participants: {
+        Args: { _post_ids: string[] }
+        Returns: {
+          email: string
+          full_name: string
+          id: string
+          joined_at: string
+          phone: string
+          post_id: string
+          status: Database["public"]["Enums"]["match_participant_status"]
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
