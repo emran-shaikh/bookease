@@ -140,6 +140,20 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Send each email type only once per booking (trigger + app may both call)
+    if (booking && typeof isPendingPayment === "boolean") {
+      const kind = isPendingPayment ? "reserved" : "confirmed";
+      const { error: logErr } = await supabaseAdmin
+        .from("booking_email_log").insert({ booking_id: booking.id, kind });
+      if (logErr) {
+        console.log(`Skipping duplicate ${kind} email for booking ${booking.id}`);
+        return new Response(
+          JSON.stringify({ success: true, skipped: "already_sent" }),
+          { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        );
+      }
+    }
+
     const bookingOwnerId = (booking as any)?.courts?.owner_id as string | undefined;
     const canSend = hasBookingId
       ? (isAdmin || booking?.user_id === userId || (bookingOwnerId && bookingOwnerId === userId))
