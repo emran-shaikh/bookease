@@ -167,10 +167,14 @@ export default function MatchFinder() {
         if (hostedPostIds.length > 0) {
           const [{ data: participants, error: participantsError }, { data: guestRequests, error: guestRequestsError }] = await Promise.all([
             supabase
-              .from('match_participants')
-              .select('id, post_id, status, joined_at, participant_profile:owner_customer_contacts!match_participants_user_id_fkey(full_name, email)')
-              .in('post_id', hostedPostIds)
-              .order('joined_at', { ascending: true }),
+              .rpc('get_hosted_match_participants', { _post_ids: hostedPostIds })
+              .then((res: any) => ({
+                ...res,
+                data: (res.data || []).map((row: any) => ({
+                  ...row,
+                  participant_profile: { full_name: row.full_name, phone: row.phone, email: row.email },
+                })),
+              })),
             supabase
               .from('match_guest_contacts')
               .select(`
@@ -222,15 +226,40 @@ export default function MatchFinder() {
     }
   }
 
+  async function submitGuestJoin() {
+    if (!guestJoinPostId) return;
+    if (guestForm.name.trim().length < 2) {
+      toast.error('Please enter your name');
+      return;
+    }
+    const digits = guestForm.phone.replace(/[^0-9]/g, '');
+    if (digits.length < 10 || digits.length > 15) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+    setGuestSubmitting(true);
+    const { error } = await supabase.rpc('request_guest_match_contact', {
+      _post_id: guestJoinPostId,
+      _guest_name: guestForm.name.trim(),
+      _guest_phone: guestForm.phone.trim(),
+      _guest_note: guestForm.note.trim() || null,
+      _contact_user_id: null,
+    } as any);
+    setGuestSubmitting(false);
+    if (error) {
+      toast.error('Could not send request', { description: error.message });
+      return;
+    }
+    toast.success('Request sent', {
+      description: 'The host has your name and number and will contact you.',
+    });
+    setGuestJoinPostId(null);
+    setGuestForm({ name: '', phone: '', note: '' });
+  }
+
   async function handleJoin(postId: string) {
     if (!user?.id) {
-      const returnPath = activeInvitePostId ? `/matches?invite=${activeInvitePostId}` : '/matches';
-      toast.error('Sign in required', {
-        description: 'Please sign in to join matches.',
-      });
-      if (activeInvitePostId === postId) {
-        navigate(`/auth?return=${encodeURIComponent(returnPath)}`);
-      }
+      setGuestJoinPostId(postId);
       return;
     }
 
