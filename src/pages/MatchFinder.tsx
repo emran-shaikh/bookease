@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { Loader2, Users, MapPin, Calendar, Clock, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function MatchFinder() {
   const { user } = useAuth();
@@ -34,6 +35,9 @@ export default function MatchFinder() {
   const [dateFilter, setDateFilter] = useState('all');
   const [quickTimeFilter, setQuickTimeFilter] = useState<'all' | 'tonight' | 'next2h'>('all');
   const [activeInvitePostId, setActiveInvitePostId] = useState<string | null>(null);
+  const [guestJoinPostId, setGuestJoinPostId] = useState<string | null>(null);
+  const [guestForm, setGuestForm] = useState({ name: '', phone: '', note: '' });
+  const [guestSubmitting, setGuestSubmitting] = useState(false);
 
   const invitePostId = useMemo(() => {
     const invite = searchParams.get('invite');
@@ -167,10 +171,14 @@ export default function MatchFinder() {
         if (hostedPostIds.length > 0) {
           const [{ data: participants, error: participantsError }, { data: guestRequests, error: guestRequestsError }] = await Promise.all([
             supabase
-              .from('match_participants')
-              .select('id, post_id, status, joined_at, participant_profile:owner_customer_contacts!match_participants_user_id_fkey(full_name, email)')
-              .in('post_id', hostedPostIds)
-              .order('joined_at', { ascending: true }),
+              .rpc('get_hosted_match_participants', { _post_ids: hostedPostIds })
+              .then((res: any) => ({
+                ...res,
+                data: (res.data || []).map((row: any) => ({
+                  ...row,
+                  participant_profile: { full_name: row.full_name, phone: row.phone, email: row.email },
+                })),
+              })),
             supabase
               .from('match_guest_contacts')
               .select(`
@@ -222,15 +230,40 @@ export default function MatchFinder() {
     }
   }
 
+  async function submitGuestJoin() {
+    if (!guestJoinPostId) return;
+    if (guestForm.name.trim().length < 2) {
+      toast.error('Please enter your name');
+      return;
+    }
+    const digits = guestForm.phone.replace(/[^0-9]/g, '');
+    if (digits.length < 10 || digits.length > 15) {
+      toast.error('Please enter a valid phone number');
+      return;
+    }
+    setGuestSubmitting(true);
+    const { error } = await supabase.rpc('request_guest_match_contact', {
+      _post_id: guestJoinPostId,
+      _guest_name: guestForm.name.trim(),
+      _guest_phone: guestForm.phone.trim(),
+      _guest_note: guestForm.note.trim() || null,
+      _contact_user_id: null,
+    } as any);
+    setGuestSubmitting(false);
+    if (error) {
+      toast.error('Could not send request', { description: error.message });
+      return;
+    }
+    toast.success('Request sent', {
+      description: 'The host has your name and number and will contact you.',
+    });
+    setGuestJoinPostId(null);
+    setGuestForm({ name: '', phone: '', note: '' });
+  }
+
   async function handleJoin(postId: string) {
     if (!user?.id) {
-      const returnPath = activeInvitePostId ? `/matches?invite=${activeInvitePostId}` : '/matches';
-      toast.error('Sign in required', {
-        description: 'Please sign in to join matches.',
-      });
-      if (activeInvitePostId === postId) {
-        navigate(`/auth?return=${encodeURIComponent(returnPath)}`);
-      }
+      setGuestJoinPostId(postId);
       return;
     }
 
@@ -729,6 +762,38 @@ export default function MatchFinder() {
           </div>
         )}
       </main>
+
+      <Dialog open={!!guestJoinPostId} onOpenChange={(open) => !open && setGuestJoinPostId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Join this match</DialogTitle>
+            <DialogDescription>
+              Share your name and number. Only the host, court owner and admin can see them.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="guest-name">Your name</Label>
+              <Input id="guest-name" value={guestForm.name} onChange={(e) => setGuestForm({ ...guestForm, name: e.target.value })} placeholder="Ali Khan" maxLength={100} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="guest-phone">Phone number</Label>
+              <Input id="guest-phone" type="tel" value={guestForm.phone} onChange={(e) => setGuestForm({ ...guestForm, phone: e.target.value })} placeholder="+92 300 1234567" maxLength={20} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="guest-note">Note (optional)</Label>
+              <Input id="guest-note" value={guestForm.note} onChange={(e) => setGuestForm({ ...guestForm, note: e.target.value })} placeholder="Skill level, bringing a friend…" maxLength={200} />
+            </div>
+            <Button className="w-full" onClick={submitGuestJoin} disabled={guestSubmitting}>
+              {guestSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Send join request
+            </Button>
+            <Button variant="ghost" className="w-full" onClick={() => navigate(`/auth?return=${encodeURIComponent(`/matches?invite=${guestJoinPostId}`)}`)}>
+              Or sign in to join instantly
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
