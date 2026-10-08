@@ -633,7 +633,18 @@ async function setIntegrationStatus(supabaseAdmin: any, integrationId: string, p
 }
 
 async function logSync(supabaseAdmin: any, payload: Record<string, unknown>) {
+  // Performance: don't store no-op automatic runs
+  const counts = ["records_created", "records_updated", "records_cancelled", "records_failed", "records_conflicted"]
+    .reduce((sum, k) => sum + Number(payload[k] || 0), 0);
+  if (counts === 0 && !payload.error_details && payload.run_type === "auto") return;
   await supabaseAdmin.from("sheet_sync_logs").insert(payload);
+  // Keep only 14 days of history
+  if (Math.random() < 0.05) {
+    await supabaseAdmin
+      .from("sheet_sync_logs")
+      .delete()
+      .lt("started_at", new Date(Date.now() - 14 * 86400000).toISOString());
+  }
 }
 
 async function loadLinks(supabaseAdmin: any, integrationId: string) {
@@ -897,6 +908,19 @@ async function syncFromSheet(supabaseAdmin: any, integration: SheetIntegration, 
       try {
         const parsed = parseSheetRow(rawRow, sheetIndex);
         const rowHash = await computeRowHash(rawRow.map((v) => String(v || "")));
+
+        // Performance: row unchanged since last sync → skip all database work
+        const unchangedLink = linksByKey.get(parsed.row_key);
+        if (
+          unchangedLink &&
+          !unchangedLink.is_deleted &&
+          unchangedLink.row_hash === rowHash &&
+          bookingById.has(unchangedLink.booking_id)
+        ) {
+          skipped += 1;
+          seenKeys.add(parsed.row_key);
+          continue;
+        }
 
         if (!parsed.court_name || !parsed.booking_date || !parsed.start_time || !parsed.end_time) {
           skipped += 1;

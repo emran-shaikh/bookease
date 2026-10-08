@@ -83,7 +83,7 @@ export default function AdminDashboard() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => fetchAdminData(), 300);
+      timer = setTimeout(() => fetchAdminData(), 1500);
     };
     const channel = supabase
       .channel(`admin-bookings:${user.id}`)
@@ -103,7 +103,7 @@ export default function AdminDashboard() {
         supabase.from('venues').select('*').eq('status', 'pending'),
         supabase.from('venues').select('*'),
         supabase.from('profiles').select('*, user_roles(role)'),
-        supabase.from('bookings').select('*, courts(name, owner_id, venues(name)), profiles(full_name, email)'),
+        supabase.from('bookings').select('*, courts(name, owner_id, venues(name)), profiles(full_name, email)').gte('booking_date', new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10)).order('booking_date', { ascending: false }).limit(1000),
         supabase
           .from('match_guest_contacts')
           .select(`

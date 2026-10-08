@@ -96,7 +96,7 @@ export default function OwnerDashboard() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const refresh = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => fetchOwnerData(), 300);
+      timer = setTimeout(() => fetchOwnerData(), 1500);
     };
     const channel = supabase
       .channel(`owner-bookings:${user.id}`)
@@ -116,7 +116,10 @@ export default function OwnerDashboard() {
         supabase.from('bookings').select(`
           *,
           courts!inner(owner_id, name)
-        `).eq('courts.owner_id', user?.id),
+        `).eq('courts.owner_id', user?.id)
+          .gte('booking_date', new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10))
+          .order('booking_date', { ascending: false })
+          .limit(1000),
         supabase.from('blocked_slots').select(`
           *,
           courts!inner(name)
