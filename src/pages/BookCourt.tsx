@@ -128,15 +128,28 @@ export default function BookCourt() {
         },
       });
 
-      if (response.error) throw response.error;
+      if (response.error || !response.data || response.data.error) throw response.error || new Error('Price service unavailable');
 
       setPriceCalculation(response.data);
     } catch (error: any) {
-      toast({
-        title: 'Error calculating price',
-        description: error.message,
-        variant: 'destructive',
-      });
+      console.warn('Price service unavailable, using local estimate:', error?.message);
+      try {
+        const [startTime, endTime] = timeSlot.split('-').map((t: string) => t.trim());
+        const sh = parseInt(startTime.split(':')[0], 10);
+        const eh = parseInt(endTime.split(':')[0], 10);
+        let hours = eh - sh;
+        if (hours <= 0) hours += 24;
+        const basePrice = Number(court.base_price) || 0;
+        setPriceCalculation({
+          basePrice,
+          hours,
+          totalPrice: (basePrice * hours).toFixed(2),
+          appliedRules: [],
+          priceMultiplier: 1,
+        } as any);
+      } catch {
+        setPriceCalculation(null);
+      }
     } finally {
       setCalculatingPrice(false);
     }
